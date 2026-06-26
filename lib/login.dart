@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'register.dart'; // Importamos tu pantalla de registro
+import 'home.dart'; // Importamos la pantalla de inicio
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
@@ -74,15 +75,13 @@ class _LoginScreenState extends State<LoginScreen> {
 
       if (mounted) Navigator.pop(context); // Cerramos el loader
 
-      // Aquí puedes redirigir al usuario a la pantalla principal de tu app cuando el login sea exitoso
-      /*
+      // Redirigir al usuario a la pantalla principal (home) cuando el login sea exitoso
       if (mounted) {
         Navigator.pushReplacement(
           context,
-          MaterialPageRoute(builder: (context) => const HomeScreen()), // Cambia HomeScreen por tu pantalla principal
+          MaterialPageRoute(builder: (context) => const HomeScreen()),
         );
       }
-      */
 
     } on FirebaseAuthException catch (e) {
       if (mounted) Navigator.pop(context); // Cerramos el loader

@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_core/firebase_core.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'firebase_options.dart';
 import 'login.dart';
+import 'home.dart';
 
 // Convertimos el main en 'async' porque iniciar Firebase toma un instante
 Future<void> main() async {
@@ -24,7 +26,26 @@ class VeridiaApp extends StatelessWidget {
         colorScheme: ColorScheme.fromSeed(seedColor: const Color(0xFF1E5631)),
         useMaterial3: true,
       ),
-      home: const WelcomeScreen(),
+      // StreamBuilder para verificar si el usuario está autenticado
+      home: StreamBuilder<User?>(
+        stream: FirebaseAuth.instance.authStateChanges(),
+        builder: (context, snapshot) {
+          // Si el usuario está logueado, muestra HomeScreen
+          if (snapshot.connectionState == ConnectionState.active && snapshot.hasData) {
+            return const HomeScreen();
+          }
+          // Si no, muestra LoginScreen
+          else if (snapshot.connectionState == ConnectionState.active) {
+            return const WelcomeScreen();
+          }
+          // Mientras se verifica, muestra una pantalla de carga
+          return const Scaffold(
+            body: Center(
+              child: CircularProgressIndicator(color: Color(0xFF1E5631)),
+            ),
+          );
+        },
+      ),
     );
   }
 }
