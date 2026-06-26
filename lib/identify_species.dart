@@ -5,6 +5,8 @@ import 'home.dart';
 import 'map_screen.dart';
 import 'history_screen.dart';
 import 'profile_screen.dart';
+import 'models/observation.dart';
+import 'services/observation_repository.dart';
 
 class IdentifySpeciesScreen extends StatefulWidget {
   const IdentifySpeciesScreen({super.key});
@@ -333,15 +335,24 @@ class _IdentifySpeciesScreenState extends State<IdentifySpeciesScreen> {
                             padding: const EdgeInsets.symmetric(horizontal: 32),
                             child: ElevatedButton(
                               onPressed: () {
-                                ScaffoldMessenger.of(context).showSnackBar(
-                                  SnackBar(
-                                    content: const Text(
-                                        'Identificando especie... 🔍'),
-                                    backgroundColor:
-                                        const Color(0xFF1E5631),
-                                    behavior: SnackBarBehavior.floating,
-                                  ),
+                                final observation = Observation(
+                                  id: DateTime.now().millisecondsSinceEpoch.toString(),
+                                  commonName: 'Nombre común detectado',
+                                  scientificName: 'Nombre científico detectado',
+                                  location: 'Ubicación actual',
+                                  notes: 'Registrado desde Cámara IA',
+                                  dateTime: DateTime.now(),
                                 );
+                                ObservationRepository.instance.addObservation(observation);
+
+                                if (mounted) {
+                                  Navigator.pushReplacement(
+                                    context,
+                                    MaterialPageRoute(
+                                      builder: (context) => const HistoryScreen(),
+                                    ),
+                                  );
+                                }
                               },
                               style: ElevatedButton.styleFrom(
                                 backgroundColor: const Color(0xFF1E5631),

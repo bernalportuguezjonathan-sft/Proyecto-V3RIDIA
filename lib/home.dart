@@ -5,6 +5,11 @@ import 'identify_species.dart';
 import 'map_screen.dart';
 import 'history_screen.dart';
 import 'profile_screen.dart';
+import 'observations_screen.dart';
+import 'challenges_screen.dart';
+import 'models/user.dart';
+import 'services/user_repository.dart';
+import 'widgets/token_icon.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -74,6 +79,30 @@ class _HomeScreenState extends State<HomeScreen> {
         ),
         centerTitle: true,
         actions: [
+          ValueListenableBuilder<UserProfile?>(
+            valueListenable: UserRepository.instance.currentUser,
+            builder: (context, userProfile, child) {
+              return Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 12),
+                child: Center(
+                  child: Row(
+                    children: [
+                      TokenIcon(size: 24),
+                      const SizedBox(width: 6),
+                      Text(
+                        '${userProfile?.tokens ?? 0}',
+                        style: const TextStyle(
+                          fontWeight: FontWeight.bold,
+                          fontSize: 14,
+                          color: Colors.white,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              );
+            },
+          ),
           IconButton(
             onPressed: () {
               showDialog(
@@ -118,7 +147,7 @@ class _HomeScreenState extends State<HomeScreen> {
           // Contenido principal
           SafeArea(
             child: SingleChildScrollView(
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 20),
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
@@ -126,20 +155,20 @@ class _HomeScreenState extends State<HomeScreen> {
                   Text(
                     '¡Bienvenido, $_userName!',
                     style: const TextStyle(
-                      fontSize: 24,
+                      fontSize: 20,
                       fontWeight: FontWeight.bold,
                       color: Color(0xFF1E5631),
                     ),
                   ),
-                  const SizedBox(height: 8),
+                  const SizedBox(height: 4),
                   const Text(
                     'Buscar especies, rutas, etc.',
                     style: TextStyle(
-                      fontSize: 14,
+                      fontSize: 12,
                       color: Colors.grey,
                     ),
                   ),
-                  const SizedBox(height: 24),
+                  const SizedBox(height: 16),
 
                   // Barra de búsqueda
                   Container(
@@ -164,27 +193,27 @@ class _HomeScreenState extends State<HomeScreen> {
                       ),
                     ),
                   ),
-                  const SizedBox(height: 28),
+                  const SizedBox(height: 12),
 
                   // Título "Accesos rápidos"
                   const Text(
                     'Accesos rápidos',
                     style: TextStyle(
-                      fontSize: 14,
+                      fontSize: 13,
                       fontWeight: FontWeight.bold,
                       color: Colors.black87,
                     ),
                   ),
-                  const SizedBox(height: 16),
+                  const SizedBox(height: 12),
 
                   // Grid de accesos rápidos (2x2)
                   GridView.count(
                     crossAxisCount: 2,
-                    mainAxisSpacing: 12,
-                    crossAxisSpacing: 12,
+                    mainAxisSpacing: 10,
+                    crossAxisSpacing: 10,
                     shrinkWrap: true,
                     physics: const NeverScrollableScrollPhysics(),
-                    childAspectRatio: 1.1,
+                    childAspectRatio: 1.15,
                     children: [
                       _crearAccesoRapido(
                         icon: Icons.camera_alt,
@@ -223,32 +252,31 @@ class _HomeScreenState extends State<HomeScreen> {
                         },
                       ),
                       _crearAccesoRapido(
-                        icon: Icons.card_giftcard,
-                        titulo: 'Recompensas',
+                        icon: Icons.emoji_events,
+                        titulo: 'Desafíos',
                         onTap: () {
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            SnackBar(
-                              content: const Text('Sección en desarrollo... 🚀'),
-                              backgroundColor: const Color(0xFF1E5631),
-                              behavior: SnackBarBehavior.floating,
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (context) => const ChallengesScreen(),
                             ),
                           );
                         },
                       ),
                     ],
                   ),
-                  const SizedBox(height: 24),
+                  const SizedBox(height: 16),
 
                   // Últimas capturas
                   const Text(
                     'Últimas capturas',
                     style: TextStyle(
-                      fontSize: 14,
+                      fontSize: 13,
                       fontWeight: FontWeight.bold,
                       color: Colors.black87,
                     ),
                   ),
-                  const SizedBox(height: 12),
+                  const SizedBox(height: 8),
 
                   SingleChildScrollView(
                     scrollDirection: Axis.horizontal,
@@ -262,7 +290,7 @@ class _HomeScreenState extends State<HomeScreen> {
                       ],
                     ),
                   ),
-                  const SizedBox(height: 12),
+                  const SizedBox(height: 8),
                   Align(
                     alignment: Alignment.centerRight,
                     child: TextButton(
@@ -274,10 +302,13 @@ class _HomeScreenState extends State<HomeScreen> {
                           ),
                         );
                       },
-                      child: const Text('Ver todas'),
+                      child: const Text(
+                        'Ver todas',
+                        style: TextStyle(fontSize: 12),
+                      ),
                     ),
                   ),
-                  const SizedBox(height: 20),
+                  const SizedBox(height: 12),
 
                   // Botón de cerrar sesión (ahora en AppBar superior)
                 ],
@@ -380,22 +411,22 @@ class _HomeScreenState extends State<HomeScreen> {
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
             Container(
-              padding: const EdgeInsets.all(16),
+              padding: const EdgeInsets.all(12),
               decoration: BoxDecoration(
                 color: const Color(0xFFE8F5E9),
                 borderRadius: BorderRadius.circular(10),
               ),
               child: Icon(
                 icon,
-                size: 32,
+                size: 28,
                 color: const Color(0xFF1E5631),
               ),
             ),
-            const SizedBox(height: 12),
+            const SizedBox(height: 8),
             Text(
               titulo,
               style: const TextStyle(
-                fontSize: 13,
+                fontSize: 12,
                 fontWeight: FontWeight.w600,
                 color: Color(0xFF1E5631),
               ),

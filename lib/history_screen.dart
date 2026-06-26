@@ -5,6 +5,8 @@ import 'home.dart';
 import 'identify_species.dart';
 import 'map_screen.dart';
 import 'profile_screen.dart';
+import 'models/observation.dart';
+import 'services/observation_repository.dart';
 
 class HistoryScreen extends StatefulWidget {
   const HistoryScreen({super.key});
@@ -58,6 +60,98 @@ class _HistoryScreenState extends State<HistoryScreen>
   void dispose() {
     _tabController.dispose();
     super.dispose();
+  }
+
+  void _showEditDialog(Observation captura) {
+    final commonNameController = TextEditingController(text: captura.commonName);
+    final scientificNameController = TextEditingController(text: captura.scientificName);
+    final locationController = TextEditingController(text: captura.location);
+    final notesController = TextEditingController(text: captura.notes);
+    final formKey = GlobalKey<FormState>();
+
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Editar especie'),
+        content: Form(
+          key: formKey,
+          child: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                TextFormField(
+                  controller: commonNameController,
+                  decoration: const InputDecoration(labelText: 'Nombre común'),
+                  validator: (value) => value == null || value.trim().isEmpty ? 'Requerido' : null,
+                ),
+                TextFormField(
+                  controller: scientificNameController,
+                  decoration: const InputDecoration(labelText: 'Nombre científico'),
+                  validator: (value) => value == null || value.trim().isEmpty ? 'Requerido' : null,
+                ),
+                TextFormField(
+                  controller: locationController,
+                  decoration: const InputDecoration(labelText: 'Ubicación'),
+                ),
+                TextFormField(
+                  controller: notesController,
+                  decoration: const InputDecoration(labelText: 'Notas'),
+                  maxLines: 3,
+                ),
+              ],
+            ),
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Cancelar'),
+          ),
+          ElevatedButton(
+            onPressed: () {
+              if (formKey.currentState?.validate() ?? false) {
+                ObservationRepository.instance.updateObservation(
+                  Observation(
+                    id: captura.id,
+                    commonName: commonNameController.text.trim(),
+                    scientificName: scientificNameController.text.trim(),
+                    location: locationController.text.trim(),
+                    notes: notesController.text.trim(),
+                    dateTime: captura.dateTime,
+                  ),
+                );
+                Navigator.pop(context);
+              }
+            },
+            style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF1E5631)),
+            child: const Text('Guardar'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _showDeleteDialog(String id) {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Eliminar especie'),
+        content: const Text('¿Deseas eliminar esta especie del historial?'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Cancelar'),
+          ),
+          TextButton(
+            onPressed: () {
+              ObservationRepository.instance.deleteObservation(id);
+              Navigator.pop(context);
+            },
+            child: const Text('Eliminar', style: TextStyle(color: Colors.red)),
+          ),
+        ],
+      ),
+    );
   }
 
   @override
@@ -123,54 +217,67 @@ class _HistoryScreenState extends State<HistoryScreen>
   }
 
   Widget _buildHistorialTab() {
-    return SingleChildScrollView(
-      padding: const EdgeInsets.all(16),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          // Filtros
-          Row(
+    return ValueListenableBuilder<List<Observation>>(
+      valueListenable: ObservationRepository.instance.observations,
+      builder: (context, observations, child) {
+        return SingleChildScrollView(
+          padding: const EdgeInsets.all(16),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Expanded(
-                child: TextField(
-                  decoration: InputDecoration(
-                    hintText: 'Buscar',
-                    prefixIcon:
-                        const Icon(Icons.search, color: Color(0xFF1E5631)),
-                    border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(10),
-                      borderSide: const BorderSide(
-                        color: Color(0xFFD3D3D3),
-                      ),
-                    ),
-                    enabledBorder: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(10),
-                      borderSide: const BorderSide(
-                        color: Color(0xFFD3D3D3),
+              // Filtros
+              Row(
+                children: [
+                  Expanded(
+                    child: TextField(
+                      decoration: InputDecoration(
+                        hintText: 'Buscar',
+                        prefixIcon:
+                            const Icon(Icons.search, color: Color(0xFF1E5631)),
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(10),
+                          borderSide: const BorderSide(
+                            color: Color(0xFFD3D3D3),
+                          ),
+                        ),
+                        enabledBorder: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(10),
+                          borderSide: const BorderSide(
+                            color: Color(0xFFD3D3D3),
+                          ),
+                        ),
                       ),
                     ),
                   ),
-                ),
+                  const SizedBox(width: 12),
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 12),
+                    decoration: BoxDecoration(
+                      border: Border.all(color: const Color(0xFFD3D3D3)),
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                    child: const Icon(Icons.tune, color: Color(0xFF1E5631)),
+                  ),
+                ],
               ),
-              const SizedBox(width: 12),
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 12),
-                decoration: BoxDecoration(
-                  border: Border.all(color: const Color(0xFFD3D3D3)),
-                  borderRadius: BorderRadius.circular(10),
+              const SizedBox(height: 20),
+              if (observations.isEmpty)
+                const Center(
+                  child: Padding(
+                    padding: EdgeInsets.only(top: 24),
+                    child: Text('No hay especies en el historial aún.'),
+                  ),
+                )
+              else
+                Column(
+                  children: observations.map((captura) {
+                    return _crearTarjetaCaptura(captura);
+                  }).toList(),
                 ),
-                child: const Icon(Icons.tune, color: Color(0xFF1E5631)),
-              ),
             ],
           ),
-          const SizedBox(height: 20),
-
-          // Lista de capturas
-          ..._generarCapturas(5).map((captura) {
-            return _crearTarjetaCaptura(captura);
-          }).toList(),
-        ],
-      ),
+        );
+      },
     );
   }
 
@@ -208,29 +315,31 @@ class _HistoryScreenState extends State<HistoryScreen>
   }
 
   Widget _buildLugaresTab() {
-    return SingleChildScrollView(
-      padding: const EdgeInsets.all(16),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          const Text(
-            'Logros recientes',
-            style: TextStyle(
-              fontSize: 14,
-              fontWeight: FontWeight.bold,
-              color: Colors.black87,
-            ),
+    return ValueListenableBuilder<List<Observation>>(
+      valueListenable: ObservationRepository.instance.observations,
+      builder: (context, observations, child) {
+        if (observations.isEmpty) {
+          return const Padding(
+            padding: EdgeInsets.all(16),
+            child: Center(child: Text('No hay lugares registrados aún.')),
+          );
+        }
+
+        return SingleChildScrollView(
+          padding: const EdgeInsets.all(16),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: observations
+                .take(3)
+                .map((captura) => _crearTarjetaCaptura(captura))
+                .toList(),
           ),
-          const SizedBox(height: 12),
-          ..._generarCapturas(3).map((captura) {
-            return _crearTarjetaCaptura(captura);
-          }).toList(),
-        ],
-      ),
+        );
+      },
     );
   }
 
-  Widget _crearTarjetaCaptura(Map<String, String> captura) {
+  Widget _crearTarjetaCaptura(Observation captura) {
     return Container(
       margin: const EdgeInsets.only(bottom: 12),
       decoration: BoxDecoration(
@@ -267,7 +376,7 @@ class _HistoryScreenState extends State<HistoryScreen>
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
-                    captura['nombre']!,
+                    captura.commonName,
                     style: const TextStyle(
                       fontSize: 14,
                       fontWeight: FontWeight.bold,
@@ -275,7 +384,7 @@ class _HistoryScreenState extends State<HistoryScreen>
                     ),
                   ),
                   Text(
-                    captura['cientifico']!,
+                    captura.scientificName,
                     style: TextStyle(
                       fontSize: 12,
                       color: Colors.grey.shade600,
@@ -283,14 +392,42 @@ class _HistoryScreenState extends State<HistoryScreen>
                   ),
                   const SizedBox(height: 4),
                   Text(
-                    captura['fecha']!,
+                    '${captura.dateTime}',
                     style: TextStyle(
                       fontSize: 11,
                       color: Colors.grey,
                     ),
                   ),
+                  const SizedBox(height: 8),
+                  Text(
+                    captura.location,
+                    style: TextStyle(
+                      fontSize: 11,
+                      color: Colors.grey.shade700,
+                    ),
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    captura.notes,
+                    style: TextStyle(
+                      fontSize: 11,
+                      color: Colors.grey.shade700,
+                    ),
+                  ),
                 ],
               ),
+            ),
+            Column(
+              children: [
+                IconButton(
+                  icon: const Icon(Icons.edit, color: Color(0xFF1E5631)),
+                  onPressed: () => _showEditDialog(captura),
+                ),
+                IconButton(
+                  icon: const Icon(Icons.delete, color: Colors.red),
+                  onPressed: () => _showDeleteDialog(captura.id),
+                ),
+              ],
             ),
           ],
         ),

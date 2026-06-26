@@ -4,6 +4,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'firebase_options.dart';
 import 'login.dart';
 import 'home.dart';
+import 'services/user_repository.dart';
 
 // Convertimos el main en 'async' porque iniciar Firebase toma un instante
 Future<void> main() async {
@@ -32,6 +33,8 @@ class VeridiaApp extends StatelessWidget {
         builder: (context, snapshot) {
           // Si el usuario está logueado, muestra HomeScreen
           if (snapshot.connectionState == ConnectionState.active && snapshot.hasData) {
+            // Inicializar el UserRepository cuando el usuario se autentica
+            UserRepository.instance.initializeUser();
             return const HomeScreen();
           }
           // Si no, muestra LoginScreen
