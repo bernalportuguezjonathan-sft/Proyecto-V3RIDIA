@@ -150,96 +150,150 @@ class _LoginScreenState extends State<LoginScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: Colors.white,
-      appBar: AppBar(
-        backgroundColor: Colors.white,
-        elevation: 0,
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back_ios, color: Colors.black87, size: 22),
-          onPressed: () => Navigator.pop(context),
-        ),
-      ),
-      body: SingleChildScrollView(
-        padding: const EdgeInsets.symmetric(horizontal: 32.0),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.center,
-          children: [
-            const SizedBox(height: 20),
-            Image.asset(
-              'img/logo.png', // Tu logo de Veridia
-              height: 120,
-              fit: BoxFit.contain,
-              errorBuilder: (context, error, stackTrace) {
-                return const Icon(Icons.local_florist, size: 80, color: Color(0xFF1E5631));
-              },
+      body: Stack(
+        children: [
+          // Fondo que cubre toda la pantalla
+          Positioned.fill(
+            child: Image.asset(
+              'assets/images/background.jpg',
+              fit: BoxFit.cover,
+              filterQuality: FilterQuality.high,
+              semanticLabel: 'Fondo decorativo',
             ),
-            const SizedBox(height: 15),
-            const Text(
-              'Iniciar Sesión',
-              style: TextStyle(
-                fontSize: 22, 
-                fontWeight: FontWeight.bold, 
-                color: Colors.black87,
-                letterSpacing: 0.5,
+          ),
+          // Gradiente desvanecimiento para mejor legibilidad
+          Positioned.fill(
+            child: Container(
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  begin: Alignment.topCenter,
+                  end: Alignment.bottomCenter,
+                  colors: [
+                    Colors.black.withOpacity(0.5),
+                    Colors.black.withOpacity(0.2),
+                    Colors.black.withOpacity(0.4),
+                  ],
+                  stops: const [0.0, 0.5, 1.0],
+                ),
               ),
             ),
-            const SizedBox(height: 30),
-            
-            _crearCampoTexto(
-              controller: _emailController,
-              hintText: 'Correo electrónico',
-              icon: Icons.hourglass_empty,
-            ),
-            _crearCampoTexto(
-              controller: _passwordController,
-              hintText: 'Contraseña',
-              icon: Icons.lock_outline,
-              isPassword: true,
-            ),
-            
-            const SizedBox(height: 24),
-            SizedBox(
-              width: double.infinity,
-              height: 50,
-              child: ElevatedButton(
-                onPressed: _iniciarSesion,
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: const Color(0xFF1E5631),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(10),
+          ),
+          // Contenido principal
+          SafeArea(
+            child: Column(
+              mainAxisSize: MainAxisSize.max,
+              children: [
+                const Spacer(flex: 1),
+                // Logo con decoración
+                Container(
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    color: Colors.white,
+                    border: Border.all(
+                      color: const Color.fromRGBO(30, 86, 49, 0.3),
+                      width: 2,
+                    ),
+                    boxShadow: [
+                      const BoxShadow(
+                        color: Color.fromRGBO(0, 0, 0, 0.08),
+                        blurRadius: 15,
+                        offset: Offset(0, 8),
+                      ),
+                    ],
                   ),
-                  elevation: 0,
+                  child: ClipOval(
+                    child: Padding(
+                      padding: const EdgeInsets.all(16.0),
+                      child: Image.asset(
+                        'assets/images/logo.png',
+                        height: 150,
+                        width: 150,
+                        fit: BoxFit.contain,
+                        filterQuality: FilterQuality.high,
+                        semanticLabel: 'Logo Veridia',
+                      ),
+                    ),
+                  ),
                 ),
-                child: const Text(
-                  'Entrar',
+                const SizedBox(height: 15),
+                const Text(
+                  'Iniciar Sesión',
                   style: TextStyle(
-                    color: Colors.white, 
-                    fontSize: 16, 
-                    fontWeight: FontWeight.w500,
+                    fontSize: 22, 
+                    fontWeight: FontWeight.bold, 
+                    color: Colors.black87,
+                    letterSpacing: 0.5,
                   ),
                 ),
-              ),
-            ),
-            const SizedBox(height: 20),
-            
-            // Botón de texto para ir al registro
-            TextButton(
-              onPressed: () {
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(builder: (context) => const RegisterScreen()),
-                );
-              },
-              child: const Text(
-                '¿No tienes cuenta? Regístrate aquí',
-                style: TextStyle(
-                  color: Color(0xFF1E5631),
-                  fontWeight: FontWeight.w600,
-                  fontSize: 14,
+                const Spacer(flex: 1),
+                // Campos de formulario
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 32.0),
+                  child: SingleChildScrollView(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.center,
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        _crearCampoTexto(
+                          controller: _emailController,
+                          hintText: 'Correo electrónico',
+                          icon: Icons.hourglass_empty,
+                        ),
+                        _crearCampoTexto(
+                          controller: _passwordController,
+                          hintText: 'Contraseña',
+                          icon: Icons.lock_outline,
+                          isPassword: true,
+                        ),
+                        const SizedBox(height: 24),
+                        SizedBox(
+                          width: double.infinity,
+                          height: 50,
+                          child: ElevatedButton(
+                            onPressed: _iniciarSesion,
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: const Color(0xFF1E5631),
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(10),
+                              ),
+                              elevation: 0,
+                            ),
+                            child: const Text(
+                              'Entrar',
+                              style: TextStyle(
+                                color: Colors.white, 
+                                fontSize: 16, 
+                                fontWeight: FontWeight.w500,
+                              ),
+                            ),
+                          ),
+                        ),
+                        const SizedBox(height: 20),
+                        TextButton(
+                          onPressed: () {
+                            Navigator.push(
+                              context,
+                              MaterialPageRoute(builder: (context) => const RegisterScreen()),
+                            );
+                          },
+                          child: const Text(
+                            '¿No tienes cuenta? Regístrate aquí',
+                            style: TextStyle(
+                              color: Color.fromARGB(255, 255, 255, 255),
+                              fontWeight: FontWeight.w600,
+                              fontSize: 14,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
                 ),
-              ),
+                const Spacer(flex: 2),
+              ],
             ),
-          ],
-        ),
+          ),
+        ],
       ),
     );
   }

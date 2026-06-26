@@ -38,14 +38,13 @@ class WelcomeScreen extends StatelessWidget {
       backgroundColor: Colors.white,
       body: Stack(
         children: [
-          Positioned(
-            bottom: 0,
-            left: 0,
-            right: 0,
+          // Fondo que cubre toda la pantalla
+          Positioned.fill(
             child: Image.asset(
               'assets/images/background.jpg',
-              fit: BoxFit.fitWidth,
-              alignment: Alignment.bottomCenter,
+              fit: BoxFit.cover,
+              filterQuality: FilterQuality.high,
+              semanticLabel: 'Fondo decorativo',
             ),
           ),
           SafeArea(
@@ -76,6 +75,8 @@ class WelcomeScreen extends StatelessWidget {
                         height: 150,
                         width: 150,
                         fit: BoxFit.contain,
+                        filterQuality: FilterQuality.high,
+                        semanticLabel: 'Logo Veridia',
                       ),
                     ),
                   ),
