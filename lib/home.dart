@@ -2,13 +2,13 @@ import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'login.dart'; // Para redirigir al login
 import 'identify_species.dart';
-import 'map_screen.dart';
-import 'history_screen.dart';
-import 'profile_screen.dart';
-import 'observations_screen.dart';
-import 'challenges_screen.dart';
+import 'mapa.dart';
+import 'historial.dart';
+import 'perfil.dart';
+import 'observaciones.dart';
+import 'desafios.dart';
 import 'models/user.dart';
-import 'services/user_repository.dart';
+import 'services/repositorioU.dart';
 import 'widgets/token_icon.dart';
 
 class HomeScreen extends StatefulWidget {

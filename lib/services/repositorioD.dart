@@ -1,6 +1,6 @@
 import 'package:flutter/foundation.dart';
-import '../models/challenge.dart';
-import 'user_repository.dart';
+import '../models/desafio.dart';
+import 'repositorioU.dart';
 
 class ChallengeRepository {
   ChallengeRepository._();

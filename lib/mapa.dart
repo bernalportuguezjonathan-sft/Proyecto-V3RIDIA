@@ -3,9 +3,9 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'login.dart';
 import 'home.dart';
 import 'identify_species.dart';
-import 'history_screen.dart';
-import 'profile_screen.dart';
-import 'map_detail_screen.dart';
+import 'historial.dart';
+import 'perfil.dart';
+import 'detallemapa.dart';
 
 class MapScreen extends StatefulWidget {
   const MapScreen({super.key});

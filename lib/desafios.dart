@@ -3,13 +3,13 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'login.dart';
 import 'home.dart';
 import 'identify_species.dart';
-import 'map_screen.dart';
-import 'history_screen.dart';
-import 'profile_screen.dart';
-import 'models/challenge.dart';
+import 'mapa.dart';
+import 'historial.dart';
+import 'perfil.dart';
+import 'models/desafio.dart';
 import 'models/user.dart';
-import 'services/challenge_repository.dart';
-import 'services/user_repository.dart';
+import 'services/repositorioD.dart';
+import 'services/repositorioU.dart';
 import 'widgets/token_icon.dart';
 
 class ChallengesScreen extends StatefulWidget {

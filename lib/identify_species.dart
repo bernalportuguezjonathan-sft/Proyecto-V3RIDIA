@@ -2,11 +2,11 @@ import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'login.dart';
 import 'home.dart';
-import 'map_screen.dart';
-import 'history_screen.dart';
-import 'profile_screen.dart';
+import 'mapa.dart';
+import 'historial.dart';
+import 'perfil.dart';
 import 'models/observation.dart';
-import 'services/observation_repository.dart';
+import 'services/repositorioO.dart';
 
 class IdentifySpeciesScreen extends StatefulWidget {
   const IdentifySpeciesScreen({super.key});

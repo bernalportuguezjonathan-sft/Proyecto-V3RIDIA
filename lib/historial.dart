@@ -3,10 +3,10 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'login.dart';
 import 'home.dart';
 import 'identify_species.dart';
-import 'map_screen.dart';
-import 'profile_screen.dart';
+import 'mapa.dart';
+import 'perfil.dart';
 import 'models/observation.dart';
-import 'services/observation_repository.dart';
+import 'services/repositorioO.dart';
 
 class HistoryScreen extends StatefulWidget {
   const HistoryScreen({super.key});

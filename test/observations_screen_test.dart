@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:veridia_app/observations_screen.dart';
+import 'package:veridia_app/observaciones.dart';
 
 void main() {
   testWidgets('permite crear una observación desde la pantalla', (tester) async {

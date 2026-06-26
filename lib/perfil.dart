@@ -3,8 +3,8 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'login.dart';
 import 'home.dart';
 import 'identify_species.dart';
-import 'map_screen.dart';
-import 'history_screen.dart';
+import 'mapa.dart';
+import 'historial.dart';
 
 class ProfileScreen extends StatefulWidget {
   const ProfileScreen({super.key});
