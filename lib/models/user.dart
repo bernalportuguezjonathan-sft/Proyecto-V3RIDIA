@@ -1,8 +1,9 @@
-class UserProfile {
+﻿class UserProfile {
   UserProfile({
     required this.userId,
     required this.email,
     required this.displayName,
+    required this.photoURL,
     required this.tokens,
     required this.createdDate,
   });
@@ -10,6 +11,7 @@ class UserProfile {
   final String userId;
   final String email;
   final String displayName;
+  final String? photoURL;
   final int tokens;
   final DateTime createdDate;
 
@@ -17,6 +19,7 @@ class UserProfile {
     String? userId,
     String? email,
     String? displayName,
+    String? photoURL,
     int? tokens,
     DateTime? createdDate,
   }) {
@@ -24,6 +27,7 @@ class UserProfile {
       userId: userId ?? this.userId,
       email: email ?? this.email,
       displayName: displayName ?? this.displayName,
+      photoURL: photoURL ?? this.photoURL,
       tokens: tokens ?? this.tokens,
       createdDate: createdDate ?? this.createdDate,
     );
