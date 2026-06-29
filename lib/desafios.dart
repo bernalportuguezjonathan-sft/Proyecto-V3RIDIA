@@ -159,7 +159,7 @@ class _ChallengesScreenState extends State<ChallengesScreen> {
                 Navigator.pop(context);
               }
             },
-            style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF1E5631)),
+            style: ElevatedButton.styleFrom(backgroundColor: const Color.fromARGB(255, 246, 246, 246)),
             child: const Text('Guardar'),
           ),
         ],
@@ -444,7 +444,7 @@ class _ChallengesScreenState extends State<ChallengesScreen> {
       floatingActionButton: FloatingActionButton(
         onPressed: () => _showChallengeForm(),
         backgroundColor: const Color(0xFF1E5631),
-        child: const Icon(Icons.add),
+        child: const Icon(Icons.add, color: Colors.white),
       ),
       bottomNavigationBar: BottomNavigationBar(
         backgroundColor: Colors.white,
