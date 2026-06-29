@@ -16,6 +16,7 @@ class UserRepository {
         userId: user.uid,
         email: user.email ?? '',
         displayName: user.displayName ?? user.email?.split('@').first ?? 'Usuario',
+        photoURL: user.photoURL,
         tokens: 0,
         createdDate: DateTime.now(),
       );
