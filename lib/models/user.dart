@@ -5,6 +5,7 @@
     required this.displayName,
     required this.photoURL,
     required this.tokens,
+    required this.role,
     required this.createdDate,
   });
 
@@ -13,6 +14,7 @@
   final String displayName;
   final String? photoURL;
   final int tokens;
+  final String role;
   final DateTime createdDate;
 
   UserProfile copyWith({
@@ -21,6 +23,7 @@
     String? displayName,
     String? photoURL,
     int? tokens,
+    String? role,
     DateTime? createdDate,
   }) {
     return UserProfile(
@@ -29,6 +32,7 @@
       displayName: displayName ?? this.displayName,
       photoURL: photoURL ?? this.photoURL,
       tokens: tokens ?? this.tokens,
+      role: role ?? this.role,
       createdDate: createdDate ?? this.createdDate,
     );
   }

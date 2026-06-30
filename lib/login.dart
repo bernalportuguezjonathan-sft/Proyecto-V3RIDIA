@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
-import 'register.dart'; // Importamos tu pantalla de registro
+import 'services/repositorioU.dart';
+import 'admin_home.dart';
 import 'home.dart'; // Importamos la pantalla de inicio
+import 'register.dart'; // Importamos tu pantalla de registro
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
@@ -75,24 +77,41 @@ class _LoginScreenState extends State<LoginScreen> {
         password: password,
       );
 
-      if (mounted) Navigator.pop(context); // Cerramos el loader
+        try {
+          await UserRepository.instance.initializeUser();
+        } catch (e, st) {
+          // Mostrar error más descriptivo para depuración
+          if (mounted) Navigator.pop(context);
+          debugPrint('Error initializing user: $e\n$st');
+          _mostrarAlerta('Error al inicializar usuario: ${e.toString()}');
+          return;
+        }
 
-      // Redirigir al usuario a la pantalla principal (home) cuando el login sea exitoso
+        if (mounted) Navigator.pop(context); // Cerramos el loader
+
+      // Redirigir al usuario según su rol
       if (mounted) {
+        final userProfile = UserRepository.instance.currentUser.value;
+        final nextPage = userProfile?.role == 'Administrador'
+            ? const AdminHomeScreen()
+            : const HomeScreen();
+
         Navigator.pushReplacement(
           context,
-          MaterialPageRoute(builder: (context) => const HomeScreen()),
+          MaterialPageRoute(builder: (context) => nextPage),
         );
       }
     } on FirebaseAuthException catch (e) {
       if (mounted) Navigator.pop(context); // Cerramos el loader
 
-      // AQUÍ CUMPLIMOS TU REGLA #1:
-      // Si el correo no existe (user-not-found) o las credenciales no cuadran (invalid-credential en nuevas versiones de Firebase)
-      if (e.code == 'user-not-found' || e.code == 'invalid-credential') {
-        _mostrarAlerta('Primero te debes registrar antes de iniciar sesión.');
-      } else if (e.code == 'wrong-password') {
+      if (e.code == 'wrong-password') {
         _mostrarAlerta('La contraseña es incorrecta.');
+      } else if (e.code == 'user-not-found') {
+        _mostrarAlerta('El correo no existe o es incorrecto.');
+      } else if (e.code == 'invalid-email') {
+        _mostrarAlerta('El formato del correo es incorrecto.');
+      } else if (e.code == 'user-disabled') {
+        _mostrarAlerta('La cuenta ha sido deshabilitada.');
       } else {
         _mostrarAlerta('Error al iniciar sesión. Verifica tus datos.');
       }
@@ -171,10 +190,10 @@ class _LoginScreenState extends State<LoginScreen> {
                 gradient: LinearGradient(
                   begin: Alignment.topCenter,
                   end: Alignment.bottomCenter,
-                  colors: [
-                    Colors.black.withOpacity(0.5),
-                    Colors.black.withOpacity(0.2),
-                    Colors.black.withOpacity(0.4),
+                  colors: const [
+                    Color.fromRGBO(0, 0, 0, 0.5),
+                    Color.fromRGBO(0, 0, 0, 0.2),
+                    Color.fromRGBO(0, 0, 0, 0.4),
                   ],
                   stops: const [0.0, 0.5, 1.0],
                 ),

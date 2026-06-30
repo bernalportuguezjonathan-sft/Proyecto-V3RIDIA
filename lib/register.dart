@@ -1,5 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'services/repositorioU.dart';
+import 'models/user.dart';
+import 'home.dart';
+import 'admin_home.dart';
 
 class RegisterScreen extends StatefulWidget {
   const RegisterScreen({super.key});
@@ -13,6 +17,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
   final _emailController = TextEditingController();
   final _passwordController = TextEditingController();
   final _confirmPasswordController = TextEditingController();
+  String? _selectedRole;
 
   // Función para las alertas modernas y flotantes
   void _mostrarAlerta(String mensaje) {
@@ -88,6 +93,12 @@ class _RegisterScreenState extends State<RegisterScreen> {
       return;
     }
 
+    // 5. Validación de rol seleccionado
+    if (_selectedRole == null) {
+      _mostrarAlerta('Por favor selecciona el tipo de usuario');
+      return;
+    }
+
     // Si todo está perfecto, mostramos el círculo de carga
     showDialog(
       context: context,
@@ -99,24 +110,73 @@ class _RegisterScreenState extends State<RegisterScreen> {
 
     try {
       // Intentamos crear el usuario en Firebase
-      await FirebaseAuth.instance.createUserWithEmailAndPassword(
+      final credential = await FirebaseAuth.instance.createUserWithEmailAndPassword(
         email: email,
         password: password,
       );
 
+      if (credential.user != null) {
+        // Create a local profile immediately so app UI can proceed even if Firestore write is blocked
+        final localProfile = UserProfile(
+          userId: credential.user!.uid,
+          email: email,
+          displayName: name,
+          photoURL: null,
+          tokens: 0,
+          role: _selectedRole!,
+          createdDate: DateTime.now(),
+        );
+
+        UserRepository.instance.currentUser.value = localProfile;
+
+        // Attempt to persist the profile, but don't block navigation on failure
+        try {
+          await UserRepository.instance.createUserProfile(
+            userId: credential.user!.uid,
+            email: email,
+            displayName: name,
+            role: _selectedRole!,
+          );
+        } catch (e) {
+          debugPrint('Could not persist user profile to Firestore: $e');
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(content: Text('Advertencia: perfil no guardado en servidor.')),
+            );
+          }
+        }
+      }
+
       if (mounted) Navigator.pop(context); // Cerramos el círculo de carga
 
-      // Mostramos éxito y lo devolvemos al Login
+      // Redirigir según rol (Admin recibe diálogo de bienvenida)
       if (mounted) {
-        ScaffoldMessenger.of(context).clearSnackBars();
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: const Text('¡Registro exitoso! Ya puedes iniciar sesión.'),
-            backgroundColor: Colors.green.shade600,
-            behavior: SnackBarBehavior.floating,
-          ),
-        );
-        Navigator.pop(context);
+        if (_selectedRole == 'Administrador') {
+          await showDialog(
+            context: context,
+            builder: (context) => AlertDialog(
+              title: const Text('Bienvenido, Administrador'),
+              content: const Text('Has sido registrado como Administrador.'),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.pop(context),
+                  child: const Text('Continuar'),
+                ),
+              ],
+            ),
+          );
+          if (!mounted) return;
+
+          Navigator.pushReplacement(
+            context,
+            MaterialPageRoute(builder: (context) => const AdminHomeScreen()),
+          );
+        } else {
+          Navigator.pushReplacement(
+            context,
+            MaterialPageRoute(builder: (context) => const HomeScreen()),
+          );
+        }
       }
     } on FirebaseAuthException catch (e) {
       if (mounted) Navigator.pop(context);
@@ -204,10 +264,10 @@ class _RegisterScreenState extends State<RegisterScreen> {
                 gradient: LinearGradient(
                   begin: Alignment.topCenter,
                   end: Alignment.bottomCenter,
-                  colors: [
-                    Colors.black.withOpacity(0.5),
-                    Colors.black.withOpacity(0.2),
-                    Colors.black.withOpacity(0.4),
+                  colors: const [
+                    Color.fromRGBO(0, 0, 0, 0.5),
+                    Color.fromRGBO(0, 0, 0, 0.2),
+                    Color.fromRGBO(0, 0, 0, 0.4),
                   ],
                   stops: const [0.0, 0.5, 1.0],
                 ),
@@ -292,6 +352,38 @@ class _RegisterScreenState extends State<RegisterScreen> {
                           icon: Icons.lock_outline,
                           isPassword: true,
                         ),
+                        const SizedBox(height: 16),
+                        DropdownButtonFormField<String>(
+                          initialValue: null,
+                          isExpanded: true,
+                          style: const TextStyle(color: Colors.black87),
+                          icon: const Icon(Icons.arrow_drop_down, color: Color(0xFF1E5631)),
+                          dropdownColor: Colors.white,
+                          decoration: InputDecoration(
+                            hintText: 'Selecciona tipo de usuario',
+                            filled: true,
+                            fillColor: Colors.white,
+                            border: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(8),
+                              borderSide: const BorderSide(color: Color(0xFFD3D3D3), width: 1),
+                            ),
+                            enabledBorder: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(8),
+                              borderSide: const BorderSide(color: Color(0xFFD3D3D3), width: 1),
+                            ),
+                          ),
+                          items: const [
+                            DropdownMenuItem(value: 'Explorador', child: Text('Explorador')),
+                            DropdownMenuItem(value: 'Administrador', child: Text('Administrador')),
+                          ],
+                          onChanged: (value) {
+                            if (value != null) {
+                              setState(() {
+                                _selectedRole = value;
+                              });
+                            }
+                          },
+                        ),
                         const SizedBox(height: 24),
                         SizedBox(
                           width: double.infinity,
@@ -331,7 +423,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
                               ),
                             ),
                             child: const Text(
-                              'Volver al login',
+                              'Volver al inicio de sesión',
                               style: TextStyle(
                                 color: Color(0xFF1E5631),
                                 fontSize: 16,

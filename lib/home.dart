@@ -19,15 +19,7 @@ class HomeScreen extends StatefulWidget {
 }
 
 class _HomeScreenState extends State<HomeScreen> {
-  late User? _currentUser;
-  String _userName = '';
-
-  @override
-  void initState() {
-    super.initState();
-    _currentUser = FirebaseAuth.instance.currentUser;
-    _userName = _currentUser?.email?.split('@').first ?? 'Explorador';
-  }
+  // The user name is read from UserRepository.currentUser so UI updates automatically
 
   // Función para cerrar sesión
   Future<void> _cerrarSesion() async {
@@ -151,14 +143,28 @@ class _HomeScreenState extends State<HomeScreen> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
-                  // Saludo
-                  Text(
-                    '¡Bienvenido, $_userName!',
-                    style: const TextStyle(
-                      fontSize: 20,
-                      fontWeight: FontWeight.bold,
-                      color: Color(0xFF1E5631),
-                    ),
+                  // Saludo (se actualiza cuando cambia UserRepository.currentUser)
+                  ValueListenableBuilder<UserProfile?>(
+                    valueListenable: UserRepository.instance.currentUser,
+                    builder: (context, userProfile, child) {
+                      String display;
+                      if (userProfile != null) {
+                        display = userProfile.displayName.isNotEmpty
+                            ? userProfile.displayName
+                            : (userProfile.email.split('@').first);
+                      } else {
+                        display = 'Explorador';
+                      }
+
+                      return Text(
+                        '¡Bienvenido, $display!',
+                        style: const TextStyle(
+                          fontSize: 20,
+                          fontWeight: FontWeight.bold,
+                          color: Color(0xFF1E5631),
+                        ),
+                      );
+                    },
                   ),
                   const SizedBox(height: 4),
                   const Text(

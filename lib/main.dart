@@ -4,6 +4,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'firebase.dart';
 import 'login.dart';
 import 'home.dart';
+import 'admin_home.dart';
 import 'services/repositorioU.dart';
 
 // Convertimos el main en 'async' porque iniciar Firebase toma un instante
@@ -37,7 +38,11 @@ class VeridiaApp extends StatelessWidget {
               future: UserRepository.instance.initializeUser(),
               builder: (context, initSnapshot) {
                 if (initSnapshot.connectionState == ConnectionState.done) {
-                  return const HomeScreen();
+                  final userProfile = UserRepository.instance.currentUser.value;
+                  final initialScreen = userProfile?.role == 'Administrador'
+                      ? const AdminHomeScreen()
+                      : const HomeScreen();
+                  return initialScreen;
                 }
                 return const Scaffold(
                   body: Center(

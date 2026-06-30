@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:image_picker/image_picker.dart';
 import 'login.dart';
 import 'home.dart';
 import 'identify_species.dart';
@@ -33,16 +34,15 @@ class _ChallengesScreenState extends State<ChallengesScreen> {
           ),
           TextButton(
             onPressed: () async {
+              final navigator = Navigator.of(context);
               await FirebaseAuth.instance.signOut();
-              if (mounted) {
-                Navigator.pushAndRemoveUntil(
-                  context,
-                  MaterialPageRoute(
-                    builder: (context) => const LoginScreen(),
-                  ),
-                  (route) => false,
-                );
-              }
+              if (!mounted) return;
+              navigator.pushAndRemoveUntil(
+                MaterialPageRoute(
+                  builder: (context) => const LoginScreen(),
+                ),
+                (route) => false,
+              );
             },
             child: const Text('Cerrar'),
           ),
@@ -167,6 +167,18 @@ class _ChallengesScreenState extends State<ChallengesScreen> {
     );
   }
 
+  Future<void> _pickImageFromGallery() async {
+    final picker = ImagePicker();
+    final pickedFile = await picker.pickImage(source: ImageSource.gallery);
+    if (!mounted) return;
+    if (pickedFile != null) {
+      // Aquí puedes guardar o usar la imagen seleccionada como necesites.
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Imagen seleccionada: ${pickedFile.name}')),
+      );
+    }
+  }
+
   void _showDeleteConfirm(String id) {
     showDialog(
       context: context,
@@ -280,7 +292,6 @@ class _ChallengesScreenState extends State<ChallengesScreen> {
                         itemCount: challenges.length,
                         itemBuilder: (context, index) {
                           final challenge = challenges[index];
-                          final progress = (challenge.currentProgress / challenge.targetGoal * 100).clamp(0, 100).toInt();
 
                           return Container(
                             margin: const EdgeInsets.only(bottom: 12),
@@ -288,10 +299,10 @@ class _ChallengesScreenState extends State<ChallengesScreen> {
                               color: Colors.white,
                               borderRadius: BorderRadius.circular(12),
                               boxShadow: [
-                                BoxShadow(
-                                  color: Colors.black.withOpacity(0.05),
+                                const BoxShadow(
+                                  color: Color.fromRGBO(0, 0, 0, 0.05),
                                   blurRadius: 8,
-                                  offset: const Offset(0, 2),
+                                  offset: Offset(0, 2),
                                 ),
                               ],
                             ),
@@ -409,6 +420,13 @@ class _ChallengesScreenState extends State<ChallengesScreen> {
                                             icon: const Icon(Icons.add_circle_outline, size: 20),
                                             color: const Color(0xFF1E5631),
                                             visualDensity: VisualDensity.compact,
+                                          ),
+                                          IconButton(
+                                            onPressed: _pickImageFromGallery,
+                                            icon: const Icon(Icons.photo_library, size: 20),
+                                            color: const Color(0xFF1E5631),
+                                            visualDensity: VisualDensity.compact,
+                                            tooltip: 'Agregar foto',
                                           ),
                                         ],
                                       ),
