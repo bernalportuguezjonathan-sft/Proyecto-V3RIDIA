@@ -36,9 +36,7 @@ class _HistoryScreenState extends State<HistoryScreen>
               if (mounted) {
                 Navigator.pushAndRemoveUntil(
                   context,
-                  MaterialPageRoute(
-                    builder: (context) => const LoginScreen(),
-                  ),
+                  MaterialPageRoute(builder: (context) => const LoginScreen()),
                   (route) => false,
                 );
               }
@@ -63,8 +61,12 @@ class _HistoryScreenState extends State<HistoryScreen>
   }
 
   void _showEditDialog(Observation captura) {
-    final commonNameController = TextEditingController(text: captura.commonName);
-    final scientificNameController = TextEditingController(text: captura.scientificName);
+    final commonNameController = TextEditingController(
+      text: captura.commonName,
+    );
+    final scientificNameController = TextEditingController(
+      text: captura.scientificName,
+    );
     final locationController = TextEditingController(text: captura.location);
     final notesController = TextEditingController(text: captura.notes);
     final formKey = GlobalKey<FormState>();
@@ -82,12 +84,18 @@ class _HistoryScreenState extends State<HistoryScreen>
                 TextFormField(
                   controller: commonNameController,
                   decoration: const InputDecoration(labelText: 'Nombre común'),
-                  validator: (value) => value == null || value.trim().isEmpty ? 'Requerido' : null,
+                  validator: (value) => value == null || value.trim().isEmpty
+                      ? 'Requerido'
+                      : null,
                 ),
                 TextFormField(
                   controller: scientificNameController,
-                  decoration: const InputDecoration(labelText: 'Nombre científico'),
-                  validator: (value) => value == null || value.trim().isEmpty ? 'Requerido' : null,
+                  decoration: const InputDecoration(
+                    labelText: 'Nombre científico',
+                  ),
+                  validator: (value) => value == null || value.trim().isEmpty
+                      ? 'Requerido'
+                      : null,
                 ),
                 TextFormField(
                   controller: locationController,
@@ -123,7 +131,9 @@ class _HistoryScreenState extends State<HistoryScreen>
                 Navigator.pop(context);
               }
             },
-            style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF1E5631)),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: const Color(0xFF1E5631),
+            ),
             child: const Text('Guardar'),
           ),
         ],
@@ -162,7 +172,7 @@ class _HistoryScreenState extends State<HistoryScreen>
         backgroundColor: const Color(0xFF1E5631),
         elevation: 0,
         leading: IconButton(
-          icon: const Icon(Icons.arrow_back),
+          icon: const Icon(Icons.arrow_back, color: Colors.white),
           onPressed: () => Navigator.pop(context),
         ),
         title: const Text(
@@ -194,9 +204,7 @@ class _HistoryScreenState extends State<HistoryScreen>
       ),
       body: Stack(
         children: [
-          Container(
-            color: const Color(0xFFF5F9F7),
-          ),
+          Container(color: const Color(0xFFF5F9F7)),
           SafeArea(
             child: TabBarView(
               controller: _tabController,
@@ -232,8 +240,10 @@ class _HistoryScreenState extends State<HistoryScreen>
                     child: TextField(
                       decoration: InputDecoration(
                         hintText: 'Buscar',
-                        prefixIcon:
-                            const Icon(Icons.search, color: Color(0xFF1E5631)),
+                        prefixIcon: const Icon(
+                          Icons.search,
+                          color: Color(0xFF1E5631),
+                        ),
                         border: OutlineInputBorder(
                           borderRadius: BorderRadius.circular(10),
                           borderSide: const BorderSide(
@@ -364,11 +374,7 @@ class _HistoryScreenState extends State<HistoryScreen>
                 color: Colors.grey.shade200,
                 borderRadius: BorderRadius.circular(10),
               ),
-              child: const Icon(
-                Icons.image,
-                color: Colors.grey,
-                size: 40,
-              ),
+              child: const Icon(Icons.image, color: Colors.grey, size: 40),
             ),
             const SizedBox(width: 12),
             Expanded(
@@ -385,34 +391,22 @@ class _HistoryScreenState extends State<HistoryScreen>
                   ),
                   Text(
                     captura.scientificName,
-                    style: TextStyle(
-                      fontSize: 12,
-                      color: Colors.grey.shade600,
-                    ),
+                    style: TextStyle(fontSize: 12, color: Colors.grey.shade600),
                   ),
                   const SizedBox(height: 4),
                   Text(
                     '${captura.dateTime}',
-                    style: TextStyle(
-                      fontSize: 11,
-                      color: Colors.grey,
-                    ),
+                    style: TextStyle(fontSize: 11, color: Colors.grey),
                   ),
                   const SizedBox(height: 8),
                   Text(
                     captura.location,
-                    style: TextStyle(
-                      fontSize: 11,
-                      color: Colors.grey.shade700,
-                    ),
+                    style: TextStyle(fontSize: 11, color: Colors.grey.shade700),
                   ),
                   const SizedBox(height: 4),
                   Text(
                     captura.notes,
-                    style: TextStyle(
-                      fontSize: 11,
-                      color: Colors.grey.shade700,
-                    ),
+                    style: TextStyle(fontSize: 11, color: Colors.grey.shade700),
                   ),
                 ],
               ),
@@ -441,20 +435,13 @@ class _HistoryScreenState extends State<HistoryScreen>
         color: Colors.white,
         borderRadius: BorderRadius.circular(12),
         boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.05),
-            blurRadius: 8,
-          ),
+          BoxShadow(color: Colors.black.withOpacity(0.05), blurRadius: 8),
         ],
       ),
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          Icon(
-            icon,
-            size: 32,
-            color: const Color(0xFF1E5631),
-          ),
+          Icon(icon, size: 32, color: const Color(0xFF1E5631)),
           const SizedBox(height: 8),
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 8),
@@ -493,6 +480,38 @@ class _HistoryScreenState extends State<HistoryScreen>
       unselectedItemColor: Colors.grey,
       type: BottomNavigationBarType.fixed,
       currentIndex: currentIndex,
+      onTap: (index) {
+        switch (index) {
+          case 0:
+            Navigator.pushReplacement(
+              context,
+              MaterialPageRoute(builder: (context) => const HomeScreen()),
+            );
+            break;
+          case 1:
+            Navigator.pushReplacement(
+              context,
+              MaterialPageRoute(
+                builder: (context) => const IdentifySpeciesScreen(),
+              ),
+            );
+            break;
+          case 2:
+            Navigator.pushReplacement(
+              context,
+              MaterialPageRoute(builder: (context) => const MapScreen()),
+            );
+            break;
+          case 3:
+            break; // Ya estamos en historial
+          case 4:
+            Navigator.pushReplacement(
+              context,
+              MaterialPageRoute(builder: (context) => const ProfileScreen()),
+            );
+            break;
+        }
+      },
       items: const [
         BottomNavigationBarItem(icon: Icon(Icons.home), label: 'Inicio'),
         BottomNavigationBarItem(icon: Icon(Icons.camera_alt), label: 'Cámara'),

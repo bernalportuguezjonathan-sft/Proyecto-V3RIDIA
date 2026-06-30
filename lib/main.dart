@@ -31,17 +31,24 @@ class VeridiaApp extends StatelessWidget {
       home: StreamBuilder<User?>(
         stream: FirebaseAuth.instance.authStateChanges(),
         builder: (context, snapshot) {
-          // Si el usuario está logueado, muestra HomeScreen
-          if (snapshot.connectionState == ConnectionState.active && snapshot.hasData) {
-            // Inicializar el UserRepository cuando el usuario se autentica
-            UserRepository.instance.initializeUser();
-            return const HomeScreen();
-          }
-          // Si no, muestra LoginScreen
-          else if (snapshot.connectionState == ConnectionState.active) {
+          if (snapshot.connectionState == ConnectionState.active &&
+              snapshot.hasData) {
+            return FutureBuilder<void>(
+              future: UserRepository.instance.initializeUser(),
+              builder: (context, initSnapshot) {
+                if (initSnapshot.connectionState == ConnectionState.done) {
+                  return const HomeScreen();
+                }
+                return const Scaffold(
+                  body: Center(
+                    child: CircularProgressIndicator(color: Color(0xFF1E5631)),
+                  ),
+                );
+              },
+            );
+          } else if (snapshot.connectionState == ConnectionState.active) {
             return const WelcomeScreen();
           }
-          // Mientras se verifica, muestra una pantalla de carga
           return const Scaffold(
             body: Center(
               child: CircularProgressIndicator(color: Color(0xFF1E5631)),

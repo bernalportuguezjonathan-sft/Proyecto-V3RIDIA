@@ -7,19 +7,39 @@ class UserRepository {
 
   static final UserRepository instance = UserRepository._();
 
-  late ValueNotifier<UserProfile?> currentUser = ValueNotifier<UserProfile?>(null);
+  late ValueNotifier<UserProfile?> currentUser = ValueNotifier<UserProfile?>(
+    null,
+  );
 
   Future<void> initializeUser() async {
     final user = FirebaseAuth.instance.currentUser;
     if (user != null) {
-      currentUser.value = UserProfile(
-        userId: user.uid,
-        email: user.email ?? '',
-        displayName: user.displayName ?? user.email?.split('@').first ?? 'Usuario',
-        photoURL: user.photoURL,
-        tokens: 0,
-        createdDate: DateTime.now(),
-      );
+      try {
+        await user.reload();
+      } catch (_) {}
+
+      final refreshedUser = FirebaseAuth.instance.currentUser;
+      if (refreshedUser != null) {
+        final currentTokens = currentUser.value?.tokens ?? 0;
+        final currentCreatedDate =
+            currentUser.value?.createdDate ?? DateTime.now();
+
+        currentUser.value = UserProfile(
+          userId: refreshedUser.uid,
+          email: refreshedUser.email ?? '',
+          displayName:
+              refreshedUser.displayName ??
+              refreshedUser.email?.split('@').first ??
+              'Usuario',
+          tokens: currentTokens,
+          createdDate: currentCreatedDate,
+          photoURL: refreshedUser.photoURL,
+        );
+      } else {
+        currentUser.value = null;
+      }
+    } else {
+      currentUser.value = null;
     }
   }
 
@@ -33,10 +53,10 @@ class UserRepository {
 
   void removeTokens(int amount) {
     if (currentUser.value != null) {
-      final newTokens = (currentUser.value!.tokens - amount).clamp(0, double.maxFinite).toInt();
-      currentUser.value = currentUser.value!.copyWith(
-        tokens: newTokens,
-      );
+      final newTokens = (currentUser.value!.tokens - amount)
+          .clamp(0, double.maxFinite)
+          .toInt();
+      currentUser.value = currentUser.value!.copyWith(tokens: newTokens);
     }
   }
 

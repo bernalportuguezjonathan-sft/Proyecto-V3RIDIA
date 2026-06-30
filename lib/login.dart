@@ -16,8 +16,8 @@ class _LoginScreenState extends State<LoginScreen> {
 
   // La misma función de alertas modernas que usamos en el registro
   void _mostrarAlerta(String mensaje) {
-    ScaffoldMessenger.of(context).clearSnackBars(); 
-    
+    ScaffoldMessenger.of(context).clearSnackBars();
+
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
         content: Row(
@@ -26,19 +26,21 @@ class _LoginScreenState extends State<LoginScreen> {
             const SizedBox(width: 12),
             Expanded(
               child: Text(
-                mensaje, 
-                style: const TextStyle(color: Colors.white, fontSize: 14, fontWeight: FontWeight.w500),
+                mensaje,
+                style: const TextStyle(
+                  color: Colors.white,
+                  fontSize: 14,
+                  fontWeight: FontWeight.w500,
+                ),
               ),
             ),
           ],
         ),
         backgroundColor: const Color(0xFF1E5631), // Verde ambiental de Veridia
         behavior: SnackBarBehavior.floating,
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(12),
-        ),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
         margin: const EdgeInsets.symmetric(horizontal: 20, vertical: 15),
-        duration: const Duration(seconds: 2), 
+        duration: const Duration(seconds: 2),
       ),
     );
   }
@@ -82,11 +84,10 @@ class _LoginScreenState extends State<LoginScreen> {
           MaterialPageRoute(builder: (context) => const HomeScreen()),
         );
       }
-
     } on FirebaseAuthException catch (e) {
       if (mounted) Navigator.pop(context); // Cerramos el loader
 
-      // AQUÍ CUMPLIMOS TU REGLA #1: 
+      // AQUÍ CUMPLIMOS TU REGLA #1:
       // Si el correo no existe (user-not-found) o las credenciales no cuadran (invalid-credential en nuevas versiones de Firebase)
       if (e.code == 'user-not-found' || e.code == 'invalid-credential') {
         _mostrarAlerta('Primero te debes registrar antes de iniciar sesión.');
@@ -125,7 +126,10 @@ class _LoginScreenState extends State<LoginScreen> {
           prefixIcon: Icon(icon, color: Colors.black87, size: 22),
           hintText: hintText,
           hintStyle: const TextStyle(color: Colors.grey, fontSize: 15),
-          contentPadding: const EdgeInsets.symmetric(vertical: 18, horizontal: 16),
+          contentPadding: const EdgeInsets.symmetric(
+            vertical: 18,
+            horizontal: 16,
+          ),
           filled: true,
           fillColor: Colors.white,
           border: OutlineInputBorder(
@@ -218,8 +222,8 @@ class _LoginScreenState extends State<LoginScreen> {
                 const Text(
                   'Iniciar Sesión',
                   style: TextStyle(
-                    fontSize: 22, 
-                    fontWeight: FontWeight.bold, 
+                    fontSize: 22,
+                    fontWeight: FontWeight.bold,
                     color: Colors.black87,
                     letterSpacing: 0.5,
                   ),
@@ -236,7 +240,7 @@ class _LoginScreenState extends State<LoginScreen> {
                         _crearCampoTexto(
                           controller: _emailController,
                           hintText: 'Correo electrónico',
-                          icon: Icons.hourglass_empty,
+                          icon: Icons.email_outlined,
                         ),
                         _crearCampoTexto(
                           controller: _passwordController,
@@ -260,8 +264,8 @@ class _LoginScreenState extends State<LoginScreen> {
                             child: const Text(
                               'Entrar',
                               style: TextStyle(
-                                color: Colors.white, 
-                                fontSize: 16, 
+                                color: Colors.white,
+                                fontSize: 16,
                                 fontWeight: FontWeight.w500,
                               ),
                             ),
@@ -272,7 +276,9 @@ class _LoginScreenState extends State<LoginScreen> {
                           onPressed: () {
                             Navigator.push(
                               context,
-                              MaterialPageRoute(builder: (context) => const RegisterScreen()),
+                              MaterialPageRoute(
+                                builder: (context) => const RegisterScreen(),
+                              ),
                             );
                           },
                           child: const Text(

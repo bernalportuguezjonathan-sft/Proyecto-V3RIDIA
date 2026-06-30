@@ -17,7 +17,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
   // Función para las alertas modernas y flotantes
   void _mostrarAlerta(String mensaje) {
     ScaffoldMessenger.of(context).clearSnackBars(); // Evita que se acumulen
-    
+
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
         content: Row(
@@ -26,17 +26,19 @@ class _RegisterScreenState extends State<RegisterScreen> {
             const SizedBox(width: 12),
             Expanded(
               child: Text(
-                mensaje, 
-                style: const TextStyle(color: Colors.white, fontSize: 14, fontWeight: FontWeight.w500),
+                mensaje,
+                style: const TextStyle(
+                  color: Colors.white,
+                  fontSize: 14,
+                  fontWeight: FontWeight.w500,
+                ),
               ),
             ),
           ],
         ),
         backgroundColor: const Color(0xFF1E5631), // Verde ambiental
         behavior: SnackBarBehavior.floating,
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(12),
-        ),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
         margin: const EdgeInsets.symmetric(horizontal: 20, vertical: 15),
         duration: const Duration(seconds: 2), // Desaparece rápido
       ),
@@ -114,13 +116,15 @@ class _RegisterScreenState extends State<RegisterScreen> {
             behavior: SnackBarBehavior.floating,
           ),
         );
-        Navigator.pop(context); 
+        Navigator.pop(context);
       }
     } on FirebaseAuthException catch (e) {
       if (mounted) Navigator.pop(context);
 
       if (e.code == 'email-already-in-use') {
-        _mostrarAlerta('Este correo ya está registrado. Por favor, inicia sesión.');
+        _mostrarAlerta(
+          'Este correo ya está registrado. Por favor, inicia sesión.',
+        );
       } else {
         _mostrarAlerta('Ocurrió un error al registrarse. Intenta de nuevo.');
       }
@@ -155,7 +159,10 @@ class _RegisterScreenState extends State<RegisterScreen> {
           prefixIcon: Icon(icon, color: Colors.black87, size: 22),
           hintText: hintText,
           hintStyle: const TextStyle(color: Colors.grey, fontSize: 15),
-          contentPadding: const EdgeInsets.symmetric(vertical: 18, horizontal: 16),
+          contentPadding: const EdgeInsets.symmetric(
+            vertical: 18,
+            horizontal: 16,
+          ),
           filled: true,
           fillColor: Colors.white,
           border: OutlineInputBorder(
@@ -248,8 +255,8 @@ class _RegisterScreenState extends State<RegisterScreen> {
                 const Text(
                   'Regístrate',
                   style: TextStyle(
-                    fontSize: 22, 
-                    fontWeight: FontWeight.bold, 
+                    fontSize: 22,
+                    fontWeight: FontWeight.bold,
                     color: Colors.black87,
                     letterSpacing: 0.5,
                   ),
@@ -271,7 +278,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
                         _crearCampoTexto(
                           controller: _emailController,
                           hintText: 'Correo electrónico',
-                          icon: Icons.hourglass_empty,
+                          icon: Icons.email_outlined,
                         ),
                         _crearCampoTexto(
                           controller: _passwordController,
@@ -301,8 +308,33 @@ class _RegisterScreenState extends State<RegisterScreen> {
                             child: const Text(
                               'Registrarse',
                               style: TextStyle(
-                                color: Colors.white, 
-                                fontSize: 16, 
+                                color: Colors.white,
+                                fontSize: 16,
+                                fontWeight: FontWeight.w500,
+                              ),
+                            ),
+                          ),
+                        ),
+                        const SizedBox(height: 16),
+                        SizedBox(
+                          width: double.infinity,
+                          height: 50,
+                          child: OutlinedButton(
+                            onPressed: () {
+                              Navigator.pop(context);
+                            },
+                            style: OutlinedButton.styleFrom(
+                              backgroundColor: Colors.white,
+                              side: const BorderSide(color: Color(0xFF1E5631)),
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(10),
+                              ),
+                            ),
+                            child: const Text(
+                              'Volver al login',
+                              style: TextStyle(
+                                color: Color(0xFF1E5631),
+                                fontSize: 16,
                                 fontWeight: FontWeight.w500,
                               ),
                             ),
