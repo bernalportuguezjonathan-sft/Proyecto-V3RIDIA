@@ -137,6 +137,13 @@ class _RegisterScreenState extends State<RegisterScreen> {
           );
         } catch (e) {
           debugPrint('Could not persist user profile to Firestore: $e');
+          // Asegurar caché aunque Firestore falle
+          await UserRepository.instance.cacheUserProfile(
+            credential.user!.uid,
+            0,
+            _selectedRole!,
+            name,
+          );
           if (mounted) {
             ScaffoldMessenger.of(context).showSnackBar(
               SnackBar(

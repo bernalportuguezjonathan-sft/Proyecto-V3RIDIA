@@ -15,7 +15,38 @@ class UserRepository {
     null,
   );
 
-  Future<void> initializeUser() async {
+  Future<List<UserProfile>> fetchAllUsers({String? role}) async {
+    try {
+      final query = await _firestore.collection('users').get();
+      final users = query.docs
+          .map((doc) {
+            final data = doc.data();
+            final createdDate = data['createdDate'] is String
+                ? DateTime.tryParse(data['createdDate'] as String)
+                : DateTime.now();
+            return UserProfile(
+              userId: doc.id,
+              email: data['email'] as String? ?? '',
+              displayName:
+                  data['displayName'] as String? ??
+                  (data['email'] as String? ?? '').split('@').first,
+              photoURL: data['photoURL'] as String?,
+              tokens: data['tokens'] as int? ?? 0,
+              role: data['role'] as String? ?? 'Explorador',
+              createdDate: createdDate ?? DateTime.now(),
+            );
+          })
+          .where((user) => role == null || user.role == role)
+          .toList();
+      users.sort((a, b) => a.displayName.compareTo(b.displayName));
+      return users;
+    } catch (e) {
+      debugPrint('UserRepository.fetchAllUsers error: $e');
+      return [];
+    }
+  }
+
+Future<void> initializeUser() async {
     final user = FirebaseAuth.instance.currentUser;
     if (user != null) {
       try {
@@ -32,49 +63,39 @@ class UserRepository {
               .get();
           data = userDoc.data();
         } catch (e) {
-          // Firestore read failed (possibly permission-denied).
+          // Firestore read failed (possibly permission-denied). Use cached data.
           debugPrint('Firestore user read error for ${refreshedUser.uid}: $e');
-          final cachedTokens = await _getCachedTokens(refreshedUser.uid);
-          final cachedRole = await _getCachedRole(refreshedUser.uid);
-          final cachedDisplayName = await _getCachedDisplayName(
-            refreshedUser.uid,
-          );
-          currentUser.value = UserProfile(
-            userId: refreshedUser.uid,
-            email: refreshedUser.email ?? '',
-            displayName: cachedDisplayName.isNotEmpty
-                ? cachedDisplayName
-                : refreshedUser.displayName ??
-                      refreshedUser.email?.split('@').first ??
-                      'Usuario',
-            photoURL: refreshedUser.photoURL,
-            tokens: cachedTokens,
-            role: cachedRole.isNotEmpty ? cachedRole : 'Explorador',
-            createdDate: DateTime.now(),
-          );
-          return;
         }
 
+        // Si data es null, intentar usar caché
+        final cachedTokens = await _getCachedTokens(refreshedUser.uid);
+        final cachedRole = await _getCachedRole(refreshedUser.uid);
+        final cachedDisplayName = await _getCachedDisplayName(
+          refreshedUser.uid,
+        );
+
         final currentTokens = data != null
-            ? (data['tokens'] as int? ?? 0)
-            : await _getCachedTokens(refreshedUser.uid);
-        final currentCreatedDate = data != null && data['createdDate'] != null
-            ? DateTime.tryParse(data['createdDate'] as String) ?? DateTime.now()
-            : currentUser.value?.createdDate ?? DateTime.now();
+            ? (data['tokens'] as int? ?? cachedTokens)
+            : cachedTokens;
         final currentRole = data != null
-            ? (data['role'] as String? ?? 'Explorador')
-            : (await _getCachedRole(refreshedUser.uid)).isNotEmpty
-            ? await _getCachedRole(refreshedUser.uid)
-            : 'Explorador';
+            ? (data['role'] as String? ?? cachedRole)
+            : (cachedRole.isNotEmpty ? cachedRole : 'Explorador');
         final displayName = data != null && data['displayName'] != null
             ? data['displayName'] as String
-            : await _getCachedDisplayName(refreshedUser.uid);
+            : (cachedDisplayName.isNotEmpty
+                ? cachedDisplayName
+                : (refreshedUser.displayName ??
+                    refreshedUser.email?.split('@').first ??
+                    'Usuario'));
+        final currentCreatedDate = data != null && data['createdDate'] != null
+            ? DateTime.tryParse(data['createdDate'] as String) ?? DateTime.now()
+            : DateTime.now();
 
         final resolvedDisplayName = displayName.isNotEmpty
             ? displayName
             : refreshedUser.displayName ??
-                  refreshedUser.email?.split('@').first ??
-                  'Usuario';
+                refreshedUser.email?.split('@').first ??
+                'Usuario';
 
         currentUser.value = UserProfile(
           userId: refreshedUser.uid,
@@ -84,13 +105,6 @@ class UserRepository {
           tokens: currentTokens,
           role: currentRole,
           createdDate: currentCreatedDate,
-        );
-
-        await _cacheUserProfile(
-          refreshedUser.uid,
-          currentTokens,
-          currentRole,
-          resolvedDisplayName,
         );
       } else {
         currentUser.value = null;
@@ -116,6 +130,21 @@ class UserRepository {
       'photoURL': null,
     });
     await _cacheUserProfile(userId, 0, role, displayName);
+  }
+
+  Future<void> updateUserProfile({
+    required String userId,
+    required String displayName,
+    String? photoURL,
+  }) async {
+    try {
+      await _firestore.collection('users').doc(userId).update({
+        'displayName': displayName,
+        if (photoURL != null) 'photoURL': photoURL,
+      });
+    } catch (e) {
+      debugPrint('Warning: failed to update profile in Firestore: $e');
+    }
   }
 
   void addTokens(int amount) {
@@ -173,6 +202,15 @@ class UserRepository {
       debugPrint('Warning: failed to read cached tokens locally: $e');
       return 0;
     }
+  }
+
+  Future<void> cacheUserProfile(
+    String uid,
+    int tokens,
+    String role,
+    String displayName,
+  ) async {
+    await _cacheUserProfile(uid, tokens, role, displayName);
   }
 
   Future<void> _cacheUserProfile(

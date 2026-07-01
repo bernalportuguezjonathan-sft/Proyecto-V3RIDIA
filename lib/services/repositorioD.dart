@@ -44,18 +44,10 @@ class ChallengeRepository {
       }
 
       final updated = List<Challenge>.from(challenges.value);
-      updated[index] = Challenge(
-        id: challenge.id,
-        title: challenge.title,
-        description: challenge.description,
-        targetSpecies: challenge.targetSpecies,
-        targetGoal: challenge.targetGoal,
-        dueDate: challenge.dueDate,
-        createdDate: challenge.createdDate,
+      updated[index] = challenge.copyWith(
         currentProgress: normalizedProgress,
         isCompleted: isCompleted,
         tokensAwarded: challenge.tokensAwarded || isCompleted,
-        tokensReward: challenge.tokensReward,
       );
       challenges.value = updated;
     }

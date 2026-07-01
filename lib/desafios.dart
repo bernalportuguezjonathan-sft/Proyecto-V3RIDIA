@@ -516,13 +516,8 @@ class _ChallengesScreenState extends State<ChallengesScreen> {
             ],
           );
         },
-      ),
-      floatingActionButton: FloatingActionButton(
-        onPressed: () => _showChallengeForm(),
-        backgroundColor: const Color(0xFF1E5631),
-        child: const Icon(Icons.add, color: Colors.white),
-      ),
-      bottomNavigationBar: BottomNavigationBar(
+),
+       bottomNavigationBar: BottomNavigationBar(
         backgroundColor: Colors.white,
         selectedItemColor: const Color(0xFF1E5631),
         unselectedItemColor: Colors.grey,
