@@ -26,20 +26,27 @@ class UserRepository {
       if (refreshedUser != null) {
         Map<String, dynamic>? data;
         try {
-          final userDoc = await _firestore.collection('users').doc(refreshedUser.uid).get();
+          final userDoc = await _firestore
+              .collection('users')
+              .doc(refreshedUser.uid)
+              .get();
           data = userDoc.data();
         } catch (e) {
           // Firestore read failed (possibly permission-denied).
           debugPrint('Firestore user read error for ${refreshedUser.uid}: $e');
           final cachedTokens = await _getCachedTokens(refreshedUser.uid);
           final cachedRole = await _getCachedRole(refreshedUser.uid);
-          final cachedDisplayName = await _getCachedDisplayName(refreshedUser.uid);
+          final cachedDisplayName = await _getCachedDisplayName(
+            refreshedUser.uid,
+          );
           currentUser.value = UserProfile(
             userId: refreshedUser.uid,
             email: refreshedUser.email ?? '',
             displayName: cachedDisplayName.isNotEmpty
                 ? cachedDisplayName
-                : refreshedUser.displayName ?? refreshedUser.email?.split('@').first ?? 'Usuario',
+                : refreshedUser.displayName ??
+                      refreshedUser.email?.split('@').first ??
+                      'Usuario',
             photoURL: refreshedUser.photoURL,
             tokens: cachedTokens,
             role: cachedRole.isNotEmpty ? cachedRole : 'Explorador',
@@ -48,22 +55,26 @@ class UserRepository {
           return;
         }
 
-        final currentTokens = data != null ? (data['tokens'] as int? ?? 0) : await _getCachedTokens(refreshedUser.uid);
+        final currentTokens = data != null
+            ? (data['tokens'] as int? ?? 0)
+            : await _getCachedTokens(refreshedUser.uid);
         final currentCreatedDate = data != null && data['createdDate'] != null
             ? DateTime.tryParse(data['createdDate'] as String) ?? DateTime.now()
             : currentUser.value?.createdDate ?? DateTime.now();
         final currentRole = data != null
             ? (data['role'] as String? ?? 'Explorador')
             : (await _getCachedRole(refreshedUser.uid)).isNotEmpty
-                ? await _getCachedRole(refreshedUser.uid)
-                : 'Explorador';
+            ? await _getCachedRole(refreshedUser.uid)
+            : 'Explorador';
         final displayName = data != null && data['displayName'] != null
             ? data['displayName'] as String
             : await _getCachedDisplayName(refreshedUser.uid);
 
         final resolvedDisplayName = displayName.isNotEmpty
             ? displayName
-            : refreshedUser.displayName ?? refreshedUser.email?.split('@').first ?? 'Usuario';
+            : refreshedUser.displayName ??
+                  refreshedUser.email?.split('@').first ??
+                  'Usuario';
 
         currentUser.value = UserProfile(
           userId: refreshedUser.uid,
@@ -75,7 +86,12 @@ class UserRepository {
           createdDate: currentCreatedDate,
         );
 
-        await _cacheUserProfile(refreshedUser.uid, currentTokens, currentRole, resolvedDisplayName);
+        await _cacheUserProfile(
+          refreshedUser.uid,
+          currentTokens,
+          currentRole,
+          resolvedDisplayName,
+        );
       } else {
         currentUser.value = null;
       }
@@ -104,7 +120,7 @@ class UserRepository {
 
   void addTokens(int amount) {
     if (currentUser.value != null) {
-      final newTokens = (currentUser.value!.tokens + amount).clamp(0, 100).toInt();
+      final newTokens = (currentUser.value!.tokens + amount).toInt();
       currentUser.value = currentUser.value!.copyWith(tokens: newTokens);
       _cacheTokens(currentUser.value!.userId, newTokens);
 
@@ -121,7 +137,7 @@ class UserRepository {
   void removeTokens(int amount) {
     if (currentUser.value != null) {
       final newTokens = (currentUser.value!.tokens - amount)
-          .clamp(0, 100)
+          .clamp(0, double.maxFinite)
           .toInt();
       currentUser.value = currentUser.value!.copyWith(tokens: newTokens);
       _cacheTokens(currentUser.value!.userId, newTokens);
@@ -159,7 +175,12 @@ class UserRepository {
     }
   }
 
-  Future<void> _cacheUserProfile(String uid, int tokens, String role, String displayName) async {
+  Future<void> _cacheUserProfile(
+    String uid,
+    int tokens,
+    String role,
+    String displayName,
+  ) async {
     await _cacheTokens(uid, tokens);
     await _cacheRole(uid, role);
     await _cacheDisplayName(uid, displayName);

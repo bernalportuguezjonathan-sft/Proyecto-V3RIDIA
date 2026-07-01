@@ -25,8 +25,83 @@ class VeridiaApp extends StatelessWidget {
       title: 'Veridia',
       debugShowCheckedModeBanner: false,
       theme: ThemeData(
-        colorScheme: ColorScheme.fromSeed(seedColor: const Color(0xFF1E5631)),
+        colorScheme: ColorScheme.fromSeed(
+          seedColor: const Color(0xFF1E5631),
+          primary: const Color(0xFF1E5631),
+          secondary: const Color(0xFF3B7A4B),
+          surface: Colors.white,
+          onPrimary: Colors.white,
+          onSecondary: Colors.white,
+          onSurface: Colors.black87,
+          surfaceTint: const Color(0xFF1E5631),
+        ),
         useMaterial3: true,
+        scaffoldBackgroundColor: const Color(0xFFF4F6F8),
+        cardTheme: CardThemeData(
+          color: Colors.white,
+          elevation: 8,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(24),
+          ),
+        ),
+        inputDecorationTheme: InputDecorationTheme(
+          filled: true,
+          fillColor: Colors.white,
+          contentPadding: const EdgeInsets.symmetric(
+            vertical: 18,
+            horizontal: 18,
+          ),
+          hintStyle: const TextStyle(color: Colors.grey, fontSize: 15),
+          border: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(14),
+            borderSide: const BorderSide(color: Color(0xFFCAD2C5), width: 1),
+          ),
+          enabledBorder: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(14),
+            borderSide: const BorderSide(color: Color(0xFFCAD2C5), width: 1),
+          ),
+          focusedBorder: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(14),
+            borderSide: const BorderSide(color: Color(0xFF1E5631), width: 1.5),
+          ),
+        ),
+        elevatedButtonTheme: ElevatedButtonThemeData(
+          style: ElevatedButton.styleFrom(
+            backgroundColor: const Color(0xFF1E5631),
+            foregroundColor: Colors.white,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(16),
+            ),
+            elevation: 0,
+            minimumSize: const Size(double.infinity, 52),
+            textStyle: const TextStyle(
+              fontSize: 16,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+        ),
+        textButtonTheme: TextButtonThemeData(
+          style: TextButton.styleFrom(
+            foregroundColor: const Color(0xFF1E5631),
+            textStyle: const TextStyle(
+              fontSize: 15,
+              fontWeight: FontWeight.w500,
+            ),
+          ),
+        ),
+        snackBarTheme: SnackBarThemeData(
+          backgroundColor: const Color(0xFF1E5631),
+          contentTextStyle: const TextStyle(
+            color: Colors.white,
+            fontSize: 14,
+            fontWeight: FontWeight.w500,
+          ),
+          behavior: SnackBarBehavior.floating,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(12),
+          ),
+          elevation: 4,
+        ),
       ),
       // StreamBuilder para verificar si el usuario está autenticado
       home: StreamBuilder<User?>(

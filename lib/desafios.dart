@@ -38,9 +38,7 @@ class _ChallengesScreenState extends State<ChallengesScreen> {
               await FirebaseAuth.instance.signOut();
               if (!mounted) return;
               navigator.pushAndRemoveUntil(
-                MaterialPageRoute(
-                  builder: (context) => const LoginScreen(),
-                ),
+                MaterialPageRoute(builder: (context) => const LoginScreen()),
                 (route) => false,
               );
             },
@@ -53,11 +51,18 @@ class _ChallengesScreenState extends State<ChallengesScreen> {
 
   void _showChallengeForm({Challenge? challenge}) {
     final titleController = TextEditingController(text: challenge?.title ?? '');
-    final descriptionController = TextEditingController(text: challenge?.description ?? '');
-    final speciesController = TextEditingController(text: challenge?.targetSpecies ?? '');
-    final goalController = TextEditingController(text: challenge?.targetGoal.toString() ?? '5');
+    final descriptionController = TextEditingController(
+      text: challenge?.description ?? '',
+    );
+    final speciesController = TextEditingController(
+      text: challenge?.targetSpecies ?? '',
+    );
+    final goalController = TextEditingController(
+      text: challenge?.targetGoal.toString() ?? '5',
+    );
     final formKey = GlobalKey<FormState>();
-    DateTime selectedDate = challenge?.dueDate ?? DateTime.now().add(const Duration(days: 30));
+    DateTime selectedDate =
+        challenge?.dueDate ?? DateTime.now().add(const Duration(days: 30));
 
     showDialog(
       context: context,
@@ -71,8 +76,12 @@ class _ChallengesScreenState extends State<ChallengesScreen> {
               children: [
                 TextFormField(
                   controller: titleController,
-                  decoration: const InputDecoration(labelText: 'Título del desafío'),
-                  validator: (value) => value == null || value.trim().isEmpty ? 'Requerido' : null,
+                  decoration: const InputDecoration(
+                    labelText: 'Título del desafío',
+                  ),
+                  validator: (value) => value == null || value.trim().isEmpty
+                      ? 'Requerido'
+                      : null,
                 ),
                 TextFormField(
                   controller: descriptionController,
@@ -81,14 +90,22 @@ class _ChallengesScreenState extends State<ChallengesScreen> {
                 ),
                 TextFormField(
                   controller: speciesController,
-                  decoration: const InputDecoration(labelText: 'Especie objetivo'),
-                  validator: (value) => value == null || value.trim().isEmpty ? 'Requerido' : null,
+                  decoration: const InputDecoration(
+                    labelText: 'Especie objetivo',
+                  ),
+                  validator: (value) => value == null || value.trim().isEmpty
+                      ? 'Requerido'
+                      : null,
                 ),
                 TextFormField(
                   controller: goalController,
-                  decoration: const InputDecoration(labelText: 'Meta (cantidad)'),
+                  decoration: const InputDecoration(
+                    labelText: 'Meta (cantidad)',
+                  ),
                   keyboardType: TextInputType.number,
-                  validator: (value) => value == null || value.trim().isEmpty ? 'Requerido' : null,
+                  validator: (value) => value == null || value.trim().isEmpty
+                      ? 'Requerido'
+                      : null,
                 ),
                 const SizedBox(height: 12),
                 Row(
@@ -105,7 +122,9 @@ class _ChallengesScreenState extends State<ChallengesScreen> {
                           context: context,
                           initialDate: selectedDate,
                           firstDate: DateTime.now(),
-                          lastDate: DateTime.now().add(const Duration(days: 365)),
+                          lastDate: DateTime.now().add(
+                            const Duration(days: 365),
+                          ),
                         );
                         if (picked != null) {
                           selectedDate = picked;
@@ -159,7 +178,14 @@ class _ChallengesScreenState extends State<ChallengesScreen> {
                 Navigator.pop(context);
               }
             },
-            style: ElevatedButton.styleFrom(backgroundColor: const Color.fromARGB(255, 246, 246, 246)),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: const Color(0xFF1E5631),
+              foregroundColor: Colors.white,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(16),
+              ),
+              padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 24),
+            ),
             child: const Text('Guardar'),
           ),
         ],
@@ -167,15 +193,22 @@ class _ChallengesScreenState extends State<ChallengesScreen> {
     );
   }
 
-  Future<void> _pickImageFromGallery() async {
+  Future<void> _pickImageFromGallery(Challenge challenge) async {
     final picker = ImagePicker();
     final pickedFile = await picker.pickImage(source: ImageSource.gallery);
     if (!mounted) return;
     if (pickedFile != null) {
-      // Aquí puedes guardar o usar la imagen seleccionada como necesites.
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Imagen seleccionada: ${pickedFile.name}')),
+      final newProgress = (challenge.currentProgress + 1).clamp(
+        0,
+        challenge.targetGoal,
       );
+      ChallengeRepository.instance.updateProgress(challenge.id, newProgress);
+      final message = newProgress >= challenge.targetGoal
+          ? 'Desafío completado! Has ganado monedas extra.'
+          : 'Foto subida: progreso $newProgress/${challenge.targetGoal}';
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text(message)));
     }
   }
 
@@ -297,7 +330,7 @@ class _ChallengesScreenState extends State<ChallengesScreen> {
                             margin: const EdgeInsets.only(bottom: 12),
                             decoration: BoxDecoration(
                               color: Colors.white,
-                              borderRadius: BorderRadius.circular(12),
+                              borderRadius: BorderRadius.circular(18),
                               boxShadow: [
                                 const BoxShadow(
                                   color: Color.fromRGBO(0, 0, 0, 0.05),
@@ -315,7 +348,8 @@ class _ChallengesScreenState extends State<ChallengesScreen> {
                                     children: [
                                       Expanded(
                                         child: Column(
-                                          crossAxisAlignment: CrossAxisAlignment.start,
+                                          crossAxisAlignment:
+                                              CrossAxisAlignment.start,
                                           children: [
                                             Text(
                                               challenge.title,
@@ -338,14 +372,23 @@ class _ChallengesScreenState extends State<ChallengesScreen> {
                                       ),
                                       if (challenge.isCompleted)
                                         Container(
-                                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                                          padding: const EdgeInsets.symmetric(
+                                            horizontal: 8,
+                                            vertical: 4,
+                                          ),
                                           decoration: BoxDecoration(
                                             color: Colors.green.shade100,
-                                            borderRadius: BorderRadius.circular(8),
+                                            borderRadius: BorderRadius.circular(
+                                              8,
+                                            ),
                                           ),
                                           child: Row(
                                             children: [
-                                              const Icon(Icons.emoji_events, size: 12, color: Colors.green),
+                                              const Icon(
+                                                Icons.emoji_events,
+                                                size: 12,
+                                                color: Colors.green,
+                                              ),
                                               const SizedBox(width: 4),
                                               Text(
                                                 '+${challenge.tokensReward}',
@@ -373,12 +416,18 @@ class _ChallengesScreenState extends State<ChallengesScreen> {
                                     children: [
                                       Text(
                                         'Progreso: ${challenge.currentProgress}/${challenge.targetGoal}',
-                                        style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w600),
+                                        style: const TextStyle(
+                                          fontSize: 11,
+                                          fontWeight: FontWeight.w600,
+                                        ),
                                       ),
                                       const Spacer(),
                                       Text(
                                         'Vence: ${challenge.dueDate.day}/${challenge.dueDate.month}/${challenge.dueDate.year}',
-                                        style: TextStyle(fontSize: 11, color: Colors.grey.shade600),
+                                        style: TextStyle(
+                                          fontSize: 11,
+                                          color: Colors.grey.shade600,
+                                        ),
                                       ),
                                     ],
                                   ),
@@ -386,63 +435,72 @@ class _ChallengesScreenState extends State<ChallengesScreen> {
                                   ClipRRect(
                                     borderRadius: BorderRadius.circular(8),
                                     child: LinearProgressIndicator(
-                                      value: challenge.currentProgress / challenge.targetGoal,
+                                      value:
+                                          challenge.currentProgress /
+                                          challenge.targetGoal,
                                       minHeight: 6,
                                       backgroundColor: Colors.grey.shade200,
                                       valueColor: AlwaysStoppedAnimation<Color>(
-                                        challenge.isCompleted ? Colors.green : const Color(0xFF1E5631),
+                                        challenge.isCompleted
+                                            ? Colors.green
+                                            : const Color(0xFF1E5631),
                                       ),
                                     ),
                                   ),
                                   const SizedBox(height: 12),
                                   Row(
-                                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                    mainAxisAlignment:
+                                        MainAxisAlignment.spaceBetween,
                                     children: [
-                                      Row(
-                                        children: [
-                                          IconButton(
-                                            onPressed: () {
-                                              ChallengeRepository.instance.updateProgress(
-                                                challenge.id,
-                                                (challenge.currentProgress - 1).clamp(0, challenge.targetGoal),
-                                              );
-                                            },
-                                            icon: const Icon(Icons.remove_circle_outline, size: 20),
-                                            visualDensity: VisualDensity.compact,
+                                      Expanded(
+                                        child: ElevatedButton.icon(
+                                          onPressed: () =>
+                                              _pickImageFromGallery(challenge),
+                                          icon: const Icon(
+                                            Icons.photo_library,
+                                            size: 18,
                                           ),
-                                          IconButton(
-                                            onPressed: () {
-                                              ChallengeRepository.instance.updateProgress(
-                                                challenge.id,
-                                                (challenge.currentProgress + 1).clamp(0, challenge.targetGoal),
-                                              );
-                                            },
-                                            icon: const Icon(Icons.add_circle_outline, size: 20),
-                                            color: const Color(0xFF1E5631),
-                                            visualDensity: VisualDensity.compact,
+                                          label: const Text('Subir foto'),
+                                          style: ElevatedButton.styleFrom(
+                                            backgroundColor: const Color(
+                                              0xFF1E5631,
+                                            ),
+                                            foregroundColor: Colors.white,
+                                            shape: RoundedRectangleBorder(
+                                              borderRadius:
+                                                  BorderRadius.circular(16),
+                                            ),
+                                            padding: const EdgeInsets.symmetric(
+                                              vertical: 14,
+                                            ),
                                           ),
-                                          IconButton(
-                                            onPressed: _pickImageFromGallery,
-                                            icon: const Icon(Icons.photo_library, size: 20),
-                                            color: const Color(0xFF1E5631),
-                                            visualDensity: VisualDensity.compact,
-                                            tooltip: 'Agregar foto',
-                                          ),
-                                        ],
+                                        ),
                                       ),
                                       Row(
                                         children: [
                                           IconButton(
-                                            onPressed: () => _showChallengeForm(challenge: challenge),
-                                            icon: const Icon(Icons.edit, size: 18),
+                                            onPressed: () => _showChallengeForm(
+                                              challenge: challenge,
+                                            ),
+                                            icon: const Icon(
+                                              Icons.edit,
+                                              size: 18,
+                                            ),
                                             color: const Color(0xFF1E5631),
-                                            visualDensity: VisualDensity.compact,
+                                            visualDensity:
+                                                VisualDensity.compact,
                                           ),
                                           IconButton(
-                                            onPressed: () => _showDeleteConfirm(challenge.id),
-                                            icon: const Icon(Icons.delete, size: 18),
+                                            onPressed: () => _showDeleteConfirm(
+                                              challenge.id,
+                                            ),
+                                            icon: const Icon(
+                                              Icons.delete,
+                                              size: 18,
+                                            ),
                                             color: Colors.red,
-                                            visualDensity: VisualDensity.compact,
+                                            visualDensity:
+                                                VisualDensity.compact,
                                           ),
                                         ],
                                       ),
@@ -472,9 +530,15 @@ class _ChallengesScreenState extends State<ChallengesScreen> {
         currentIndex: 0,
         items: const [
           BottomNavigationBarItem(icon: Icon(Icons.home), label: 'Inicio'),
-          BottomNavigationBarItem(icon: Icon(Icons.camera_alt), label: 'Cámara'),
+          BottomNavigationBarItem(
+            icon: Icon(Icons.camera_alt),
+            label: 'Cámara',
+          ),
           BottomNavigationBarItem(icon: Icon(Icons.map), label: 'Mapa'),
-          BottomNavigationBarItem(icon: Icon(Icons.history), label: 'Historial'),
+          BottomNavigationBarItem(
+            icon: Icon(Icons.history),
+            label: 'Historial',
+          ),
           BottomNavigationBarItem(icon: Icon(Icons.person), label: 'Perfil'),
         ],
         onTap: (index) {
@@ -488,7 +552,9 @@ class _ChallengesScreenState extends State<ChallengesScreen> {
             case 1:
               Navigator.pushReplacement(
                 context,
-                MaterialPageRoute(builder: (context) => const IdentifySpeciesScreen()),
+                MaterialPageRoute(
+                  builder: (context) => const IdentifySpeciesScreen(),
+                ),
               );
               break;
             case 2:

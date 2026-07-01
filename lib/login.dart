@@ -77,17 +77,17 @@ class _LoginScreenState extends State<LoginScreen> {
         password: password,
       );
 
-        try {
-          await UserRepository.instance.initializeUser();
-        } catch (e, st) {
-          // Mostrar error más descriptivo para depuración
-          if (mounted) Navigator.pop(context);
-          debugPrint('Error initializing user: $e\n$st');
-          _mostrarAlerta('Error al inicializar usuario: ${e.toString()}');
-          return;
-        }
+      try {
+        await UserRepository.instance.initializeUser();
+      } catch (e, st) {
+        // Mostrar error más descriptivo para depuración
+        if (mounted) Navigator.pop(context);
+        debugPrint('Error initializing user: $e\n$st');
+        _mostrarAlerta('Error al inicializar usuario: ${e.toString()}');
+        return;
+      }
 
-        if (mounted) Navigator.pop(context); // Cerramos el loader
+      if (mounted) Navigator.pop(context); // Cerramos el loader
 
       // Redirigir al usuario según su rol
       if (mounted) {
@@ -135,33 +135,38 @@ class _LoginScreenState extends State<LoginScreen> {
     required IconData icon,
     bool isPassword = false,
   }) {
+    final theme = Theme.of(context);
     return Padding(
       padding: const EdgeInsets.only(bottom: 16.0),
       child: TextField(
         controller: controller,
         obscureText: isPassword,
+        cursorColor: theme.colorScheme.primary,
         style: const TextStyle(color: Colors.black87, fontSize: 15),
         decoration: InputDecoration(
-          prefixIcon: Icon(icon, color: Colors.black87, size: 22),
+          prefixIcon: Icon(icon, color: theme.colorScheme.primary, size: 22),
           hintText: hintText,
+          filled: true,
+          fillColor: theme.colorScheme.surface,
+          border: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(14),
+            borderSide: const BorderSide(color: Color(0xFFCAD2C5), width: 1),
+          ),
+          enabledBorder: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(14),
+            borderSide: const BorderSide(color: Color(0xFFCAD2C5), width: 1),
+          ),
+          focusedBorder: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(14),
+            borderSide: BorderSide(
+              color: theme.colorScheme.primary,
+              width: 1.5,
+            ),
+          ),
           hintStyle: const TextStyle(color: Colors.grey, fontSize: 15),
           contentPadding: const EdgeInsets.symmetric(
             vertical: 18,
-            horizontal: 16,
-          ),
-          filled: true,
-          fillColor: Colors.white,
-          border: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(8),
-            borderSide: const BorderSide(color: Color(0xFFD3D3D3), width: 1),
-          ),
-          enabledBorder: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(8),
-            borderSide: const BorderSide(color: Color(0xFFD3D3D3), width: 1),
-          ),
-          focusedBorder: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(8),
-            borderSide: const BorderSide(color: Color(0xFF1E5631), width: 1.2),
+            horizontal: 18,
           ),
         ),
       ),
@@ -171,10 +176,9 @@ class _LoginScreenState extends State<LoginScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: Colors.white,
+      backgroundColor: const Color(0xFFF4F6F8),
       body: Stack(
         children: [
-          // Fondo que cubre toda la pantalla
           Positioned.fill(
             child: Image.asset(
               'assets/images/background.jpg',
@@ -183,138 +187,136 @@ class _LoginScreenState extends State<LoginScreen> {
               semanticLabel: 'Fondo decorativo',
             ),
           ),
-          // Gradiente desvanecimiento para mejor legibilidad
           Positioned.fill(
-            child: Container(
-              decoration: BoxDecoration(
-                gradient: LinearGradient(
-                  begin: Alignment.topCenter,
-                  end: Alignment.bottomCenter,
-                  colors: const [
-                    Color.fromRGBO(0, 0, 0, 0.5),
-                    Color.fromRGBO(0, 0, 0, 0.2),
-                    Color.fromRGBO(0, 0, 0, 0.4),
+            child: Container(color: const Color.fromRGBO(0, 0, 0, 0.35)),
+          ),
+          SafeArea(
+            child: Center(
+              child: SingleChildScrollView(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 24.0,
+                  vertical: 32.0,
+                ),
+                physics: const BouncingScrollPhysics(),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Container(
+                      width: 118,
+                      height: 118,
+                      decoration: BoxDecoration(
+                        color: Colors.white,
+                        shape: BoxShape.circle,
+                        boxShadow: [
+                          const BoxShadow(
+                            color: Color.fromRGBO(0, 0, 0, 0.12),
+                            blurRadius: 18,
+                            offset: Offset(0, 12),
+                          ),
+                        ],
+                      ),
+                      child: Padding(
+                        padding: const EdgeInsets.all(18.0),
+                        child: Image.asset(
+                          'assets/images/logo.png',
+                          fit: BoxFit.contain,
+                          semanticLabel: 'Logo Veridia',
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 18),
+                    const Text(
+                      'Iniciar Sesión',
+                      style: TextStyle(
+                        fontSize: 26,
+                        fontWeight: FontWeight.bold,
+                        color: Colors.white,
+                        letterSpacing: 0.2,
+                      ),
+                    ),
+                    const SizedBox(height: 28),
+                    Container(
+                      width: double.infinity,
+                      padding: const EdgeInsets.all(24.0),
+                      decoration: BoxDecoration(
+                        color: const Color.fromRGBO(255, 255, 255, 0.96),
+                        borderRadius: BorderRadius.circular(24),
+                        boxShadow: [
+                          const BoxShadow(
+                            color: Color.fromRGBO(0, 0, 0, 0.10),
+                            blurRadius: 24,
+                            offset: Offset(0, 12),
+                          ),
+                        ],
+                        border: Border.all(
+                          color: const Color.fromRGBO(255, 255, 255, 0.9),
+                        ),
+                      ),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.stretch,
+                        children: [
+                          _crearCampoTexto(
+                            controller: _emailController,
+                            hintText: 'Correo electrónico',
+                            icon: Icons.email_outlined,
+                          ),
+                          _crearCampoTexto(
+                            controller: _passwordController,
+                            hintText: 'Contraseña',
+                            icon: Icons.lock_outline,
+                            isPassword: true,
+                          ),
+                          const SizedBox(height: 8),
+                          SizedBox(
+                            width: double.infinity,
+                            height: 52,
+                            child: ElevatedButton(
+                              onPressed: _iniciarSesion,
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: const Color(0xFF1E5631),
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(14),
+                                ),
+                                elevation: 0,
+                              ),
+                              child: const Text(
+                                'Entrar',
+                                style: TextStyle(
+                                  color: Colors.white,
+                                  fontSize: 16,
+                                  fontWeight: FontWeight.w600,
+                                ),
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(height: 20),
+                    TextButton(
+                      onPressed: () {
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (context) => const RegisterScreen(),
+                          ),
+                        );
+                      },
+                      style: TextButton.styleFrom(
+                        foregroundColor: Colors.white,
+                      ),
+                      child: const Text(
+                        '¿No tienes cuenta? Regístrate aquí',
+                        style: TextStyle(
+                          decoration: TextDecoration.underline,
+                          fontSize: 14,
+                          fontWeight: FontWeight.w500,
+                        ),
+                      ),
+                    ),
                   ],
-                  stops: const [0.0, 0.5, 1.0],
                 ),
               ),
-            ),
-          ),
-          // Contenido principal
-          SafeArea(
-            child: Column(
-              mainAxisSize: MainAxisSize.max,
-              children: [
-                const Spacer(flex: 1),
-                // Logo con decoración
-                Container(
-                  decoration: BoxDecoration(
-                    shape: BoxShape.circle,
-                    color: Colors.white,
-                    border: Border.all(
-                      color: const Color.fromRGBO(30, 86, 49, 0.3),
-                      width: 2,
-                    ),
-                    boxShadow: [
-                      const BoxShadow(
-                        color: Color.fromRGBO(0, 0, 0, 0.08),
-                        blurRadius: 15,
-                        offset: Offset(0, 8),
-                      ),
-                    ],
-                  ),
-                  child: ClipOval(
-                    child: Padding(
-                      padding: const EdgeInsets.all(16.0),
-                      child: Image.asset(
-                        'assets/images/logo.png',
-                        height: 150,
-                        width: 150,
-                        fit: BoxFit.contain,
-                        filterQuality: FilterQuality.high,
-                        semanticLabel: 'Logo Veridia',
-                      ),
-                    ),
-                  ),
-                ),
-                const SizedBox(height: 15),
-                const Text(
-                  'Iniciar Sesión',
-                  style: TextStyle(
-                    fontSize: 22,
-                    fontWeight: FontWeight.bold,
-                    color: Colors.black87,
-                    letterSpacing: 0.5,
-                  ),
-                ),
-                const Spacer(flex: 1),
-                // Campos de formulario
-                Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 32.0),
-                  child: SingleChildScrollView(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.center,
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        _crearCampoTexto(
-                          controller: _emailController,
-                          hintText: 'Correo electrónico',
-                          icon: Icons.email_outlined,
-                        ),
-                        _crearCampoTexto(
-                          controller: _passwordController,
-                          hintText: 'Contraseña',
-                          icon: Icons.lock_outline,
-                          isPassword: true,
-                        ),
-                        const SizedBox(height: 24),
-                        SizedBox(
-                          width: double.infinity,
-                          height: 50,
-                          child: ElevatedButton(
-                            onPressed: _iniciarSesion,
-                            style: ElevatedButton.styleFrom(
-                              backgroundColor: const Color(0xFF1E5631),
-                              shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(10),
-                              ),
-                              elevation: 0,
-                            ),
-                            child: const Text(
-                              'Entrar',
-                              style: TextStyle(
-                                color: Colors.white,
-                                fontSize: 16,
-                                fontWeight: FontWeight.w500,
-                              ),
-                            ),
-                          ),
-                        ),
-                        const SizedBox(height: 20),
-                        TextButton(
-                          onPressed: () {
-                            Navigator.push(
-                              context,
-                              MaterialPageRoute(
-                                builder: (context) => const RegisterScreen(),
-                              ),
-                            );
-                          },
-                          child: const Text(
-                            '¿No tienes cuenta? Regístrate aquí',
-                            style: TextStyle(
-                              color: Color.fromARGB(255, 255, 255, 255),
-                              fontWeight: FontWeight.w600,
-                              fontSize: 14,
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
-                const Spacer(flex: 2),
-              ],
             ),
           ),
         ],

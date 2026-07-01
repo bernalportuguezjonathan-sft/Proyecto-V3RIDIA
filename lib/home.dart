@@ -5,7 +5,6 @@ import 'identify_species.dart';
 import 'mapa.dart';
 import 'historial.dart';
 import 'perfil.dart';
-import 'observaciones.dart';
 import 'desafios.dart';
 import 'models/user.dart';
 import 'services/repositorioU.dart';
@@ -20,39 +19,6 @@ class HomeScreen extends StatefulWidget {
 
 class _HomeScreenState extends State<HomeScreen> {
   // The user name is read from UserRepository.currentUser so UI updates automatically
-
-  // Función para cerrar sesión
-  Future<void> _cerrarSesion() async {
-    showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text(
-          '¿Cerrar sesión?',
-          style: TextStyle(fontWeight: FontWeight.bold),
-        ),
-        content: const Text('¿Estás seguro de que quieres cerrar sesión?'),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('Cancelar'),
-          ),
-          TextButton(
-            onPressed: () async {
-              await FirebaseAuth.instance.signOut();
-              if (mounted) {
-                Navigator.pushAndRemoveUntil(
-                  context,
-                  MaterialPageRoute(builder: (context) => const LoginScreen()),
-                  (route) => false,
-                );
-              }
-            },
-            child: const Text('Cerrar sesión', style: TextStyle(color: Colors.red)),
-          ),
-        ],
-      ),
-    );
-  }
 
   @override
   Widget build(BuildContext context) {
@@ -99,26 +65,25 @@ class _HomeScreenState extends State<HomeScreen> {
             onPressed: () {
               showDialog(
                 context: context,
-                builder: (context) => AlertDialog(
+                builder: (dialogContext) => AlertDialog(
                   title: const Text('¿Cerrar sesión?'),
                   content: const Text('¿Estás seguro?'),
                   actions: [
                     TextButton(
-                      onPressed: () => Navigator.pop(context),
+                      onPressed: () => Navigator.pop(dialogContext),
                       child: const Text('Cancelar'),
                     ),
                     TextButton(
                       onPressed: () async {
+                        final navigator = Navigator.of(dialogContext);
                         await FirebaseAuth.instance.signOut();
-                        if (mounted) {
-                          Navigator.pushAndRemoveUntil(
-                            context,
-                            MaterialPageRoute(
-                              builder: (context) => const LoginScreen(),
-                            ),
-                            (route) => false,
-                          );
-                        }
+                        if (!mounted) return;
+                        navigator.pushAndRemoveUntil(
+                          MaterialPageRoute(
+                            builder: (_) => const LoginScreen(),
+                          ),
+                          (route) => false,
+                        );
                       },
                       child: const Text('Cerrar'),
                     ),
@@ -133,9 +98,7 @@ class _HomeScreenState extends State<HomeScreen> {
       body: Stack(
         children: [
           // Fondo
-          Container(
-            color: const Color(0xFFF5F9F7),
-          ),
+          Container(color: const Color(0xFFF5F9F7)),
           // Contenido principal
           SafeArea(
             child: SingleChildScrollView(
@@ -169,10 +132,7 @@ class _HomeScreenState extends State<HomeScreen> {
                   const SizedBox(height: 4),
                   const Text(
                     'Buscar especies, rutas, etc.',
-                    style: TextStyle(
-                      fontSize: 12,
-                      color: Colors.grey,
-                    ),
+                    style: TextStyle(fontSize: 12, color: Colors.grey),
                   ),
                   const SizedBox(height: 16),
 
@@ -180,12 +140,12 @@ class _HomeScreenState extends State<HomeScreen> {
                   Container(
                     decoration: BoxDecoration(
                       color: Colors.white,
-                      borderRadius: BorderRadius.circular(10),
-                      boxShadow: [
+                      borderRadius: BorderRadius.circular(16),
+                      boxShadow: const [
                         BoxShadow(
-                          color: Colors.black.withOpacity(0.05),
+                          color: Color.fromRGBO(0, 0, 0, 0.05),
                           blurRadius: 8,
-                          offset: const Offset(0, 2),
+                          offset: Offset(0, 2),
                         ),
                       ],
                     ),
@@ -193,9 +153,14 @@ class _HomeScreenState extends State<HomeScreen> {
                       decoration: InputDecoration(
                         hintText: 'Buscar especies, rutas, etc.',
                         hintStyle: TextStyle(color: Colors.grey.shade400),
-                        prefixIcon: const Icon(Icons.search, color: Color(0xFF1E5631)),
+                        prefixIcon: const Icon(
+                          Icons.search,
+                          color: Color(0xFF1E5631),
+                        ),
                         border: InputBorder.none,
-                        contentPadding: const EdgeInsets.symmetric(vertical: 12),
+                        contentPadding: const EdgeInsets.symmetric(
+                          vertical: 12,
+                        ),
                       ),
                     ),
                   ),
@@ -228,7 +193,8 @@ class _HomeScreenState extends State<HomeScreen> {
                           Navigator.push(
                             context,
                             MaterialPageRoute(
-                              builder: (context) => const IdentifySpeciesScreen(),
+                              builder: (context) =>
+                                  const IdentifySpeciesScreen(),
                             ),
                           );
                         },
@@ -288,11 +254,20 @@ class _HomeScreenState extends State<HomeScreen> {
                     scrollDirection: Axis.horizontal,
                     child: Row(
                       children: [
-                        _crearTarjetaCaptura('Nombre común', 'Nombre científico'),
+                        _crearTarjetaCaptura(
+                          'Nombre común',
+                          'Nombre científico',
+                        ),
                         const SizedBox(width: 12),
-                        _crearTarjetaCaptura('Nombre común', 'Nombre científico'),
+                        _crearTarjetaCaptura(
+                          'Nombre común',
+                          'Nombre científico',
+                        ),
                         const SizedBox(width: 12),
-                        _crearTarjetaCaptura('Nombre común', 'Nombre científico'),
+                        _crearTarjetaCaptura(
+                          'Nombre común',
+                          'Nombre científico',
+                        ),
                       ],
                     ),
                   ),
@@ -344,50 +319,35 @@ class _HomeScreenState extends State<HomeScreen> {
             case 2:
               Navigator.push(
                 context,
-                MaterialPageRoute(
-                  builder: (context) => const MapScreen(),
-                ),
+                MaterialPageRoute(builder: (context) => const MapScreen()),
               );
               break;
             case 3:
               Navigator.push(
                 context,
-                MaterialPageRoute(
-                  builder: (context) => const HistoryScreen(),
-                ),
+                MaterialPageRoute(builder: (context) => const HistoryScreen()),
               );
               break;
             case 4:
               Navigator.push(
                 context,
-                MaterialPageRoute(
-                  builder: (context) => const ProfileScreen(),
-                ),
+                MaterialPageRoute(builder: (context) => const ProfileScreen()),
               );
               break;
           }
         },
         items: const [
-          BottomNavigationBarItem(
-            icon: Icon(Icons.home),
-            label: 'Inicio',
-          ),
+          BottomNavigationBarItem(icon: Icon(Icons.home), label: 'Inicio'),
           BottomNavigationBarItem(
             icon: Icon(Icons.camera_alt),
             label: 'Cámara',
           ),
-          BottomNavigationBarItem(
-            icon: Icon(Icons.map),
-            label: 'Mapa',
-          ),
+          BottomNavigationBarItem(icon: Icon(Icons.map), label: 'Mapa'),
           BottomNavigationBarItem(
             icon: Icon(Icons.history),
             label: 'Historial',
           ),
-          BottomNavigationBarItem(
-            icon: Icon(Icons.person),
-            label: 'Perfil',
-          ),
+          BottomNavigationBarItem(icon: Icon(Icons.person), label: 'Perfil'),
         ],
       ),
     );
@@ -404,12 +364,12 @@ class _HomeScreenState extends State<HomeScreen> {
       child: Container(
         decoration: BoxDecoration(
           color: Colors.white,
-          borderRadius: BorderRadius.circular(12),
-          boxShadow: [
+          borderRadius: BorderRadius.circular(16),
+          boxShadow: const [
             BoxShadow(
-              color: Colors.black.withOpacity(0.05),
+              color: Color.fromRGBO(0, 0, 0, 0.05),
               blurRadius: 8,
-              offset: const Offset(0, 2),
+              offset: Offset(0, 2),
             ),
           ],
         ),
@@ -422,11 +382,7 @@ class _HomeScreenState extends State<HomeScreen> {
                 color: const Color(0xFFE8F5E9),
                 borderRadius: BorderRadius.circular(10),
               ),
-              child: Icon(
-                icon,
-                size: 28,
-                color: const Color(0xFF1E5631),
-              ),
+              child: Icon(icon, size: 28, color: const Color(0xFF1E5631)),
             ),
             const SizedBox(height: 8),
             Text(
@@ -450,8 +406,15 @@ class _HomeScreenState extends State<HomeScreen> {
       width: 100,
       height: 120,
       decoration: BoxDecoration(
-        color: Colors.grey.shade200,
-        borderRadius: BorderRadius.circular(10),
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        boxShadow: const [
+          BoxShadow(
+            color: Color.fromRGBO(0, 0, 0, 0.05),
+            blurRadius: 8,
+            offset: Offset(0, 2),
+          ),
+        ],
       ),
       child: Column(
         mainAxisAlignment: MainAxisAlignment.end,
@@ -480,10 +443,7 @@ class _HomeScreenState extends State<HomeScreen> {
                 ),
                 Text(
                   nombreCientifico,
-                  style: TextStyle(
-                    fontSize: 9,
-                    color: Colors.grey.shade600,
-                  ),
+                  style: TextStyle(fontSize: 9, color: Colors.grey.shade600),
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
                 ),

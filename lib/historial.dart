@@ -22,24 +22,23 @@ class _HistoryScreenState extends State<HistoryScreen>
   void _cerrarSesion() {
     showDialog(
       context: context,
-      builder: (context) => AlertDialog(
+      builder: (dialogContext) => AlertDialog(
         title: const Text('¿Cerrar sesión?'),
         content: const Text('¿Estás seguro?'),
         actions: [
           TextButton(
-            onPressed: () => Navigator.pop(context),
+            onPressed: () => Navigator.pop(dialogContext),
             child: const Text('Cancelar'),
           ),
           TextButton(
             onPressed: () async {
               await FirebaseAuth.instance.signOut();
-              if (mounted) {
-                Navigator.pushAndRemoveUntil(
-                  context,
-                  MaterialPageRoute(builder: (context) => const LoginScreen()),
-                  (route) => false,
-                );
-              }
+              if (!mounted) return;
+              Navigator.pushAndRemoveUntil(
+                context,
+                MaterialPageRoute(builder: (_) => const LoginScreen()),
+                (route) => false,
+              );
             },
             child: const Text('Cerrar'),
           ),
@@ -355,11 +354,11 @@ class _HistoryScreenState extends State<HistoryScreen>
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(12),
-        boxShadow: [
+        boxShadow: const [
           BoxShadow(
-            color: Colors.black.withOpacity(0.05),
+            color: Color.fromRGBO(0, 0, 0, 0.05),
             blurRadius: 8,
-            offset: const Offset(0, 2),
+            offset: Offset(0, 2),
           ),
         ],
       ),
@@ -434,8 +433,8 @@ class _HistoryScreenState extends State<HistoryScreen>
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(12),
-        boxShadow: [
-          BoxShadow(color: Colors.black.withOpacity(0.05), blurRadius: 8),
+        boxShadow: const [
+          BoxShadow(color: Color.fromRGBO(0, 0, 0, 0.05), blurRadius: 8),
         ],
       ),
       child: Column(
@@ -459,17 +458,6 @@ class _HistoryScreenState extends State<HistoryScreen>
           ),
         ],
       ),
-    );
-  }
-
-  List<Map<String, String>> _generarCapturas(int cantidad) {
-    return List.generate(
-      cantidad,
-      (index) => {
-        'nombre': 'Nombre común ${index + 1}',
-        'cientifico': 'Nombre científico ${index + 1}',
-        'fecha': '${DateTime.now().subtract(Duration(days: index))}',
-      },
     );
   }
 

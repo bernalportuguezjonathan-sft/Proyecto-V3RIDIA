@@ -1,11 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'login.dart';
-import 'home.dart';
-import 'identify_species.dart';
-import 'mapa.dart';
-import 'historial.dart';
-import 'perfil.dart';
 
 class MapDetailScreen extends StatefulWidget {
   final Map<String, dynamic> ubicacion;
@@ -20,26 +15,23 @@ class _MapDetailScreenState extends State<MapDetailScreen> {
   void _cerrarSesion() {
     showDialog(
       context: context,
-      builder: (context) => AlertDialog(
+      builder: (dialogContext) => AlertDialog(
         title: const Text('¿Cerrar sesión?'),
         content: const Text('¿Estás seguro?'),
         actions: [
           TextButton(
-            onPressed: () => Navigator.pop(context),
+            onPressed: () => Navigator.pop(dialogContext),
             child: const Text('Cancelar'),
           ),
           TextButton(
             onPressed: () async {
               await FirebaseAuth.instance.signOut();
-              if (mounted) {
-                Navigator.pushAndRemoveUntil(
-                  context,
-                  MaterialPageRoute(
-                    builder: (context) => const LoginScreen(),
-                  ),
-                  (route) => false,
-                );
-              }
+              if (!mounted) return;
+              Navigator.pushAndRemoveUntil(
+                context,
+                MaterialPageRoute(builder: (_) => const LoginScreen()),
+                (route) => false,
+              );
             },
             child: const Text('Cerrar'),
           ),
@@ -47,6 +39,7 @@ class _MapDetailScreenState extends State<MapDetailScreen> {
       ),
     );
   }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -76,9 +69,7 @@ class _MapDetailScreenState extends State<MapDetailScreen> {
       ),
       body: Stack(
         children: [
-          Container(
-            color: const Color(0xFFF5F9F7),
-          ),
+          Container(color: const Color(0xFFF5F9F7)),
           SafeArea(
             child: SingleChildScrollView(
               child: Column(
@@ -109,9 +100,9 @@ class _MapDetailScreenState extends State<MapDetailScreen> {
                             decoration: BoxDecoration(
                               color: const Color(0xFF1E5631),
                               shape: BoxShape.circle,
-                              boxShadow: [
+                              boxShadow: const [
                                 BoxShadow(
-                                  color: Colors.black.withOpacity(0.2),
+                                  color: Color.fromRGBO(0, 0, 0, 0.2),
                                   blurRadius: 8,
                                 ),
                               ],
@@ -199,11 +190,20 @@ class _MapDetailScreenState extends State<MapDetailScreen> {
                           child: ListView(
                             scrollDirection: Axis.horizontal,
                             children: [
-                              _crearTarjetaEspecie('Ave 1', 'Nombre científico'),
+                              _crearTarjetaEspecie(
+                                'Ave 1',
+                                'Nombre científico',
+                              ),
                               const SizedBox(width: 12),
-                              _crearTarjetaEspecie('Ave 2', 'Nombre científico'),
+                              _crearTarjetaEspecie(
+                                'Ave 2',
+                                'Nombre científico',
+                              ),
                               const SizedBox(width: 12),
-                              _crearTarjetaEspecie('Ave 3', 'Nombre científico'),
+                              _crearTarjetaEspecie(
+                                'Ave 3',
+                                'Nombre científico',
+                              ),
                             ],
                           ),
                         ),
@@ -258,11 +258,8 @@ class _MapDetailScreenState extends State<MapDetailScreen> {
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(10),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.05),
-            blurRadius: 8,
-          ),
+        boxShadow: const [
+          BoxShadow(color: Color.fromRGBO(0, 0, 0, 0.05), blurRadius: 8),
         ],
       ),
       child: Column(
@@ -275,11 +272,7 @@ class _MapDetailScreenState extends State<MapDetailScreen> {
               color: Colors.grey.shade200,
               borderRadius: BorderRadius.circular(8),
             ),
-            child: const Icon(
-              Icons.pets,
-              color: Colors.grey,
-              size: 28,
-            ),
+            child: const Icon(Icons.pets, color: Colors.grey, size: 28),
           ),
           const SizedBox(height: 8),
           Padding(
@@ -299,10 +292,7 @@ class _MapDetailScreenState extends State<MapDetailScreen> {
                 ),
                 Text(
                   cientifico,
-                  style: TextStyle(
-                    fontSize: 9,
-                    color: Colors.grey.shade600,
-                  ),
+                  style: TextStyle(fontSize: 9, color: Colors.grey.shade600),
                   textAlign: TextAlign.center,
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,

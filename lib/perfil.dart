@@ -7,11 +7,15 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_storage/firebase_storage.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:app_settings/app_settings.dart';
 import 'login.dart';
 import 'home.dart';
 import 'identify_species.dart';
 import 'mapa.dart';
 import 'historial.dart';
+import 'models/observation.dart';
+import 'models/user.dart';
+import 'services/repositorioO.dart';
 import 'services/repositorioU.dart';
 
 class ProfileScreen extends StatefulWidget {
@@ -385,7 +389,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
   void _cerrarSesion() async {
     showDialog(
       context: context,
-      builder: (context) => AlertDialog(
+      builder: (dialogContext) => AlertDialog(
         title: const Text(
           '¿Cerrar sesión?',
           style: TextStyle(fontWeight: FontWeight.bold),
@@ -464,11 +468,11 @@ class _ProfileScreenState extends State<ProfileScreen> {
                         ],
                       ),
                       borderRadius: BorderRadius.circular(16),
-                      boxShadow: [
+                      boxShadow: const [
                         BoxShadow(
-                          color: const Color(0xFF1E5631).withOpacity(0.2),
+                          color: Color.fromRGBO(30, 86, 49, 0.2),
                           blurRadius: 10,
-                          offset: const Offset(0, 5),
+                          offset: Offset(0, 5),
                         ),
                       ],
                     ),
@@ -483,9 +487,9 @@ class _ProfileScreenState extends State<ProfileScreen> {
                               decoration: BoxDecoration(
                                 color: Colors.white,
                                 shape: BoxShape.circle,
-                                boxShadow: [
+                                boxShadow: const [
                                   BoxShadow(
-                                    color: Colors.black.withOpacity(0.2),
+                                    color: Color.fromRGBO(0, 0, 0, 0.2),
                                     blurRadius: 8,
                                   ),
                                 ],
@@ -672,7 +676,12 @@ class _ProfileScreenState extends State<ProfileScreen> {
                               backgroundColor: Colors.white,
                               foregroundColor: const Color(0xFF1E5631),
                               shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(12),
+                                borderRadius: BorderRadius.circular(16),
+                              ),
+                              elevation: 0,
+                              padding: const EdgeInsets.symmetric(
+                                vertical: 14,
+                                horizontal: 24,
                               ),
                             ),
                             child: const Padding(
@@ -737,12 +746,27 @@ class _ProfileScreenState extends State<ProfileScreen> {
                         _crearOpcionPerfil(
                           icon: Icons.person_outline,
                           titulo: 'Mi actividad',
-                          onTap: () {},
+                          onTap: () {
+                            Navigator.push(
+                              context,
+                              MaterialPageRoute(
+                                builder: (context) => const ActivityScreen(),
+                              ),
+                            );
+                          },
                         ),
                         _crearOpcionPerfil(
                           icon: Icons.bookmark_outline,
                           titulo: 'Mis publicaciones',
-                          onTap: () {},
+                          onTap: () {
+                            Navigator.push(
+                              context,
+                              MaterialPageRoute(
+                                builder: (context) =>
+                                    const PublicationsScreen(),
+                              ),
+                            );
+                          },
                         ),
                       ],
                     ),
@@ -767,12 +791,27 @@ class _ProfileScreenState extends State<ProfileScreen> {
                         _crearOpcionPerfil(
                           icon: Icons.settings_outlined,
                           titulo: 'Configuración',
-                          onTap: () {},
+                          onTap: () {
+                            Navigator.push(
+                              context,
+                              MaterialPageRoute(
+                                builder: (context) => const SettingsScreen(),
+                              ),
+                            );
+                          },
                         ),
                         _crearOpcionPerfil(
                           icon: Icons.info_outline,
                           titulo: 'Acerca de Veridia',
-                          onTap: () {},
+                          onTap: () {
+                            Navigator.push(
+                              context,
+                              MaterialPageRoute(
+                                builder: (context) =>
+                                    const AboutVeridiaScreen(),
+                              ),
+                            );
+                          },
                         ),
                       ],
                     ),
@@ -847,9 +886,9 @@ class _ProfileScreenState extends State<ProfileScreen> {
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
         color: Colors.white,
-        borderRadius: BorderRadius.circular(12),
-        boxShadow: [
-          BoxShadow(color: Colors.black.withOpacity(0.05), blurRadius: 8),
+        borderRadius: BorderRadius.circular(16),
+        boxShadow: const [
+          BoxShadow(color: Color.fromRGBO(0, 0, 0, 0.05), blurRadius: 8),
         ],
       ),
       child: Column(
@@ -881,9 +920,9 @@ class _ProfileScreenState extends State<ProfileScreen> {
       margin: const EdgeInsets.only(bottom: 12),
       decoration: BoxDecoration(
         color: Colors.white,
-        borderRadius: BorderRadius.circular(12),
-        boxShadow: [
-          BoxShadow(color: Colors.black.withOpacity(0.05), blurRadius: 8),
+        borderRadius: BorderRadius.circular(16),
+        boxShadow: const [
+          BoxShadow(color: Color.fromRGBO(0, 0, 0, 0.05), blurRadius: 8),
         ],
       ),
       child: Material(
@@ -915,6 +954,696 @@ class _ProfileScreenState extends State<ProfileScreen> {
               ],
             ),
           ),
+        ),
+      ),
+    );
+  }
+}
+
+class ActivityScreen extends StatelessWidget {
+  const ActivityScreen({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(
+        title: const Text('Mi actividad'),
+        backgroundColor: const Color(0xFF1E5631),
+      ),
+      body: ValueListenableBuilder<List<Observation>>(
+        valueListenable: ObservationRepository.instance.observations,
+        builder: (context, observations, child) {
+          final totalObservations = observations.length;
+          final uniqueSpecies = observations
+              .map((observation) => observation.commonName)
+              .toSet()
+              .length;
+          final lastObservation = observations.isNotEmpty
+              ? observations.first.dateTime
+              : null;
+
+          return Padding(
+            padding: const EdgeInsets.all(24),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text(
+                  'Tu huella en la naturaleza',
+                  style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold),
+                ),
+                const SizedBox(height: 16),
+                const Text(
+                  'Sigue tus descubrimientos y comprueba cómo cada aporte suma al cuidado de la flora y fauna.',
+                  style: TextStyle(fontSize: 15, color: Colors.black87),
+                ),
+                const SizedBox(height: 24),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    _statCard(
+                      icon: Icons.nature,
+                      title: '$totalObservations',
+                      subtitle: 'Observaciones',
+                    ),
+                    _statCard(
+                      icon: Icons.flare,
+                      title: '$uniqueSpecies',
+                      subtitle: 'Especies únicas',
+                    ),
+                    _statCard(
+                      icon: Icons.schedule,
+                      title: lastObservation != null
+                          ? '${lastObservation.day}/${lastObservation.month}/${lastObservation.year}'
+                          : '-',
+                      subtitle: 'Última fecha',
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 24),
+                _infoCard(
+                  icon: Icons.photo_camera,
+                  title: 'Observaciones recientes',
+                  description:
+                      'Revisa las últimas fotos y datos que has registrado en tu viaje natural.',
+                ),
+                _infoCard(
+                  icon: Icons.emoji_events,
+                  title: 'Retos completados',
+                  description:
+                      'Sigue tu progreso y mira cómo avanzas con cada desafío superado.',
+                ),
+                _infoCard(
+                  icon: Icons.monetization_on,
+                  title: 'Recompensas',
+                  description:
+                      'Consigue monedas por cada contribución y conviértelas en logros dentro de Verídia.',
+                ),
+              ],
+            ),
+          );
+        },
+      ),
+    );
+  }
+
+  Widget _statCard({
+    required IconData icon,
+    required String title,
+    required String subtitle,
+  }) {
+    return Expanded(
+      child: Container(
+        padding: const EdgeInsets.all(16),
+        margin: const EdgeInsets.only(right: 8),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(18),
+          boxShadow: const [
+            BoxShadow(color: Color.fromRGBO(0, 0, 0, 0.05), blurRadius: 10),
+          ],
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Icon(icon, color: const Color(0xFF1E5631), size: 28),
+            const SizedBox(height: 12),
+            Text(
+              title,
+              style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
+            ),
+            const SizedBox(height: 8),
+            Text(
+              subtitle,
+              style: const TextStyle(fontSize: 13, color: Colors.black54),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _infoCard({
+    required IconData icon,
+    required String title,
+    required String description,
+  }) {
+    return Container(
+      margin: const EdgeInsets.only(bottom: 16),
+      padding: const EdgeInsets.all(18),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(18),
+        boxShadow: const [
+          BoxShadow(color: Color.fromRGBO(0, 0, 0, 0.05), blurRadius: 10),
+        ],
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Icon(icon, color: const Color(0xFF1E5631), size: 28),
+          const SizedBox(width: 16),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  title,
+                  style: const TextStyle(
+                    fontSize: 16,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  description,
+                  style: const TextStyle(fontSize: 14, color: Colors.black87),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class PublicationsScreen extends StatelessWidget {
+  const PublicationsScreen({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(
+        title: const Text('Mis publicaciones'),
+        backgroundColor: const Color(0xFF1E5631),
+      ),
+      body: ValueListenableBuilder<List<Observation>>(
+        valueListenable: ObservationRepository.instance.observations,
+        builder: (context, observations, child) {
+          return Padding(
+            padding: const EdgeInsets.all(16),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const SizedBox(height: 12),
+                Row(
+                  children: [
+                    const Icon(
+                      Icons.bookmark_outline,
+                      color: Color(0xFF1E5631),
+                      size: 24,
+                    ),
+                    const SizedBox(width: 12),
+                    Text(
+                      '${observations.length} publicaciones',
+                      style: const TextStyle(
+                        fontSize: 18,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 12),
+                const Text(
+                  'Tus observaciones más recientes están aquí. Revísalas, edítalas o compártelas con tu comunidad.',
+                  style: TextStyle(fontSize: 15, color: Colors.black87),
+                ),
+                const SizedBox(height: 20),
+                Expanded(
+                  child: observations.isEmpty
+                      ? Center(
+                          child: Column(
+                            mainAxisSize: MainAxisSize.min,
+                            children: const [
+                              Icon(
+                                Icons.photo_library_outlined,
+                                size: 72,
+                                color: Color(0xFF1E5631),
+                              ),
+                              SizedBox(height: 24),
+                              Text(
+                                'Aún no tienes publicaciones cargadas.',
+                                style: TextStyle(
+                                  fontSize: 16,
+                                  color: Colors.black54,
+                                ),
+                              ),
+                              SizedBox(height: 8),
+                              Text(
+                                'Sube tu primera foto para empezar a construir tu colección natural.',
+                                style: TextStyle(
+                                  fontSize: 14,
+                                  color: Colors.black45,
+                                ),
+                                textAlign: TextAlign.center,
+                              ),
+                            ],
+                          ),
+                        )
+                      : ListView.separated(
+                          itemCount: observations.length,
+                          separatorBuilder: (context, index) =>
+                              const SizedBox(height: 12),
+                          itemBuilder: (context, index) {
+                            final observation = observations[index];
+                            return _publicationCard(observation);
+                          },
+                        ),
+                ),
+              ],
+            ),
+          );
+        },
+      ),
+    );
+  }
+
+  Widget _publicationCard(Observation observation) {
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(18),
+        boxShadow: const [
+          BoxShadow(color: Color.fromRGBO(0, 0, 0, 0.05), blurRadius: 10),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              const Icon(Icons.nature, color: Color(0xFF1E5631), size: 22),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Text(
+                  observation.commonName,
+                  style: const TextStyle(
+                    fontSize: 16,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 6),
+          Text(
+            observation.scientificName,
+            style: const TextStyle(fontSize: 13, color: Colors.black54),
+          ),
+          const SizedBox(height: 10),
+          Row(
+            children: [
+              const Icon(Icons.location_on, size: 16, color: Colors.grey),
+              const SizedBox(width: 6),
+              Expanded(
+                child: Text(
+                  observation.location,
+                  style: const TextStyle(fontSize: 13, color: Colors.black54),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 10),
+          Text(
+            observation.notes,
+            style: const TextStyle(fontSize: 14, color: Colors.black87),
+          ),
+          const SizedBox(height: 12),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Text(
+                'Fecha: ${observation.dateTime.day}/${observation.dateTime.month}/${observation.dateTime.year}',
+                style: const TextStyle(fontSize: 12, color: Colors.black45),
+              ),
+              const Icon(Icons.arrow_forward_ios, size: 14, color: Colors.grey),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class SettingsScreen extends StatefulWidget {
+  const SettingsScreen({super.key});
+
+  @override
+  State<SettingsScreen> createState() => _SettingsScreenState();
+}
+
+class _SettingsScreenState extends State<SettingsScreen> {
+  String _selectedLanguage = 'Español';
+
+  @override
+  void initState() {
+    super.initState();
+    _loadLanguage();
+  }
+
+  Future<void> _loadLanguage() async {
+    final prefs = await SharedPreferences.getInstance();
+    setState(() {
+      _selectedLanguage = prefs.getString('preferred_language') ?? 'Español';
+    });
+  }
+
+  Future<void> _saveLanguage(String language) async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString('preferred_language', language);
+    setState(() {
+      _selectedLanguage = language;
+    });
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Idioma establecido a $language.')),
+      );
+    }
+  }
+
+  Future<void> _showLanguageDialog() async {
+    await showModalBottomSheet<void>(
+      context: context,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
+      ),
+      builder: (context) {
+        return Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const ListTile(
+              title: Text(
+                'Selecciona un idioma',
+                style: TextStyle(fontWeight: FontWeight.bold),
+              ),
+            ),
+            ListTile(
+              title: const Text('Español'),
+              trailing: _selectedLanguage == 'Español'
+                  ? const Icon(Icons.check, color: Color(0xFF1E5631))
+                  : null,
+              onTap: () {
+                _saveLanguage('Español');
+                Navigator.pop(context);
+              },
+            ),
+            ListTile(
+              title: const Text('English'),
+              trailing: _selectedLanguage == 'English'
+                  ? const Icon(Icons.check, color: Color(0xFF1E5631))
+                  : null,
+              onTap: () {
+                _saveLanguage('English');
+                Navigator.pop(context);
+              },
+            ),
+            const SizedBox(height: 16),
+          ],
+        );
+      },
+    );
+  }
+
+  void _openNotificationSettings() {
+    AppSettings.openNotificationSettings();
+  }
+
+  void _openPrivacySettings() {
+    AppSettings.openAppSettings();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(
+        title: const Text('Configuración'),
+        backgroundColor: const Color(0xFF1E5631),
+      ),
+      body: Padding(
+        padding: const EdgeInsets.all(24),
+        child: ValueListenableBuilder<UserProfile?>(
+          valueListenable: UserRepository.instance.currentUser,
+          builder: (context, user, child) {
+            return Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text(
+                  'Ajustes',
+                  style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold),
+                ),
+                const SizedBox(height: 16),
+                const Text(
+                  'Personaliza tu experiencia y revisa los datos de tu cuenta en Verídia.',
+                  style: TextStyle(fontSize: 15, color: Colors.black87),
+                ),
+                const SizedBox(height: 24),
+                _infoTile(
+                  icon: Icons.person,
+                  title: 'Nombre',
+                  subtitle: user?.displayName ?? 'Explorador',
+                ),
+                _infoTile(
+                  icon: Icons.email,
+                  title: 'Email',
+                  subtitle: user?.email ?? 'No disponible',
+                ),
+                _infoTile(
+                  icon: Icons.monetization_on,
+                  title: 'Monedas',
+                  subtitle: '${user?.tokens ?? 0}',
+                ),
+                const SizedBox(height: 16),
+                _settingTile(
+                  icon: Icons.notifications,
+                  title: 'Notificaciones',
+                  subtitle: 'Abrir ajustes de notificaciones del sistema.',
+                  onTap: _openNotificationSettings,
+                ),
+                _settingTile(
+                  icon: Icons.lock_outline,
+                  title: 'Privacidad',
+                  subtitle: 'Abrir configuración de permisos de la aplicación.',
+                  onTap: _openPrivacySettings,
+                ),
+                _settingTile(
+                  icon: Icons.language,
+                  title: 'Idioma',
+                  subtitle: 'Idioma actual: $_selectedLanguage',
+                  onTap: _showLanguageDialog,
+                ),
+              ],
+            );
+          },
+        ),
+      ),
+    );
+  }
+
+  Widget _infoTile({
+    required IconData icon,
+    required String title,
+    required String subtitle,
+  }) {
+    return Container(
+      margin: const EdgeInsets.only(bottom: 14),
+      padding: const EdgeInsets.all(18),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(18),
+        boxShadow: const [
+          BoxShadow(color: Color.fromRGBO(0, 0, 0, 0.05), blurRadius: 10),
+        ],
+      ),
+      child: Row(
+        children: [
+          Icon(icon, color: const Color(0xFF1E5631), size: 26),
+          const SizedBox(width: 14),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  title,
+                  style: const TextStyle(
+                    fontSize: 14,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+                const SizedBox(height: 6),
+                Text(
+                  subtitle,
+                  style: const TextStyle(fontSize: 14, color: Colors.black87),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _settingTile({
+    required IconData icon,
+    required String title,
+    required String subtitle,
+    required VoidCallback onTap,
+  }) {
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(18),
+      child: Container(
+        margin: const EdgeInsets.only(bottom: 16),
+        padding: const EdgeInsets.all(18),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(18),
+          boxShadow: const [
+            BoxShadow(color: Color.fromRGBO(0, 0, 0, 0.05), blurRadius: 10),
+          ],
+        ),
+        child: Row(
+          children: [
+            Icon(icon, color: const Color(0xFF1E5631), size: 24),
+            const SizedBox(width: 14),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    title,
+                    style: const TextStyle(
+                      fontSize: 16,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  Text(
+                    subtitle,
+                    style: const TextStyle(fontSize: 14, color: Colors.black87),
+                  ),
+                ],
+              ),
+            ),
+            const Icon(Icons.chevron_right, color: Colors.grey),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class AboutVeridiaScreen extends StatelessWidget {
+  const AboutVeridiaScreen({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(
+        title: const Text('Acerca de Veridia'),
+        backgroundColor: const Color(0xFF1E5631),
+      ),
+      body: ValueListenableBuilder<List<Observation>>(
+        valueListenable: ObservationRepository.instance.observations,
+        builder: (context, observations, child) {
+          final totalObservations = observations.length;
+          final uniqueSpecies = observations
+              .map((observation) => observation.commonName)
+              .toSet()
+              .length;
+
+          return Padding(
+            padding: const EdgeInsets.all(24),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text(
+                  'Verídia',
+                  style: TextStyle(fontSize: 28, fontWeight: FontWeight.bold),
+                ),
+                const SizedBox(height: 16),
+                const Text(
+                  'Verídia es una app pensada para gamificar de forma intuitiva y divertida el aprendizaje sobre ambientes naturales, fauna y flora. Aquí puedes explorar ecosistemas, descubrir especies y ganar recompensas mientras te conviertes en un guardián activo de la naturaleza.',
+                  style: TextStyle(
+                    fontSize: 16,
+                    color: Colors.black87,
+                    height: 1.5,
+                  ),
+                ),
+                const SizedBox(height: 24),
+                Row(
+                  children: [
+                    _aboutStatTile(
+                      icon: Icons.nature_people,
+                      label: 'Observaciones',
+                      value: '$totalObservations',
+                    ),
+                    const SizedBox(width: 12),
+                    _aboutStatTile(
+                      icon: Icons.eco,
+                      label: 'Especies',
+                      value: '$uniqueSpecies',
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 24),
+                const Text(
+                  '¿Qué puedes hacer en Verídia?',
+                  style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                ),
+                const SizedBox(height: 12),
+                const Text(
+                  '• Completar retos con fotos reales de la naturaleza.',
+                ),
+                const Text(
+                  '• Aprender sobre especies y hábitats desde tu propia experiencia.',
+                ),
+                const Text(
+                  '• Ganar monedas y logros por cada contribución ecológica.',
+                ),
+                const SizedBox(height: 24),
+                const Text(
+                  'Únete a una comunidad que valora la curiosidad, el respeto por el medio ambiente y la diversión mientras aprendes.',
+                  style: TextStyle(fontSize: 15, color: Colors.black87),
+                ),
+              ],
+            ),
+          );
+        },
+      ),
+    );
+  }
+
+  Widget _aboutStatTile({
+    required IconData icon,
+    required String label,
+    required String value,
+  }) {
+    return Expanded(
+      child: Container(
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(18),
+          boxShadow: const [
+            BoxShadow(color: Color.fromRGBO(0, 0, 0, 0.05), blurRadius: 10),
+          ],
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Icon(icon, color: const Color(0xFF1E5631), size: 28),
+            const SizedBox(height: 12),
+            Text(
+              value,
+              style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
+            ),
+            const SizedBox(height: 8),
+            Text(
+              label,
+              style: const TextStyle(fontSize: 13, color: Colors.black54),
+            ),
+          ],
         ),
       ),
     );
