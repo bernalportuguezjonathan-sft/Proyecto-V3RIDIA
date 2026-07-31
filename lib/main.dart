@@ -219,6 +219,22 @@ class WelcomeScreen extends StatelessWidget {
                   ),
                 ),
                 const Spacer(flex: 3),
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFF1E5631).withValues(alpha: 0.12),
+                    borderRadius: BorderRadius.circular(999),
+                  ),
+                  child: const Text(
+                    'Actualización: mapa con especies reales y captura de imágenes',
+                    style: TextStyle(
+                      fontSize: 12,
+                      fontWeight: FontWeight.w700,
+                      color: Color(0xFF1E5631),
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 16),
                 Row(
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
@@ -233,7 +249,7 @@ class WelcomeScreen extends StatelessWidget {
                 Padding(
                   padding: const EdgeInsets.symmetric(horizontal: 32.0),
                   child: SizedBox(
-                    width: 200,
+                    width: 220,
                     height: 48,
                     child: ElevatedButton(
                       onPressed: () {
@@ -253,7 +269,7 @@ class WelcomeScreen extends StatelessWidget {
                         elevation: 2,
                       ),
                       child: const Text(
-                        'Siguiente',
+                        'Entrar a Veridia',
                         style: TextStyle(
                           fontSize: 16,
                           fontWeight: FontWeight.bold,
