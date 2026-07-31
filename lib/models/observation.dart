@@ -6,6 +6,7 @@ class Observation {
     required this.location,
     required this.notes,
     required this.dateTime,
+    this.imagePath,
   });
 
   final String id;
@@ -14,4 +15,5 @@ class Observation {
   final String location;
   final String notes;
   final DateTime dateTime;
+  final String? imagePath;
 }
