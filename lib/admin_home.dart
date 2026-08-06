@@ -7,10 +7,10 @@ import 'services/repositorioA.dart';
 import 'services/repositorioD.dart';
 import 'services/repositorioU.dart';
 import 'admin_profile.dart';
+import 'ban_management.dart';
 import 'login.dart';
 import 'mapa.dart';
 import 'assignment_history.dart';
-import 'users_status.dart';
 
 class AdminHomeScreen extends StatefulWidget {
   const AdminHomeScreen({super.key});
@@ -445,33 +445,34 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
               const SizedBox(height: 16),
               GridView.count(
                 crossAxisCount: 2,
-                crossAxisSpacing: 12,
-                mainAxisSpacing: 12,
+                crossAxisSpacing: 14,
+                mainAxisSpacing: 14,
                 shrinkWrap: true,
                 physics: const NeverScrollableScrollPhysics(),
+                childAspectRatio: 0.78,
                 children: [
                   _buildActionCard(
-                    icon: Icons.add_circle_outline,
-                    label: 'Desafío diario',
+                    icon: Icons.emoji_events,
+                    label: 'Gestión de Desafíos',
+                    subtitle:
+                        'Planificar desafíos dirigidos por datos (Crowdsourcing de fotos de especies específicas)',
                     color: const Color(0xFF1E5631),
-                    onTap: _agregarDesafioDiario,
+                    onTap: _showAssignChallengeDialog,
                   ),
                   _buildActionCard(
-                    icon: Icons.place,
-                    label: 'Puntos de interés',
+                    icon: Icons.map,
+                    label: 'Análisis de Mapa & Zonas',
+                    subtitle:
+                        'Visualizar mapas de calor, gestionar zonas protegidas y monitorear especies invasoras',
                     color: const Color(0xFF2D7A3F),
                     onTap: _mostrarPuntosDeInteres,
                   ),
                   _buildActionCard(
-                    icon: Icons.assignment_ind,
-                    label: 'Crear desafío',
+                    icon: Icons.timeline,
+                    label: 'Feed & Monitoreo de Datos',
+                    subtitle:
+                        'Feed de escaneos en tiempo real, registro detallado de especies y auditoría del sistema',
                     color: const Color(0xFF3A8D5B),
-                    onTap: _showAssignChallengeDialog,
-                  ),
-                  _buildActionCard(
-                    icon: Icons.history,
-                    label: 'Historial',
-                    color: const Color(0xFF4CAF50),
                     onTap: () {
                       Navigator.push(
                         context,
@@ -481,26 +482,16 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
                     },
                   ),
                   _buildActionCard(
-                    icon: Icons.people,
-                    label: 'Usuarios',
-                    color: const Color(0xFF66BB6A),
+                    icon: Icons.gavel,
+                    label: 'Moderación & Gamificación de Comunidad',
+                    subtitle:
+                        'Gestionar reportes de contenido, moderar usuarios y visualizar ranking de gamificación',
+                    color: const Color(0xFF4CAF50),
                     onTap: () {
                       Navigator.push(
                         context,
                         MaterialPageRoute(
-                            builder: (context) => const UsersStatusScreen()),
-                      );
-                    },
-                  ),
-                  _buildActionCard(
-                    icon: Icons.person,
-                    label: 'Mi Perfil',
-                    color: const Color(0xFF81C784),
-                    onTap: () {
-                      Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                            builder: (context) => const AdminProfileScreen()),
+                            builder: (context) => const BanManagementScreen()),
                       );
                     },
                   ),
@@ -603,6 +594,7 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
   Widget _buildActionCard({
     required IconData icon,
     required String label,
+    required String subtitle,
     required Color color,
     required VoidCallback onTap,
   }) {
@@ -610,37 +602,51 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
       color: Colors.transparent,
       child: InkWell(
         onTap: onTap,
-        borderRadius: BorderRadius.circular(16),
+        borderRadius: BorderRadius.circular(20),
         child: Container(
+          padding: const EdgeInsets.all(18),
           decoration: BoxDecoration(
             color: Colors.white,
-            borderRadius: BorderRadius.circular(16),
+            borderRadius: BorderRadius.circular(20),
             boxShadow: [
               BoxShadow(
-                color: color.withOpacity(0.15),
-                blurRadius: 10,
-                offset: const Offset(0, 3),
+                color: color.withOpacity(0.14),
+                blurRadius: 18,
+                offset: const Offset(0, 8),
               ),
             ],
           ),
           child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Container(
-                width: 56,
-                height: 56,
+                width: 52,
+                height: 52,
                 decoration: BoxDecoration(
-                  color: color.withOpacity(0.15),
-                  shape: BoxShape.circle,
+                  color: color.withOpacity(0.12),
+                  borderRadius: BorderRadius.circular(16),
                 ),
                 child: Icon(icon, color: color, size: 28),
               ),
-              const SizedBox(height: 12),
+              const SizedBox(height: 16),
               Text(label,
                   style: TextStyle(
-                      fontWeight: FontWeight.w600,
+                      fontWeight: FontWeight.w700,
                       color: Colors.black87,
-                      fontSize: 14)),
+                      fontSize: 15)),
+              const SizedBox(height: 10),
+              Flexible(
+                child: Text(
+                  subtitle,
+                  softWrap: true,
+                  overflow: TextOverflow.visible,
+                  style: const TextStyle(
+                    color: Colors.black54,
+                    fontSize: 12,
+                    height: 1.5,
+                  ),
+                ),
+              ),
             ],
           ),
         ),

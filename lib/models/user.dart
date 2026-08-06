@@ -7,6 +7,9 @@
     required this.tokens,
     required this.role,
     required this.createdDate,
+    required this.isBanned,
+    this.banExpires,
+    this.banReason,
   });
 
   final String userId;
@@ -16,6 +19,9 @@
   final int tokens;
   final String role;
   final DateTime createdDate;
+  final bool isBanned;
+  final DateTime? banExpires;
+  final String? banReason;
 
   UserProfile copyWith({
     String? userId,
@@ -25,6 +31,9 @@
     int? tokens,
     String? role,
     DateTime? createdDate,
+    bool? isBanned,
+    DateTime? banExpires,
+    String? banReason,
   }) {
     return UserProfile(
       userId: userId ?? this.userId,
@@ -34,6 +43,9 @@
       tokens: tokens ?? this.tokens,
       role: role ?? this.role,
       createdDate: createdDate ?? this.createdDate,
+      isBanned: isBanned ?? this.isBanned,
+      banExpires: banExpires ?? this.banExpires,
+      banReason: banReason ?? this.banReason,
     );
   }
 }

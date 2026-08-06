@@ -19,6 +19,7 @@ class LoginScreen extends StatefulWidget {
 class _LoginScreenState extends State<LoginScreen> {
   final _emailController = TextEditingController();
   final _passwordController = TextEditingController();
+  final _adminCodeController = TextEditingController();
   String _selectedRole = 'Explorador';
 
   void _mostrarAlerta(String mensaje) {
@@ -62,6 +63,18 @@ class _LoginScreenState extends State<LoginScreen> {
     if (password.isEmpty) {
       _mostrarAlerta('Por favor llena el campo de Contraseña');
       return;
+    }
+
+    if (_selectedRole == 'Administrador') {
+      final adminCode = _adminCodeController.text.trim();
+      if (adminCode.isEmpty) {
+        _mostrarAlerta('Ingresa el código de administrador.');
+        return;
+      }
+      if (adminCode != 'SDNJ') {
+        _mostrarAlerta('El código de administrador es incorrecto.');
+        return;
+      }
     }
 
     showDialog(
@@ -118,6 +131,12 @@ class _LoginScreenState extends State<LoginScreen> {
 
   Future<void> _handleAuthenticatedUser(User firebaseUser) async {
     UserProfile? userProfile = UserRepository.instance.currentUser.value;
+    final dbProfile = await UserRepository.instance.getUserProfileById(firebaseUser.uid);
+    if (dbProfile != null) {
+      userProfile = dbProfile;
+      UserRepository.instance.currentUser.value = userProfile;
+    }
+
     if (userProfile == null) {
       userProfile = UserProfile(
         userId: firebaseUser.uid,
@@ -130,13 +149,60 @@ class _LoginScreenState extends State<LoginScreen> {
         tokens: 0,
         role: _selectedRole,
         createdDate: DateTime.now(),
+        isBanned: false,
+        banExpires: null,
+        banReason: null,
       );
       UserRepository.instance.currentUser.value = userProfile;
     }
 
-    final isAdmin =
-        userProfile.role == 'Administrador' || _selectedRole == 'Administrador';
-    if (!isAdmin && userProfile.role != _selectedRole) {
+    if (userProfile.isBanned) {
+      final now = DateTime.now();
+      if (userProfile.banExpires != null && userProfile.banExpires!.isBefore(now)) {
+        await UserRepository.instance.unbanUser(userId: userProfile.userId);
+        userProfile = userProfile.copyWith(isBanned: false, banExpires: null, banReason: null);
+        UserRepository.instance.currentUser.value = userProfile;
+      } else {
+        final banLabel = userProfile.banExpires == null
+            ? 'Suspensión Permanente'
+            : 'Suspendido hasta ${userProfile.banExpires!.day}/${userProfile.banExpires!.month}/${userProfile.banExpires!.year}';
+        final banReason = userProfile.banReason ?? 'Motivo no disponible';
+        if (!mounted) return;
+        await showDialog(
+          context: context,
+          builder: (context) => AlertDialog(
+            backgroundColor: Colors.white,
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
+            title: const Text('Cuenta Suspendida', style: TextStyle(fontWeight: FontWeight.bold)),
+            content: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(banLabel, style: const TextStyle(fontSize: 14, color: Colors.black87)),
+                const SizedBox(height: 12),
+                Text(
+                  banReason,
+                  style: const TextStyle(fontSize: 14, color: Colors.black54),
+                ),
+              ],
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(context),
+                child: const Text('Cerrar'),
+              ),
+            ],
+          ),
+        );
+        if (mounted) {
+          await FirebaseAuth.instance.signOut();
+          UserRepository.instance.currentUser.value = null;
+        }
+        return;
+      }
+    }
+
+    if (userProfile.role != _selectedRole) {
       _mostrarAlerta(
         'El usuario ingresado no tiene el rol seleccionado. '
         'Selecciona ${userProfile.role} o corrige el rol.',
@@ -185,6 +251,18 @@ class _LoginScreenState extends State<LoginScreen> {
       ),
     );
 
+    if (_selectedRole == 'Administrador') {
+      final adminCode = _adminCodeController.text.trim();
+      if (adminCode.isEmpty) {
+        _mostrarAlerta('Ingresa el código de administrador.');
+        return;
+      }
+      if (adminCode != 'SDNJ') {
+        _mostrarAlerta('El código de administrador es incorrecto.');
+        return;
+      }
+    }
+
     try {
       final googleAuth = await googleUser.authentication;
       if (googleAuth.accessToken == null || googleAuth.idToken == null) {
@@ -228,6 +306,7 @@ class _LoginScreenState extends State<LoginScreen> {
   void dispose() {
     _emailController.dispose();
     _passwordController.dispose();
+    _adminCodeController.dispose();
     super.dispose();
   }
 
@@ -408,6 +487,24 @@ class _LoginScreenState extends State<LoginScreen> {
                               }
                             },
                           ),
+                          if (_selectedRole == 'Administrador') ...[
+                            const SizedBox(height: 10),
+                            const Text(
+                              'El rol Administrador requiere el código privado.',
+                              style: TextStyle(
+                                fontSize: 13,
+                                color: Color(0xFF4F4F4F),
+                                height: 1.4,
+                              ),
+                            ),
+                            const SizedBox(height: 10),
+                            _crearCampoTexto(
+                              controller: _adminCodeController,
+                              hintText: 'Código de administrador',
+                              icon: Icons.vpn_key,
+                              isPassword: true,
+                            ),
+                          ],
                           const SizedBox(height: 8),
                           SizedBox(
                             width: double.infinity,

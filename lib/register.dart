@@ -17,6 +17,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
   final _emailController = TextEditingController();
   final _passwordController = TextEditingController();
   final _confirmPasswordController = TextEditingController();
+  final _adminCodeController = TextEditingController();
   String? _selectedRole;
 
   // Función para las alertas modernas y flotantes
@@ -99,6 +100,46 @@ class _RegisterScreenState extends State<RegisterScreen> {
       return;
     }
 
+    if (_selectedRole == 'Administrador') {
+      final adminCode = _adminCodeController.text.trim();
+      if (adminCode.isEmpty) {
+        await showDialog(
+          context: context,
+          builder: (context) => AlertDialog(
+            title: const Text('Código requerido'),
+            content: const Text(
+              'Ingresa el código privado de administrador para continuar.',
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(context),
+                child: const Text('Aceptar'),
+              ),
+            ],
+          ),
+        );
+        return;
+      }
+      if (adminCode != 'SDNJ') {
+        await showDialog(
+          context: context,
+          builder: (context) => AlertDialog(
+            title: const Text('Código inválido'),
+            content: const Text(
+              'El código no es correcto. Solicita a tus superiores el código de administrador.',
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(context),
+                child: const Text('Aceptar'),
+              ),
+            ],
+          ),
+        );
+        return;
+      }
+    }
+
     // Si todo está perfecto, mostramos el círculo de carga
     showDialog(
       context: context,
@@ -123,6 +164,9 @@ class _RegisterScreenState extends State<RegisterScreen> {
           tokens: 0,
           role: _selectedRole!,
           createdDate: DateTime.now(),
+          isBanned: false,
+          banExpires: null,
+          banReason: null,
         );
 
         UserRepository.instance.currentUser.value = localProfile;
@@ -206,6 +250,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
     _emailController.dispose();
     _passwordController.dispose();
     _confirmPasswordController.dispose();
+    _adminCodeController.dispose();
     super.dispose();
   }
 
@@ -413,6 +458,22 @@ class _RegisterScreenState extends State<RegisterScreen> {
                               }
                             },
                           ),
+                          if (_selectedRole == 'Administrador') ...[
+                            const SizedBox(height: 16),
+                            _crearCampoTexto(
+                              controller: _adminCodeController,
+                              hintText: 'Código privado de administrador',
+                              icon: Icons.vpn_key_outlined,
+                            ),
+                            const SizedBox(height: 8),
+                            const Text(
+                              'Solicita a tus superiores el código de administrador antes de continuar.',
+                              style: TextStyle(
+                                color: Colors.black54,
+                                fontSize: 12,
+                              ),
+                            ),
+                          ],
                           const SizedBox(height: 24),
                           ElevatedButton(
                             onPressed: _registrarUsuario,

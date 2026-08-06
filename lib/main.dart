@@ -5,6 +5,7 @@ import 'firebase.dart';
 import 'login.dart';
 import 'home.dart';
 import 'admin_home.dart';
+import 'banned_screen.dart';
 import 'services/repositorioU.dart';
 
 // Convertimos el main en 'async' porque iniciar Firebase toma un instante
@@ -114,6 +115,9 @@ class VeridiaApp extends StatelessWidget {
               builder: (context, initSnapshot) {
                 if (initSnapshot.connectionState == ConnectionState.done) {
                   final userProfile = UserRepository.instance.currentUser.value;
+                  if (userProfile?.isBanned == true) {
+                    return const BannedScreen();
+                  }
                   final initialScreen = userProfile?.role == 'Administrador'
                       ? const AdminHomeScreen()
                       : const HomeScreen();

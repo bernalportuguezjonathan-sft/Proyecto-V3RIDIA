@@ -24,6 +24,12 @@ class UserRepository {
             final createdDate = data['createdDate'] is String
                 ? DateTime.tryParse(data['createdDate'] as String)
                 : DateTime.now();
+            final banExpiresValue = data['banExpires'];
+            final banExpires = banExpiresValue is String
+                ? DateTime.tryParse(banExpiresValue)
+                : banExpiresValue is Timestamp
+                    ? banExpiresValue.toDate()
+                    : null;
             return UserProfile(
               userId: doc.id,
               email: data['email'] as String? ?? '',
@@ -34,6 +40,9 @@ class UserRepository {
               tokens: data['tokens'] as int? ?? 0,
               role: data['role'] as String? ?? 'Explorador',
               createdDate: createdDate ?? DateTime.now(),
+              isBanned: data['isBanned'] as bool? ?? false,
+              banExpires: banExpires,
+              banReason: data['banReason'] as String?,
             );
           })
           .where((user) => role == null || user.role == role)
@@ -90,6 +99,22 @@ Future<void> initializeUser() async {
         final currentCreatedDate = data != null && data['createdDate'] != null
             ? DateTime.tryParse(data['createdDate'] as String) ?? DateTime.now()
             : DateTime.now();
+        var currentIsBanned = data != null
+            ? (data['isBanned'] as bool? ?? false)
+            : false;
+        final banExpiresValue = data != null ? data['banExpires'] : null;
+        final banExpires = banExpiresValue is String
+            ? DateTime.tryParse(banExpiresValue)
+            : banExpiresValue is Timestamp
+                ? banExpiresValue.toDate()
+                : null;
+        var banReason = data != null ? data['banReason'] as String? : null;
+
+        if (currentIsBanned && banExpires != null && banExpires.isBefore(DateTime.now())) {
+          await unbanUser(userId: refreshedUser.uid);
+          currentIsBanned = false;
+          banReason = null;
+        }
 
         final resolvedDisplayName = displayName.isNotEmpty
             ? displayName
@@ -105,6 +130,9 @@ Future<void> initializeUser() async {
           tokens: currentTokens,
           role: currentRole,
           createdDate: currentCreatedDate,
+          isBanned: currentIsBanned,
+          banExpires: banExpires,
+          banReason: banReason,
         );
       } else {
         currentUser.value = null;
@@ -128,6 +156,9 @@ Future<void> initializeUser() async {
       'tokens': 0,
       'createdDate': now.toIso8601String(),
       'photoURL': null,
+      'isBanned': false,
+      'banExpires': null,
+      'banReason': null,
     });
     await _cacheUserProfile(userId, 0, role, displayName);
   }
@@ -145,6 +176,61 @@ Future<void> initializeUser() async {
     } catch (e) {
       debugPrint('Warning: failed to update profile in Firestore: $e');
     }
+  }
+
+  Future<void> banUser({
+    required String userId,
+    required bool isPermanent,
+    required int days,
+    required String reason,
+  }) async {
+    final banExpires = isPermanent ? null : DateTime.now().add(Duration(days: days));
+
+    await _firestore.collection('users').doc(userId).update({
+      'isBanned': true,
+      'banExpires': banExpires,
+      'banReason': reason,
+    });
+  }
+
+  Future<void> unbanUser({
+    required String userId,
+  }) async {
+    await _firestore.collection('users').doc(userId).update({
+      'isBanned': false,
+      'banExpires': null,
+      'banReason': null,
+    });
+  }
+
+  Future<UserProfile?> getUserProfileById(String userId) async {
+    final doc = await _firestore.collection('users').doc(userId).get();
+    final data = doc.data();
+    if (data == null) return null;
+
+    final createdDate = data['createdDate'] is String
+        ? DateTime.tryParse(data['createdDate'] as String)
+        : DateTime.now();
+
+    return UserProfile(
+      userId: doc.id,
+      email: data['email'] as String? ?? '',
+      displayName: data['displayName'] as String? ??
+          (data['email'] as String? ?? '').split('@').first,
+      photoURL: data['photoURL'] as String?,
+      tokens: data['tokens'] as int? ?? 0,
+      role: data['role'] as String? ?? 'Explorador',
+      createdDate: createdDate ?? DateTime.now(),
+      isBanned: data['isBanned'] as bool? ?? false,
+      banExpires: data['banExpires'] != null
+          ? (data['banExpires'] is String
+              ? DateTime.tryParse(data['banExpires'] as String)
+              : data['banExpires'] is Timestamp
+                  ? (data['banExpires'] as Timestamp).toDate()
+                  : null)
+          : null,
+      banReason: data['banReason'] as String?,
+    );
   }
 
   void addTokens(int amount) {

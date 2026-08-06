@@ -14,6 +14,9 @@ void main() {
       tokens: 0,
       role: 'Explorador',
       createdDate: DateTime.now(),
+      isBanned: false,
+      banExpires: null,
+      banReason: null,
     );
     ChallengeRepository.instance.challenges.value = [];
   });
