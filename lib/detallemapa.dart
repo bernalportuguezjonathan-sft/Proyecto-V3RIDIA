@@ -281,6 +281,13 @@ class _MapDetailScreenState extends State<MapDetailScreen> {
                   maxLines: 2,
                   overflow: TextOverflow.ellipsis,
                 ),
+                const SizedBox(height: 4),
+                Text(
+                  species.descriptionHabitat,
+                  style: TextStyle(fontSize: 9, color: Colors.grey.shade700),
+                  maxLines: 3,
+                  overflow: TextOverflow.ellipsis,
+                ),
               ],
             ),
           ),
