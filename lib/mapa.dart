@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_map/flutter_map.dart';
 import 'package:latlong2/latlong.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'login.dart';
 import 'home.dart';
 import 'identify_species.dart';
@@ -21,14 +22,44 @@ class _MapScreenState extends State<MapScreen> {
   late final TextEditingController _searchController;
   late final MapController _mapController;
   String? _selectedSpecies;
+  List<BirdZone> _birdZones = [];
   List<BirdZone> _filteredZones = [];
+  bool _isLoadingZones = true;
+  final LatLng _defaultCenter = const LatLng(4.7120, -74.2000);
 
   @override
   void initState() {
     super.initState();
     _searchController = TextEditingController();
     _mapController = MapController();
-    _filteredZones = birdZones;
+    _clearLocalCache();
+    _loadBirdZones();
+  }
+
+  Future<void> _clearLocalCache() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.clear();
+    } catch (_) {
+      // If cache cleanup fails, ignore so the map can still load.
+    }
+  }
+
+  Future<void> _loadBirdZones() async {
+    final zones = await loadBirdZones();
+    if (!mounted) return;
+    setState(() {
+      _birdZones = zones;
+      _filteredZones = zones;
+      _isLoadingZones = false;
+    });
+
+    if (zones.isNotEmpty) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (!mounted) return;
+        _mapController.move(LatLng(zones.first.latitude, zones.first.longitude), 13.0);
+      });
+    }
   }
 
   @override
@@ -69,7 +100,7 @@ class _MapScreenState extends State<MapScreen> {
   void _applyFilters() {
     setState(() {
       _filteredZones = filterBirdZones(
-        birdZones,
+        _birdZones,
         query: _searchController.text,
         selectedSpecies: _selectedSpecies,
       );
@@ -80,9 +111,12 @@ class _MapScreenState extends State<MapScreen> {
     setState(() {
       _searchController.clear();
       _selectedSpecies = null;
-      _filteredZones = birdZones;
+      _filteredZones = _birdZones;
     });
-    _mapController.move(const LatLng(4.7092, -74.2183), 12.0);
+    final center = _birdZones.isNotEmpty
+        ? LatLng(_birdZones.first.latitude, _birdZones.first.longitude)
+        : _defaultCenter;
+    _mapController.move(center, 12.0);
   }
 
   void _focusZone(BirdZone zone) {
@@ -244,7 +278,23 @@ class _MapScreenState extends State<MapScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final speciesList = getAvailableSpecies(birdZones);
+    final speciesList = getAvailableSpecies(_birdZones);
+
+    if (_isLoadingZones) {
+      return Scaffold(
+        backgroundColor: const Color(0xFFF5F9F7),
+        appBar: AppBar(
+          backgroundColor: const Color(0xFF1E5631),
+          title: const Text('Mapa de aves - Mosquera'),
+          centerTitle: true,
+          leading: IconButton(
+            icon: const Icon(Icons.arrow_back),
+            onPressed: () => Navigator.pop(context),
+          ),
+        ),
+        body: const Center(child: CircularProgressIndicator()),
+      );
+    }
 
     return Scaffold(
       backgroundColor: const Color(0xFFF5F9F7),
@@ -355,14 +405,21 @@ class _MapScreenState extends State<MapScreen> {
               children: [
                 FlutterMap(
                   mapController: _mapController,
-                  options: const MapOptions(
-                    initialCenter: LatLng(4.7092, -74.2183),
+                  options: MapOptions(
+                    initialCenter: _defaultCenter,
                     initialZoom: 12.0,
                   ),
                   children: [
                     TileLayer(
+                      urlTemplate: 'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',
+                      userAgentPackageName: 'com.example.veridia_app',
+                    ),
+                    TileLayer(
                       urlTemplate: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
                       userAgentPackageName: 'com.example.veridia_app',
+                      tileBuilder: (context, tileWidget, tile) {
+                        return Opacity(opacity: 0.65, child: tileWidget);
+                      },
                     ),
                     PolygonLayer(polygons: _buildPolygons()),
                     MarkerLayer(markers: _buildMarkers()),
@@ -384,7 +441,7 @@ class _MapScreenState extends State<MapScreen> {
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         const Text(
-                          'Mapa de Mosquera',
+                          'Mapa híbrido de Mosquera',
                           style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold),
                         ),
                         Text(
@@ -392,6 +449,11 @@ class _MapScreenState extends State<MapScreen> {
                               ? 'Sin zonas visibles'
                               : '${_filteredZones.length} zonas activas',
                           style: TextStyle(fontSize: 11, color: Colors.grey.shade700),
+                        ),
+                        const SizedBox(height: 4),
+                        Text(
+                          'Humedales, lagunas y parques urbanos',
+                          style: TextStyle(fontSize: 10, color: Color(0xFF1E5631), fontWeight: FontWeight.w600),
                         ),
                       ],
                     ),

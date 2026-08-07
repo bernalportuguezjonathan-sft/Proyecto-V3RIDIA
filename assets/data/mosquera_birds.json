@@ -1,0 +1,98 @@
+[
+  {
+    "id": "guali",
+    "nombre_zona": "Humedal Gualí",
+    "descripcion_zona": "Gran sistema de humedales con alta diversidad de aves acuáticas y migratorias.",
+    "coordenadas": {
+      "latitud": 4.712,
+      "longitud": -74.200
+    },
+    "especies_destacadas": [
+      {
+        "id_especie": "tingua_bogotana",
+        "nombre_comun": "Tingua Bogotana",
+        "nombre_cientifico": "Rallus semiplumbeus",
+        "descripcion": "Ave endémica y en peligro. Pico largo y rojo, plumaje gris y café oliváceo.",
+        "url_imagen": "https://upload.wikimedia.org/wikipedia/commons/e/ed/Tingua_Bogotana_-_Humedal_La_Conejera.jpg"
+      },
+      {
+        "id_especie": "monjita_bogotana",
+        "nombre_comun": "Monjita Bogotana",
+        "nombre_cientifico": "Chrysomus icterocephalus bogotensis",
+        "descripcion": "Macho con cabeza amarilla brillante y cuerpo negro. Muy común en juncos.",
+        "url_imagen": "https://upload.wikimedia.org/wikipedia/commons/2/23/Yellow-hooded_Blackbird_at_Humedal_La_Conejera%2C_Colombia.jpg"
+      },
+      {
+        "id_especie": "pato_turrio",
+        "nombre_comun": "Pato Turrio",
+        "nombre_cientifico": "Oxyura jamaicensis andina",
+        "descripcion": "Pequeño pato zambullidor con pico azul brillante (en machos) y cola rígida.",
+        "url_imagen": "https://upload.wikimedia.org/wikipedia/commons/a/a2/Pato_Turrio_en_Humedal_Guali.jpg"
+      }
+    ]
+  },
+  {
+    "id": "herrera",
+    "nombre_zona": "Laguna de La Herrera",
+    "descripcion_zona": "Masa de agua natural al noroeste de Mosquera, ideal para ver garzas y patos pico de oro.",
+    "coordenadas": {
+      "latitud": 4.690,
+      "longitud": -74.274
+    },
+    "especies_destacadas": [
+      {
+        "id_especie": "pato_pico_oro",
+        "nombre_comun": "Pato Pico de Oro",
+        "nombre_cientifico": "Anas georgica spinicauda",
+        "descripcion": "Pato de color café con un pico amarillo brillante con una línea negra central.",
+        "url_imagen": "https://upload.wikimedia.org/wikipedia/commons/9/90/Pato_Pico_de_Oro_%28Anas_georgica_spinicauda%29.jpg"
+      },
+      {
+        "id_especie": "garza_real",
+        "nombre_comun": "Garza Real",
+        "nombre_cientifico": "Ardea alba",
+        "descripcion": "Gran garza blanca con pico amarillo y patas negras. Elegante y majestuosa.",
+        "url_imagen": "https://upload.wikimedia.org/wikipedia/commons/0/03/Great_Egret_%28Ardea_alba%29.jpg"
+      },
+      {
+        "id_especie": "tingua_azul",
+        "nombre_comun": "Tingua Azul",
+        "nombre_cientifico": "Porphyrio martinica",
+        "descripcion": "Ave de plumaje azul púrpura brillante, pico rojo y amarillo y patas amarillas.",
+        "url_imagen": "https://upload.wikimedia.org/wikipedia/commons/8/8e/Purple_Gallinule_-_Porphyrio_martinica.jpg"
+      }
+    ]
+  },
+  {
+    "id": "parque_sabana",
+    "nombre_zona": "Parque de la Sabana",
+    "descripcion_zona": "Parque urbano con zonas verdes y pequeños cuerpos de agua, bueno para aves de parque.",
+    "coordenadas": {
+      "latitud": 4.726,
+      "longitud": -74.228
+    },
+    "especies_destacadas": [
+      {
+        "id_especie": "copeton",
+        "nombre_comun": "Copetón",
+        "nombre_cientifico": "Zonotrichia capensis",
+        "descripcion": "Pequeño gorrión con una pequeña cresta y un collar naranja rojizo en la nuca.",
+        "url_imagen": "https://upload.wikimedia.org/wikipedia/commons/d/dc/Rufous-collared_Sparrow_%28Zonotrichia_capensis%29_-_Copet%C3%B3n.jpg"
+      },
+      {
+        "id_especie": "mirla",
+        "nombre_comun": "Mirla",
+        "nombre_cientifico": "Turdus fuscater",
+        "descripcion": "Tordo grande de color negro o gris oscuro con pico y anillo ocular naranjas.",
+        "url_imagen": "https://upload.wikimedia.org/wikipedia/commons/e/ee/Great_Thrush_%28Turdus_fuscater%29_at_Humedal_La_Conejera.jpg"
+      },
+      {
+        "id_especie": "colibri_chillon",
+        "nombre_comun": "Colibrí chillón",
+        "nombre_cientifico": "Colibri coruscans",
+        "descripcion": "Gran colibrí verde brillante con una gran mancha azul violácea detrás del ojo.",
+        "url_imagen": "https://upload.wikimedia.org/wikipedia/commons/3/3a/Sparkling_Violetear_%28Colibri_coruscans%29_-_Colibr%C3%AD_chill%C3%B3n.jpg"
+      }
+    ]
+  }
+]

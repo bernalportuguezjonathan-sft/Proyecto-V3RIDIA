@@ -72,16 +72,12 @@ Future<void> initializeUser() async {
               .get();
           data = userDoc.data();
         } catch (e) {
-          // Firestore read failed (possibly permission-denied). Use cached data.
           debugPrint('Firestore user read error for ${refreshedUser.uid}: $e');
         }
 
-        // Si data es null, intentar usar caché
         final cachedTokens = await _getCachedTokens(refreshedUser.uid);
         final cachedRole = await _getCachedRole(refreshedUser.uid);
-        final cachedDisplayName = await _getCachedDisplayName(
-          refreshedUser.uid,
-        );
+        final cachedDisplayName = await _getCachedDisplayName(refreshedUser.uid);
 
         final currentTokens = data != null
             ? (data['tokens'] as int? ?? cachedTokens)
@@ -149,17 +145,21 @@ Future<void> initializeUser() async {
     required String role,
   }) async {
     final now = DateTime.now();
-    await _firestore.collection('users').doc(userId).set({
-      'email': email,
-      'displayName': displayName,
-      'role': role,
-      'tokens': 0,
-      'createdDate': now.toIso8601String(),
-      'photoURL': null,
-      'isBanned': false,
-      'banExpires': null,
-      'banReason': null,
-    });
+    try {
+      await _firestore.collection('users').doc(userId).set({
+        'email': email,
+        'displayName': displayName,
+        'role': role,
+        'tokens': 0,
+        'createdDate': now.toIso8601String(),
+        'photoURL': null,
+        'isBanned': false,
+        'banExpires': null,
+        'banReason': null,
+      });
+    } catch (e) {
+      debugPrint('Warning: Firestore profile write failed: $e');
+    }
     await _cacheUserProfile(userId, 0, role, displayName);
   }
 
