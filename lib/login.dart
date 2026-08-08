@@ -1,13 +1,17 @@
-import 'dart:math';
+import 'dart:async';
 
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:google_sign_in/google_sign_in.dart';
-import 'services/repositorioU.dart';
+import 'services/repositorio_u.dart';
 import 'models/user.dart';
 import 'admin_home.dart';
 import 'home.dart';
 import 'register.dart';
+import 'widgets/animated_visibility.dart';
+import 'widgets/google_logo_icon.dart';
+import 'widgets/google_web_button.dart';
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
@@ -16,11 +20,51 @@ class LoginScreen extends StatefulWidget {
   State<LoginScreen> createState() => _LoginScreenState();
 }
 
-class _LoginScreenState extends State<LoginScreen> {
+class _LoginScreenState extends State<LoginScreen>
+    with SingleTickerProviderStateMixin {
   final _emailController = TextEditingController();
   final _passwordController = TextEditingController();
   final _adminCodeController = TextEditingController();
   String _selectedRole = 'Explorador';
+
+  late final GoogleSignIn _googleSignIn = GoogleSignIn(
+    scopes: ['email'],
+    clientId: kIsWeb ? webGoogleClientId : null,
+  );
+  StreamSubscription<GoogleSignInAccount?>? _googleSignInSub;
+
+  late final AnimationController _entranceController = AnimationController(
+    vsync: this,
+    duration: const Duration(milliseconds: 700),
+  )..forward();
+  late final Animation<double> _fade = CurvedAnimation(
+    parent: _entranceController,
+    curve: Curves.easeOut,
+  );
+  late final Animation<Offset> _slide =
+      Tween<Offset>(begin: const Offset(0, 0.06), end: Offset.zero).animate(
+        CurvedAnimation(
+          parent: _entranceController,
+          curve: Curves.easeOutCubic,
+        ),
+      );
+  late final Animation<double> _logoScale = CurvedAnimation(
+    parent: _entranceController,
+    curve: const Interval(0.0, 0.8, curve: Curves.easeOutBack),
+  );
+
+  @override
+  void initState() {
+    super.initState();
+    if (kIsWeb) {
+      _googleSignInSub = _googleSignIn.onCurrentUserChanged.listen((account) {
+        if (account != null) {
+          _completeGoogleSignIn(account);
+        }
+      });
+      _googleSignIn.signInSilently();
+    }
+  }
 
   void _mostrarAlerta(String mensaje) {
     ScaffoldMessenger.of(context).clearSnackBars();
@@ -131,7 +175,9 @@ class _LoginScreenState extends State<LoginScreen> {
 
   Future<void> _handleAuthenticatedUser(User firebaseUser) async {
     UserProfile? userProfile = UserRepository.instance.currentUser.value;
-    final dbProfile = await UserRepository.instance.getUserProfileById(firebaseUser.uid);
+    final dbProfile = await UserRepository.instance.getUserProfileById(
+      firebaseUser.uid,
+    );
     if (dbProfile != null) {
       userProfile = dbProfile;
       UserRepository.instance.currentUser.value = userProfile;
@@ -158,9 +204,14 @@ class _LoginScreenState extends State<LoginScreen> {
 
     if (userProfile.isBanned) {
       final now = DateTime.now();
-      if (userProfile.banExpires != null && userProfile.banExpires!.isBefore(now)) {
+      if (userProfile.banExpires != null &&
+          userProfile.banExpires!.isBefore(now)) {
         await UserRepository.instance.unbanUser(userId: userProfile.userId);
-        userProfile = userProfile.copyWith(isBanned: false, banExpires: null, banReason: null);
+        userProfile = userProfile.copyWith(
+          isBanned: false,
+          banExpires: null,
+          banReason: null,
+        );
         UserRepository.instance.currentUser.value = userProfile;
       } else {
         final banLabel = userProfile.banExpires == null
@@ -172,13 +223,21 @@ class _LoginScreenState extends State<LoginScreen> {
           context: context,
           builder: (context) => AlertDialog(
             backgroundColor: Colors.white,
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
-            title: const Text('Cuenta Suspendida', style: TextStyle(fontWeight: FontWeight.bold)),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(18),
+            ),
+            title: const Text(
+              'Cuenta Suspendida',
+              style: TextStyle(fontWeight: FontWeight.bold),
+            ),
             content: Column(
               mainAxisSize: MainAxisSize.min,
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(banLabel, style: const TextStyle(fontSize: 14, color: Colors.black87)),
+                Text(
+                  banLabel,
+                  style: const TextStyle(fontSize: 14, color: Colors.black87),
+                ),
                 const SizedBox(height: 12),
                 Text(
                   banReason,
@@ -195,8 +254,7 @@ class _LoginScreenState extends State<LoginScreen> {
           ),
         );
         if (mounted) {
-          await FirebaseAuth.instance.signOut();
-          UserRepository.instance.currentUser.value = null;
+          await UserRepository.instance.signOut();
         }
         return;
       }
@@ -222,12 +280,10 @@ class _LoginScreenState extends State<LoginScreen> {
   }
 
   Future<void> _signInWithGoogle() async {
-    final googleSignIn = GoogleSignIn(scopes: ['email']);
     GoogleSignInAccount? googleUser;
-    var didShowDialog = false;
 
     try {
-      googleUser = await googleSignIn.signIn();
+      googleUser = await _googleSignIn.signIn();
     } catch (e) {
       if (mounted) {
         _mostrarAlerta(
@@ -241,6 +297,15 @@ class _LoginScreenState extends State<LoginScreen> {
       return;
     }
 
+    await _completeGoogleSignIn(googleUser);
+  }
+
+  Future<void> _completeGoogleSignIn(GoogleSignInAccount googleUser) async {
+    if (_selectedRole == 'Administrador') {
+      return;
+    }
+
+    var didShowDialog = false;
     if (!mounted) return;
     didShowDialog = true;
     showDialog(
@@ -251,21 +316,14 @@ class _LoginScreenState extends State<LoginScreen> {
       ),
     );
 
-    if (_selectedRole == 'Administrador') {
-      final adminCode = _adminCodeController.text.trim();
-      if (adminCode.isEmpty) {
-        _mostrarAlerta('Ingresa el código de administrador.');
-        return;
-      }
-      if (adminCode != 'SDNJ') {
-        _mostrarAlerta('El código de administrador es incorrecto.');
-        return;
-      }
-    }
-
     try {
-      final googleAuth = await googleUser.authentication;
-      if (googleAuth.accessToken == null || googleAuth.idToken == null) {
+      debugPrint('Google Sign-In: obteniendo tokens...');
+      final googleAuth = await googleUser.authentication.timeout(
+        const Duration(seconds: 20),
+        onTimeout: () => throw TimeoutException('authentication'),
+      );
+      debugPrint('Google Sign-In: tokens obtenidos.');
+      if (googleAuth.idToken == null && googleAuth.accessToken == null) {
         if (mounted) {
           _mostrarAlerta('No se pudieron obtener las credenciales de Google.');
         }
@@ -277,12 +335,32 @@ class _LoginScreenState extends State<LoginScreen> {
         idToken: googleAuth.idToken,
       );
 
-      final userCredential = await FirebaseAuth.instance.signInWithCredential(
-        credential,
+      debugPrint('Google Sign-In: iniciando sesión en Firebase...');
+      final userCredential = await FirebaseAuth.instance
+          .signInWithCredential(credential)
+          .timeout(
+            const Duration(seconds: 20),
+            onTimeout: () => throw TimeoutException('signInWithCredential'),
+          );
+      debugPrint(
+        'Google Sign-In: sesión de Firebase OK, uid=${userCredential.user?.uid}',
       );
       await UserRepository.instance.initializeUser();
+
+      if (didShowDialog && mounted) {
+        Navigator.pop(context);
+        didShowDialog = false;
+      }
+
       if (mounted && userCredential.user != null) {
         await _handleAuthenticatedUser(userCredential.user!);
+      }
+    } on TimeoutException catch (e) {
+      if (mounted) {
+        _mostrarAlerta(
+          'Se agotó el tiempo esperando a Google (paso: ${e.message}). '
+          'Intenta de nuevo.',
+        );
       }
     } on FirebaseAuthException catch (e) {
       if (!mounted) return;
@@ -292,6 +370,7 @@ class _LoginScreenState extends State<LoginScreen> {
         _mostrarAlerta('Error al iniciar sesión con Google. Intenta de nuevo.');
       }
     } catch (e) {
+      debugPrint('Google Sign-In: error inesperado -> $e');
       if (mounted) {
         _mostrarAlerta('Error en la autenticación con Google.');
       }
@@ -304,6 +383,8 @@ class _LoginScreenState extends State<LoginScreen> {
 
   @override
   void dispose() {
+    _entranceController.dispose();
+    _googleSignInSub?.cancel();
     _emailController.dispose();
     _passwordController.dispose();
     _adminCodeController.dispose();
@@ -379,233 +460,267 @@ class _LoginScreenState extends State<LoginScreen> {
                   vertical: 32.0,
                 ),
                 physics: const BouncingScrollPhysics(),
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Container(
-                      width: 118,
-                      height: 118,
-                      decoration: BoxDecoration(
-                        color: Colors.white,
-                        shape: BoxShape.circle,
-                        boxShadow: [
-                          const BoxShadow(
-                            color: Color.fromRGBO(0, 0, 0, 0.12),
-                            blurRadius: 18,
-                            offset: Offset(0, 12),
-                          ),
-                        ],
-                      ),
-                      child: Padding(
-                        padding: const EdgeInsets.all(18.0),
-                        child: Image.asset(
-                          'assets/images/logo.png',
-                          fit: BoxFit.contain,
-                          semanticLabel: 'Logo Veridia',
-                        ),
-                      ),
-                    ),
-                    const SizedBox(height: 18),
-                    const Text(
-                      'Iniciar Sesión',
-                      style: TextStyle(
-                        fontSize: 26,
-                        fontWeight: FontWeight.bold,
-                        color: Colors.white,
-                        letterSpacing: 0.2,
-                      ),
-                    ),
-                    const SizedBox(height: 28),
-                    Container(
-                      width: double.infinity,
-                      padding: const EdgeInsets.all(24.0),
-                      decoration: BoxDecoration(
-                        color: const Color.fromRGBO(255, 255, 255, 0.96),
-                        borderRadius: BorderRadius.circular(24),
-                        boxShadow: [
-                          const BoxShadow(
-                            color: Color.fromRGBO(0, 0, 0, 0.10),
-                            blurRadius: 24,
-                            offset: Offset(0, 12),
-                          ),
-                        ],
-                        border: Border.all(
-                          color: const Color.fromRGBO(255, 255, 255, 0.9),
-                        ),
-                      ),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.stretch,
-                        children: [
-                          _crearCampoTexto(
-                            controller: _emailController,
-                            hintText: 'Correo electrónico',
-                            icon: Icons.email_outlined,
-                          ),
-                          _crearCampoTexto(
-                            controller: _passwordController,
-                            hintText: 'Contraseña',
-                            icon: Icons.lock_outline,
-                            isPassword: true,
-                          ),
-                          const SizedBox(height: 12),
-                          DropdownButtonFormField<String>(
-                            initialValue: _selectedRole,
-                            decoration: InputDecoration(
-                              labelText: 'Iniciar sesión como',
-                              filled: true,
-                              fillColor: Theme.of(context).colorScheme.surface,
-                              border: OutlineInputBorder(
-                                borderRadius: BorderRadius.circular(14),
-                                borderSide: const BorderSide(
-                                  color: Color(0xFFCAD2C5),
-                                  width: 1,
+                child: FadeTransition(
+                  opacity: _fade,
+                  child: SlideTransition(
+                    position: _slide,
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        ScaleTransition(
+                          scale: _logoScale,
+                          child: Container(
+                            width: 118,
+                            height: 118,
+                            decoration: BoxDecoration(
+                              color: Colors.white,
+                              shape: BoxShape.circle,
+                              boxShadow: [
+                                const BoxShadow(
+                                  color: Color.fromRGBO(0, 0, 0, 0.10),
+                                  blurRadius: 16,
+                                  offset: Offset(0, 8),
                                 ),
-                              ),
-                              enabledBorder: OutlineInputBorder(
-                                borderRadius: BorderRadius.circular(14),
-                                borderSide: const BorderSide(
-                                  color: Color(0xFFCAD2C5),
-                                  width: 1,
-                                ),
+                              ],
+                            ),
+                            child: Padding(
+                              padding: const EdgeInsets.all(18.0),
+                              child: Image.asset(
+                                'assets/images/logo.png',
+                                fit: BoxFit.contain,
+                                semanticLabel: 'Logo Veridia',
                               ),
                             ),
-                            items: const [
-                              DropdownMenuItem(
-                                value: 'Explorador',
-                                child: Text('Explorador'),
-                              ),
-                              DropdownMenuItem(
-                                value: 'Administrador',
-                                child: Text('Administrador'),
+                          ),
+                        ),
+                        const SizedBox(height: 18),
+                        const Text(
+                          'Iniciar Sesión',
+                          style: TextStyle(
+                            fontSize: 26,
+                            fontWeight: FontWeight.bold,
+                            color: Colors.white,
+                            letterSpacing: 0.2,
+                          ),
+                        ),
+                        const SizedBox(height: 28),
+                        Container(
+                          width: double.infinity,
+                          padding: const EdgeInsets.all(24.0),
+                          decoration: BoxDecoration(
+                            color: const Color.fromRGBO(255, 255, 255, 0.97),
+                            borderRadius: BorderRadius.circular(24),
+                            boxShadow: [
+                              const BoxShadow(
+                                color: Color.fromRGBO(0, 0, 0, 0.08),
+                                blurRadius: 20,
+                                offset: Offset(0, 10),
                               ),
                             ],
-                            onChanged: (value) {
-                              if (value != null) {
-                                setState(() {
-                                  _selectedRole = value;
-                                });
-                              }
-                            },
                           ),
-                          if (_selectedRole == 'Administrador') ...[
-                            const SizedBox(height: 10),
-                            const Text(
-                              'El rol Administrador requiere el código privado.',
-                              style: TextStyle(
-                                fontSize: 13,
-                                color: Color(0xFF4F4F4F),
-                                height: 1.4,
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.stretch,
+                            children: [
+                              _crearCampoTexto(
+                                controller: _emailController,
+                                hintText: 'Correo electrónico',
+                                icon: Icons.email_outlined,
                               ),
-                            ),
-                            const SizedBox(height: 10),
-                            _crearCampoTexto(
-                              controller: _adminCodeController,
-                              hintText: 'Código de administrador',
-                              icon: Icons.vpn_key,
-                              isPassword: true,
-                            ),
-                          ],
-                          const SizedBox(height: 8),
-                          SizedBox(
-                            width: double.infinity,
-                            height: 52,
-                            child: ElevatedButton(
-                              onPressed: _iniciarSesion,
-                              style: ElevatedButton.styleFrom(
-                                backgroundColor: const Color(0xFF1E5631),
-                                shape: RoundedRectangleBorder(
-                                  borderRadius: BorderRadius.circular(14),
-                                ),
-                                elevation: 0,
+                              _crearCampoTexto(
+                                controller: _passwordController,
+                                hintText: 'Contraseña',
+                                icon: Icons.lock_outline,
+                                isPassword: true,
                               ),
-                              child: const Text(
-                                'Entrar',
-                                style: TextStyle(
-                                  color: Colors.white,
-                                  fontSize: 16,
-                                  fontWeight: FontWeight.w600,
-                                ),
-                              ),
-                            ),
-                          ),
-                          const SizedBox(height: 12),
-                          SizedBox(
-                            width: double.infinity,
-                            height: 52,
-                            child: OutlinedButton(
-                              onPressed: _signInWithGoogle,
-                              style: OutlinedButton.styleFrom(
-                                backgroundColor: Colors.white,
-                                foregroundColor: Colors.black87,
-                                side: const BorderSide(
-                                  color: Color(0xFFB0B0B0),
-                                ),
-                                shape: RoundedRectangleBorder(
-                                  borderRadius: BorderRadius.circular(14),
-                                ),
-                                padding: const EdgeInsets.symmetric(
-                                  vertical: 0,
-                                  horizontal: 0,
-                                ),
-                              ),
-                              child: Row(
-                                mainAxisAlignment: MainAxisAlignment.center,
-                                children: [
-                                  Container(
-                                    height: 36,
-                                    width: 36,
-                                    decoration: BoxDecoration(
-                                      color: Colors.white,
-                                      borderRadius: BorderRadius.circular(8),
-                                      border: Border.all(
-                                        color: const Color(0xFFDDDDDD),
-                                        width: 1,
-                                      ),
-                                    ),
-                                    child: Padding(
-                                      padding: const EdgeInsets.all(6.0),
-                                      child: const GoogleLogoIcon(size: 24),
+                              const SizedBox(height: 12),
+                              DropdownButtonFormField<String>(
+                                initialValue: _selectedRole,
+                                decoration: InputDecoration(
+                                  labelText: 'Iniciar sesión como',
+                                  filled: true,
+                                  fillColor: Theme.of(
+                                    context,
+                                  ).colorScheme.surface,
+                                  border: OutlineInputBorder(
+                                    borderRadius: BorderRadius.circular(14),
+                                    borderSide: const BorderSide(
+                                      color: Color(0xFFCAD2C5),
+                                      width: 1,
                                     ),
                                   ),
-                                  const SizedBox(width: 12),
-                                  const Text(
-                                    'Iniciar sesión con Google',
+                                  enabledBorder: OutlineInputBorder(
+                                    borderRadius: BorderRadius.circular(14),
+                                    borderSide: const BorderSide(
+                                      color: Color(0xFFCAD2C5),
+                                      width: 1,
+                                    ),
+                                  ),
+                                ),
+                                items: const [
+                                  DropdownMenuItem(
+                                    value: 'Explorador',
+                                    child: Text('Explorador'),
+                                  ),
+                                  DropdownMenuItem(
+                                    value: 'Administrador',
+                                    child: Text('Administrador'),
+                                  ),
+                                ],
+                                onChanged: (value) {
+                                  if (value != null) {
+                                    setState(() {
+                                      _selectedRole = value;
+                                    });
+                                  }
+                                },
+                              ),
+                              AnimatedVisibility(
+                                visible: _selectedRole == 'Administrador',
+                                child: Column(
+                                  crossAxisAlignment:
+                                      CrossAxisAlignment.stretch,
+                                  children: [
+                                    const SizedBox(height: 10),
+                                    const Text(
+                                      'El rol Administrador requiere el código privado.',
+                                      style: TextStyle(
+                                        fontSize: 13,
+                                        color: Color(0xFF4F4F4F),
+                                        height: 1.4,
+                                      ),
+                                    ),
+                                    const SizedBox(height: 10),
+                                    _crearCampoTexto(
+                                      controller: _adminCodeController,
+                                      hintText: 'Código de administrador',
+                                      icon: Icons.vpn_key,
+                                      isPassword: true,
+                                    ),
+                                  ],
+                                ),
+                              ),
+                              const SizedBox(height: 8),
+                              SizedBox(
+                                width: double.infinity,
+                                height: 52,
+                                child: ElevatedButton(
+                                  onPressed: _iniciarSesion,
+                                  style: ElevatedButton.styleFrom(
+                                    backgroundColor: const Color(0xFF1E5631),
+                                    shape: RoundedRectangleBorder(
+                                      borderRadius: BorderRadius.circular(14),
+                                    ),
+                                    elevation: 0,
+                                  ),
+                                  child: const Text(
+                                    'Entrar',
                                     style: TextStyle(
-                                      color: Colors.black87,
+                                      color: Colors.white,
                                       fontSize: 16,
                                       fontWeight: FontWeight.w600,
                                     ),
                                   ),
-                                ],
+                                ),
                               ),
+                              AnimatedVisibility(
+                                visible: _selectedRole != 'Administrador',
+                                child: Column(
+                                  crossAxisAlignment:
+                                      CrossAxisAlignment.stretch,
+                                  children: [
+                                    const SizedBox(height: 12),
+                                    if (kIsWeb)
+                                      Center(child: buildGoogleWebButton())
+                                    else
+                                      SizedBox(
+                                        width: double.infinity,
+                                        height: 52,
+                                        child: OutlinedButton(
+                                          onPressed: _signInWithGoogle,
+                                          style: OutlinedButton.styleFrom(
+                                            backgroundColor: Colors.white,
+                                            foregroundColor: Colors.black87,
+                                            side: const BorderSide(
+                                              color: Color(0xFFB0B0B0),
+                                            ),
+                                            shape: RoundedRectangleBorder(
+                                              borderRadius:
+                                                  BorderRadius.circular(14),
+                                            ),
+                                            padding: const EdgeInsets.symmetric(
+                                              vertical: 0,
+                                              horizontal: 0,
+                                            ),
+                                          ),
+                                          child: Row(
+                                            mainAxisAlignment:
+                                                MainAxisAlignment.center,
+                                            children: [
+                                              Container(
+                                                height: 36,
+                                                width: 36,
+                                                decoration: BoxDecoration(
+                                                  color: Colors.white,
+                                                  borderRadius:
+                                                      BorderRadius.circular(8),
+                                                  border: Border.all(
+                                                    color: const Color(
+                                                      0xFFDDDDDD,
+                                                    ),
+                                                    width: 1,
+                                                  ),
+                                                ),
+                                                child: const Padding(
+                                                  padding: EdgeInsets.all(6.0),
+                                                  child: GoogleLogoIcon(
+                                                    size: 24,
+                                                  ),
+                                                ),
+                                              ),
+                                              const SizedBox(width: 12),
+                                              const Text(
+                                                'Iniciar sesión con Google',
+                                                style: TextStyle(
+                                                  color: Colors.black87,
+                                                  fontSize: 16,
+                                                  fontWeight: FontWeight.w600,
+                                                ),
+                                              ),
+                                            ],
+                                          ),
+                                        ),
+                                      ),
+                                  ],
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                        const SizedBox(height: 20),
+                        TextButton(
+                          onPressed: () {
+                            Navigator.push(
+                              context,
+                              MaterialPageRoute(
+                                builder: (context) => const RegisterScreen(),
+                              ),
+                            );
+                          },
+                          style: TextButton.styleFrom(
+                            foregroundColor: Colors.white,
+                          ),
+                          child: const Text(
+                            '¿No tienes cuenta? Regístrate aquí',
+                            style: TextStyle(
+                              decoration: TextDecoration.underline,
+                              fontSize: 14,
+                              fontWeight: FontWeight.w500,
                             ),
                           ),
-                        ],
-                      ),
-                    ),
-                    const SizedBox(height: 20),
-                    TextButton(
-                      onPressed: () {
-                        Navigator.push(
-                          context,
-                          MaterialPageRoute(
-                            builder: (context) => const RegisterScreen(),
-                          ),
-                        );
-                      },
-                      style: TextButton.styleFrom(
-                        foregroundColor: Colors.white,
-                      ),
-                      child: const Text(
-                        '¿No tienes cuenta? Regístrate aquí',
-                        style: TextStyle(
-                          decoration: TextDecoration.underline,
-                          fontSize: 14,
-                          fontWeight: FontWeight.w500,
                         ),
-                      ),
+                      ],
                     ),
-                  ],
+                  ),
                 ),
               ),
             ),
@@ -614,72 +729,4 @@ class _LoginScreenState extends State<LoginScreen> {
       ),
     );
   }
-}
-
-class GoogleLogoIcon extends StatelessWidget {
-  const GoogleLogoIcon({super.key, this.size = 24});
-
-  final double size;
-
-  @override
-  Widget build(BuildContext context) {
-    return SizedBox(
-      width: size,
-      height: size,
-      child: CustomPaint(painter: _GoogleLogoPainter()),
-    );
-  }
-}
-
-class _GoogleLogoPainter extends CustomPainter {
-  @override
-  void paint(Canvas canvas, Size size) {
-    final strokeWidth = size.width * 0.23;
-    final radius = (size.width - strokeWidth) / 2;
-    final center = Offset(size.width / 2, size.height / 2);
-    final rect = Rect.fromCircle(center: center, radius: radius);
-
-    final paint = Paint()
-      ..style = PaintingStyle.stroke
-      ..strokeWidth = strokeWidth
-      ..strokeCap = StrokeCap.round;
-
-    paint.color = const Color(0xFF4285F4);
-    canvas.drawArc(rect, -pi / 2, pi / 2, false, paint);
-
-    paint.color = const Color(0xFFDB4437);
-    canvas.drawArc(rect, 0, pi / 3, false, paint);
-
-    paint.color = const Color(0xFFF4B400);
-    canvas.drawArc(rect, pi / 3, pi / 3, false, paint);
-
-    paint.color = const Color(0xFF0F9D58);
-    canvas.drawArc(rect, 2 * pi / 3, 4 * pi / 3 - 0.2, false, paint);
-
-    final innerPaint = Paint()..color = Colors.white;
-    canvas.drawCircle(center, radius - strokeWidth / 1.2, innerPaint);
-
-    final gPaint = Paint()
-      ..color = const Color(0xFF4285F4)
-      ..strokeWidth = strokeWidth * 0.7
-      ..style = PaintingStyle.stroke
-      ..strokeCap = StrokeCap.round;
-
-    final path = Path();
-    path.arcTo(
-      Rect.fromCircle(center: center, radius: radius * 0.57),
-      -pi / 2,
-      5 * pi / 6,
-      false,
-    );
-    path.moveTo(
-      center.dx + radius * 0.57 * cos(pi / 3),
-      center.dy + radius * 0.57 * sin(pi / 3),
-    );
-    path.lineTo(center.dx + radius * 0.25, center.dy);
-    canvas.drawPath(path, gPaint);
-  }
-
-  @override
-  bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
 }

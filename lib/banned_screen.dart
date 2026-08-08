@@ -1,12 +1,12 @@
 import 'package:flutter/material.dart';
-import 'package:firebase_auth/firebase_auth.dart';
-import 'services/repositorioU.dart';
+import 'services/repositorio_u.dart';
 
 class BannedScreen extends StatelessWidget {
   const BannedScreen({super.key});
 
   Future<void> _signOut(BuildContext context) async {
-    await FirebaseAuth.instance.signOut();
+    await UserRepository.instance.signOut();
+    if (!context.mounted) return;
     if (Navigator.canPop(context)) {
       Navigator.popUntil(context, (route) => route.isFirst);
     }
@@ -36,9 +36,9 @@ class BannedScreen extends StatelessWidget {
             Text(
               'Acceso restringido',
               style: Theme.of(context).textTheme.headlineSmall?.copyWith(
-                    color: Colors.black87,
-                    fontWeight: FontWeight.bold,
-                  ),
+                color: Colors.black87,
+                fontWeight: FontWeight.bold,
+              ),
             ),
             const SizedBox(height: 14),
             Text(
@@ -48,11 +48,17 @@ class BannedScreen extends StatelessWidget {
             const SizedBox(height: 16),
             Text(
               banReason,
-              style: const TextStyle(fontSize: 15, color: Colors.black54, height: 1.5),
+              style: const TextStyle(
+                fontSize: 15,
+                color: Colors.black54,
+                height: 1.5,
+              ),
             ),
             const Spacer(),
             ElevatedButton(
-              style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF1E5631)),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: const Color(0xFF1E5631),
+              ),
               onPressed: () => _signOut(context),
               child: const Padding(
                 padding: EdgeInsets.symmetric(vertical: 14.0),

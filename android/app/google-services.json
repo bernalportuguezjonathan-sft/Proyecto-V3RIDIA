@@ -50,6 +50,14 @@
       },
       "oauth_client": [
         {
+          "client_id": "523510024166-d3k82tjdo8kdgijqkn8ad85emneed9ba.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.example.veridia_app",
+            "certificate_hash": "0adfbfcbbed94e67d36e614a845a1f6e53226a18"
+          }
+        },
+        {
           "client_id": "523510024166-g4se2aa356mnlmkotah178gss2efve3a.apps.googleusercontent.com",
           "client_type": 3
         }

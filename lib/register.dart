@@ -1,9 +1,16 @@
+import 'dart:async';
+
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
-import 'services/repositorioU.dart';
+import 'package:google_sign_in/google_sign_in.dart';
+import 'services/repositorio_u.dart';
 import 'models/user.dart';
 import 'home.dart';
 import 'admin_home.dart';
+import 'widgets/animated_visibility.dart';
+import 'widgets/google_logo_icon.dart';
+import 'widgets/google_web_button.dart';
 
 class RegisterScreen extends StatefulWidget {
   const RegisterScreen({super.key});
@@ -12,13 +19,52 @@ class RegisterScreen extends StatefulWidget {
   State<RegisterScreen> createState() => _RegisterScreenState();
 }
 
-class _RegisterScreenState extends State<RegisterScreen> {
+class _RegisterScreenState extends State<RegisterScreen>
+    with SingleTickerProviderStateMixin {
   final _nameController = TextEditingController();
   final _emailController = TextEditingController();
   final _passwordController = TextEditingController();
   final _confirmPasswordController = TextEditingController();
   final _adminCodeController = TextEditingController();
   String? _selectedRole;
+
+  late final GoogleSignIn _googleSignIn = GoogleSignIn(
+    scopes: ['email'],
+    clientId: kIsWeb ? webGoogleClientId : null,
+  );
+  StreamSubscription<GoogleSignInAccount?>? _googleSignInSub;
+
+  late final AnimationController _entranceController = AnimationController(
+    vsync: this,
+    duration: const Duration(milliseconds: 700),
+  )..forward();
+  late final Animation<double> _fade = CurvedAnimation(
+    parent: _entranceController,
+    curve: Curves.easeOut,
+  );
+  late final Animation<Offset> _slide =
+      Tween<Offset>(begin: const Offset(0, 0.06), end: Offset.zero).animate(
+        CurvedAnimation(
+          parent: _entranceController,
+          curve: Curves.easeOutCubic,
+        ),
+      );
+  late final Animation<double> _logoScale = CurvedAnimation(
+    parent: _entranceController,
+    curve: const Interval(0.0, 0.8, curve: Curves.easeOutBack),
+  );
+
+  @override
+  void initState() {
+    super.initState();
+    if (kIsWeb) {
+      _googleSignInSub = _googleSignIn.onCurrentUserChanged.listen((account) {
+        if (account != null) {
+          _completeGoogleSignIn(account);
+        }
+      });
+    }
+  }
 
   // Función para las alertas modernas y flotantes
   void _mostrarAlerta(String mensaje) {
@@ -236,8 +282,164 @@ class _RegisterScreenState extends State<RegisterScreen> {
     }
   }
 
+  Future<void> _handleGoogleAuthenticatedUser(
+    User firebaseUser,
+    String role,
+  ) async {
+    UserProfile? userProfile = await UserRepository.instance.getUserProfileById(
+      firebaseUser.uid,
+    );
+
+    if (userProfile == null) {
+      userProfile = UserProfile(
+        userId: firebaseUser.uid,
+        email: firebaseUser.email ?? '',
+        displayName:
+            firebaseUser.displayName ??
+            firebaseUser.email?.split('@').first ??
+            'Usuario',
+        photoURL: firebaseUser.photoURL,
+        tokens: 0,
+        role: role,
+        createdDate: DateTime.now(),
+        isBanned: false,
+        banExpires: null,
+        banReason: null,
+      );
+      UserRepository.instance.currentUser.value = userProfile;
+      try {
+        await UserRepository.instance.createUserProfile(
+          userId: firebaseUser.uid,
+          email: userProfile.email,
+          displayName: userProfile.displayName,
+          role: role,
+        );
+      } catch (e) {
+        debugPrint('Could not persist Google profile to Firestore: $e');
+      }
+    } else {
+      UserRepository.instance.currentUser.value = userProfile;
+    }
+
+    if (userProfile.role != role) {
+      _mostrarAlerta(
+        'Ya tienes una cuenta registrada como ${userProfile.role}. '
+        'Inicia sesión con ese rol en su lugar.',
+      );
+      return;
+    }
+
+    final nextPage = userProfile.role == 'Administrador'
+        ? const AdminHomeScreen()
+        : const HomeScreen();
+
+    if (!mounted) return;
+    Navigator.pushReplacement(
+      context,
+      MaterialPageRoute(builder: (context) => nextPage),
+    );
+  }
+
+  Future<void> _registrarseConGoogle() async {
+    if (_selectedRole == null) {
+      _mostrarAlerta('Por favor selecciona el tipo de usuario');
+      return;
+    }
+
+    GoogleSignInAccount? googleUser;
+    try {
+      googleUser = await _googleSignIn.signIn();
+    } catch (e) {
+      _mostrarAlerta('Error al abrir la ventana de Google. Intenta de nuevo.');
+      return;
+    }
+
+    if (googleUser == null) return;
+
+    await _completeGoogleSignIn(googleUser);
+  }
+
+  Future<void> _completeGoogleSignIn(GoogleSignInAccount googleUser) async {
+    if (_selectedRole == null) {
+      _mostrarAlerta('Por favor selecciona el tipo de usuario');
+      return;
+    }
+    final role = _selectedRole!;
+
+    if (role == 'Administrador') {
+      return;
+    }
+
+    if (!mounted) return;
+    var dialogClosed = false;
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) => const Center(
+        child: CircularProgressIndicator(color: Color(0xFF1E5631)),
+      ),
+    );
+
+    try {
+      debugPrint('Google Sign-In: obteniendo tokens...');
+      final googleAuth = await googleUser.authentication.timeout(
+        const Duration(seconds: 20),
+        onTimeout: () => throw TimeoutException('authentication'),
+      );
+      debugPrint('Google Sign-In: tokens obtenidos.');
+      if (googleAuth.idToken == null && googleAuth.accessToken == null) {
+        _mostrarAlerta('No se pudieron obtener las credenciales de Google.');
+        return;
+      }
+
+      final credential = GoogleAuthProvider.credential(
+        accessToken: googleAuth.accessToken,
+        idToken: googleAuth.idToken,
+      );
+
+      debugPrint('Google Sign-In: iniciando sesión en Firebase...');
+      final userCredential = await FirebaseAuth.instance
+          .signInWithCredential(credential)
+          .timeout(
+            const Duration(seconds: 20),
+            onTimeout: () => throw TimeoutException('signInWithCredential'),
+          );
+      debugPrint(
+        'Google Sign-In: sesión de Firebase OK, uid=${userCredential.user?.uid}',
+      );
+      await UserRepository.instance.initializeUser();
+
+      if (mounted) {
+        Navigator.pop(context);
+        dialogClosed = true;
+      }
+
+      if (userCredential.user != null) {
+        await _handleGoogleAuthenticatedUser(userCredential.user!, role);
+      }
+    } on TimeoutException catch (e) {
+      _mostrarAlerta(
+        'Se agotó el tiempo esperando a Google (paso: ${e.message}). '
+        'Intenta de nuevo.',
+      );
+    } on FirebaseAuthException catch (e) {
+      if (e.code == 'account-exists-with-different-credential') {
+        _mostrarAlerta('Esta cuenta ya existe con otro método de acceso.');
+      } else {
+        _mostrarAlerta('Error al registrarse con Google. Intenta de nuevo.');
+      }
+    } catch (e) {
+      debugPrint('Google Sign-In: error inesperado -> $e');
+      _mostrarAlerta('Error en la autenticación con Google.');
+    } finally {
+      if (!dialogClosed && mounted) Navigator.pop(context);
+    }
+  }
+
   @override
   void dispose() {
+    _entranceController.dispose();
+    _googleSignInSub?.cancel();
     _nameController.dispose();
     _emailController.dispose();
     _passwordController.dispose();
@@ -317,190 +519,280 @@ class _RegisterScreenState extends State<RegisterScreen> {
                   vertical: 28.0,
                 ),
                 physics: const BouncingScrollPhysics(),
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Container(
-                      width: 112,
-                      height: 112,
-                      decoration: BoxDecoration(
-                        color: theme.colorScheme.surface,
-                        shape: BoxShape.circle,
-                        boxShadow: [
-                          const BoxShadow(
-                            color: Color.fromRGBO(0, 0, 0, 0.12),
-                            blurRadius: 18,
-                            offset: Offset(0, 12),
+                child: FadeTransition(
+                  opacity: _fade,
+                  child: SlideTransition(
+                    position: _slide,
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        ScaleTransition(
+                          scale: _logoScale,
+                          child: Container(
+                            width: 112,
+                            height: 112,
+                            decoration: BoxDecoration(
+                              color: theme.colorScheme.surface,
+                              shape: BoxShape.circle,
+                              boxShadow: [
+                                const BoxShadow(
+                                  color: Color.fromRGBO(0, 0, 0, 0.10),
+                                  blurRadius: 16,
+                                  offset: Offset(0, 8),
+                                ),
+                              ],
+                            ),
+                            child: Padding(
+                              padding: const EdgeInsets.all(18.0),
+                              child: Image.asset(
+                                'assets/images/logo.png',
+                                fit: BoxFit.contain,
+                                semanticLabel: 'Logo Veridia',
+                              ),
+                            ),
                           ),
-                        ],
-                      ),
-                      child: Padding(
-                        padding: const EdgeInsets.all(18.0),
-                        child: Image.asset(
-                          'assets/images/logo.png',
-                          fit: BoxFit.contain,
-                          semanticLabel: 'Logo Veridia',
                         ),
-                      ),
-                    ),
-                    const SizedBox(height: 18),
-                    const Text(
-                      'Regístrate',
-                      style: TextStyle(
-                        fontSize: 26,
-                        fontWeight: FontWeight.bold,
-                        color: Colors.white,
-                        letterSpacing: 0.2,
-                      ),
-                    ),
-                    const SizedBox(height: 10),
-                    const Text(
-                      'Crea tu cuenta para explorar observaciones y proteger ecosistemas.',
-                      textAlign: TextAlign.center,
-                      style: TextStyle(
-                        color: Colors.white70,
-                        fontSize: 14,
-                        height: 1.4,
-                      ),
-                    ),
-                    const SizedBox(height: 28),
-                    Container(
-                      width: double.infinity,
-                      padding: const EdgeInsets.all(24.0),
-                      decoration: BoxDecoration(
-                        color: const Color.fromRGBO(255, 255, 255, 0.96),
-                        borderRadius: BorderRadius.circular(24),
-                        boxShadow: [
-                          const BoxShadow(
-                            color: Color.fromRGBO(0, 0, 0, 0.12),
-                            blurRadius: 24,
-                            offset: Offset(0, 12),
+                        const SizedBox(height: 18),
+                        const Text(
+                          'Regístrate',
+                          style: TextStyle(
+                            fontSize: 26,
+                            fontWeight: FontWeight.bold,
+                            color: Colors.white,
+                            letterSpacing: 0.2,
                           ),
-                        ],
-                      ),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.stretch,
-                        children: [
-                          _crearCampoTexto(
-                            controller: _nameController,
-                            hintText: 'Nombre completo',
-                            icon: Icons.person_outline,
+                        ),
+                        const SizedBox(height: 10),
+                        const Text(
+                          'Crea tu cuenta para explorar observaciones y proteger ecosistemas.',
+                          textAlign: TextAlign.center,
+                          style: TextStyle(
+                            color: Colors.white70,
+                            fontSize: 14,
+                            height: 1.4,
                           ),
-                          _crearCampoTexto(
-                            controller: _emailController,
-                            hintText: 'Correo electrónico',
-                            icon: Icons.email_outlined,
-                          ),
-                          _crearCampoTexto(
-                            controller: _passwordController,
-                            hintText: 'Contraseña',
-                            icon: Icons.lock_outline,
-                            isPassword: true,
-                          ),
-                          _crearCampoTexto(
-                            controller: _confirmPasswordController,
-                            hintText: 'Confirmar contraseña',
-                            icon: Icons.lock_outline,
-                            isPassword: true,
-                          ),
-                          const SizedBox(height: 16),
-                          DropdownButtonFormField<String>(
-                            initialValue: _selectedRole,
-                            isExpanded: true,
-                            style: const TextStyle(color: Colors.black87),
-                            icon: Icon(
-                              Icons.arrow_drop_down,
-                              color: theme.colorScheme.primary,
-                            ),
-                            dropdownColor: theme.colorScheme.surface,
-                            decoration: InputDecoration(
-                              hintText: 'Selecciona tipo de usuario',
-                              filled: true,
-                              fillColor: theme.colorScheme.surface,
-                              border: OutlineInputBorder(
-                                borderRadius: BorderRadius.circular(14),
-                                borderSide: const BorderSide(
-                                  color: Color(0xFFCAD2C5),
-                                  width: 1,
-                                ),
-                              ),
-                              enabledBorder: OutlineInputBorder(
-                                borderRadius: BorderRadius.circular(14),
-                                borderSide: const BorderSide(
-                                  color: Color(0xFFCAD2C5),
-                                  width: 1,
-                                ),
-                              ),
-                            ),
-                            items: const [
-                              DropdownMenuItem(
-                                value: 'Explorador',
-                                child: Text('Explorador'),
-                              ),
-                              DropdownMenuItem(
-                                value: 'Administrador',
-                                child: Text('Administrador'),
+                        ),
+                        const SizedBox(height: 28),
+                        Container(
+                          width: double.infinity,
+                          padding: const EdgeInsets.all(24.0),
+                          decoration: BoxDecoration(
+                            color: const Color.fromRGBO(255, 255, 255, 0.97),
+                            borderRadius: BorderRadius.circular(24),
+                            boxShadow: [
+                              const BoxShadow(
+                                color: Color.fromRGBO(0, 0, 0, 0.08),
+                                blurRadius: 20,
+                                offset: Offset(0, 10),
                               ),
                             ],
-                            onChanged: (value) {
-                              if (value != null) {
-                                setState(() {
-                                  _selectedRole = value;
-                                });
-                              }
-                            },
                           ),
-                          if (_selectedRole == 'Administrador') ...[
-                            const SizedBox(height: 16),
-                            _crearCampoTexto(
-                              controller: _adminCodeController,
-                              hintText: 'Código privado de administrador',
-                              icon: Icons.vpn_key_outlined,
-                            ),
-                            const SizedBox(height: 8),
-                            const Text(
-                              'Solicita a tus superiores el código de administrador antes de continuar.',
-                              style: TextStyle(
-                                color: Colors.black54,
-                                fontSize: 12,
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.stretch,
+                            children: [
+                              _crearCampoTexto(
+                                controller: _nameController,
+                                hintText: 'Nombre completo',
+                                icon: Icons.person_outline,
                               ),
-                            ),
-                          ],
-                          const SizedBox(height: 24),
-                          ElevatedButton(
-                            onPressed: _registrarUsuario,
-                            child: const Text('Registrarse'),
-                          ),
-                        ],
-                      ),
-                    ),
-                    const SizedBox(height: 18),
-                    SizedBox(
-                      width: double.infinity,
-                      height: 52,
-                      child: OutlinedButton(
-                        onPressed: () {
-                          Navigator.pop(context);
-                        },
-                        style: OutlinedButton.styleFrom(
-                          backgroundColor: Colors.white.withValues(alpha: 0.2),
-                          foregroundColor: Colors.white,
-                          side: const BorderSide(
-                            color: Colors.white,
-                            width: 1.5,
-                          ),
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(16),
-                          ),
-                          textStyle: const TextStyle(
-                            fontSize: 16,
-                            fontWeight: FontWeight.w700,
+                              _crearCampoTexto(
+                                controller: _emailController,
+                                hintText: 'Correo electrónico',
+                                icon: Icons.email_outlined,
+                              ),
+                              _crearCampoTexto(
+                                controller: _passwordController,
+                                hintText: 'Contraseña',
+                                icon: Icons.lock_outline,
+                                isPassword: true,
+                              ),
+                              _crearCampoTexto(
+                                controller: _confirmPasswordController,
+                                hintText: 'Confirmar contraseña',
+                                icon: Icons.lock_outline,
+                                isPassword: true,
+                              ),
+                              const SizedBox(height: 16),
+                              DropdownButtonFormField<String>(
+                                initialValue: _selectedRole,
+                                isExpanded: true,
+                                style: const TextStyle(color: Colors.black87),
+                                icon: Icon(
+                                  Icons.arrow_drop_down,
+                                  color: theme.colorScheme.primary,
+                                ),
+                                dropdownColor: theme.colorScheme.surface,
+                                decoration: InputDecoration(
+                                  hintText: 'Selecciona tipo de usuario',
+                                  filled: true,
+                                  fillColor: theme.colorScheme.surface,
+                                  border: OutlineInputBorder(
+                                    borderRadius: BorderRadius.circular(14),
+                                    borderSide: const BorderSide(
+                                      color: Color(0xFFCAD2C5),
+                                      width: 1,
+                                    ),
+                                  ),
+                                  enabledBorder: OutlineInputBorder(
+                                    borderRadius: BorderRadius.circular(14),
+                                    borderSide: const BorderSide(
+                                      color: Color(0xFFCAD2C5),
+                                      width: 1,
+                                    ),
+                                  ),
+                                ),
+                                items: const [
+                                  DropdownMenuItem(
+                                    value: 'Explorador',
+                                    child: Text('Explorador'),
+                                  ),
+                                  DropdownMenuItem(
+                                    value: 'Administrador',
+                                    child: Text('Administrador'),
+                                  ),
+                                ],
+                                onChanged: (value) {
+                                  if (value != null) {
+                                    setState(() {
+                                      _selectedRole = value;
+                                    });
+                                  }
+                                },
+                              ),
+                              AnimatedVisibility(
+                                visible: _selectedRole == 'Administrador',
+                                child: Column(
+                                  crossAxisAlignment:
+                                      CrossAxisAlignment.stretch,
+                                  children: [
+                                    const SizedBox(height: 16),
+                                    _crearCampoTexto(
+                                      controller: _adminCodeController,
+                                      hintText:
+                                          'Código privado de administrador',
+                                      icon: Icons.vpn_key_outlined,
+                                    ),
+                                    const SizedBox(height: 8),
+                                    const Text(
+                                      'Solicita a tus superiores el código de administrador antes de continuar.',
+                                      style: TextStyle(
+                                        color: Colors.black54,
+                                        fontSize: 12,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                              const SizedBox(height: 24),
+                              ElevatedButton(
+                                onPressed: _registrarUsuario,
+                                child: const Text('Registrarse'),
+                              ),
+                              AnimatedVisibility(
+                                visible: _selectedRole != 'Administrador',
+                                child: Column(
+                                  crossAxisAlignment:
+                                      CrossAxisAlignment.stretch,
+                                  children: [
+                                    const SizedBox(height: 12),
+                                    if (kIsWeb)
+                                      Center(child: buildGoogleWebButton())
+                                    else
+                                      SizedBox(
+                                        width: double.infinity,
+                                        height: 52,
+                                        child: OutlinedButton(
+                                          onPressed: _registrarseConGoogle,
+                                          style: OutlinedButton.styleFrom(
+                                            backgroundColor: Colors.white,
+                                            foregroundColor: Colors.black87,
+                                            side: const BorderSide(
+                                              color: Color(0xFFB0B0B0),
+                                            ),
+                                            shape: RoundedRectangleBorder(
+                                              borderRadius:
+                                                  BorderRadius.circular(14),
+                                            ),
+                                            padding: const EdgeInsets.symmetric(
+                                              vertical: 0,
+                                              horizontal: 0,
+                                            ),
+                                          ),
+                                          child: Row(
+                                            mainAxisAlignment:
+                                                MainAxisAlignment.center,
+                                            children: [
+                                              Container(
+                                                height: 36,
+                                                width: 36,
+                                                decoration: BoxDecoration(
+                                                  color: Colors.white,
+                                                  borderRadius:
+                                                      BorderRadius.circular(8),
+                                                  border: Border.all(
+                                                    color: const Color(
+                                                      0xFFDDDDDD,
+                                                    ),
+                                                    width: 1,
+                                                  ),
+                                                ),
+                                                child: const Padding(
+                                                  padding: EdgeInsets.all(6.0),
+                                                  child: GoogleLogoIcon(
+                                                    size: 24,
+                                                  ),
+                                                ),
+                                              ),
+                                              const SizedBox(width: 12),
+                                              const Text(
+                                                'Registrarse con Google',
+                                                style: TextStyle(
+                                                  color: Colors.black87,
+                                                  fontSize: 16,
+                                                  fontWeight: FontWeight.w600,
+                                                ),
+                                              ),
+                                            ],
+                                          ),
+                                        ),
+                                      ),
+                                  ],
+                                ),
+                              ),
+                            ],
                           ),
                         ),
-                        child: const Text('Volver al inicio de sesión'),
-                      ),
+                        const SizedBox(height: 18),
+                        SizedBox(
+                          width: double.infinity,
+                          height: 52,
+                          child: OutlinedButton(
+                            onPressed: () {
+                              Navigator.pop(context);
+                            },
+                            style: OutlinedButton.styleFrom(
+                              backgroundColor: Colors.white.withValues(
+                                alpha: 0.2,
+                              ),
+                              foregroundColor: Colors.white,
+                              side: const BorderSide(
+                                color: Colors.white,
+                                width: 1.5,
+                              ),
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(16),
+                              ),
+                              textStyle: const TextStyle(
+                                fontSize: 16,
+                                fontWeight: FontWeight.w700,
+                              ),
+                            ),
+                            child: const Text('Volver al inicio de sesión'),
+                          ),
+                        ),
+                      ],
                     ),
-                  ],
+                  ),
                 ),
               ),
             ),

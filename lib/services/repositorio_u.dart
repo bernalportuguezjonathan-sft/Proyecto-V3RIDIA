@@ -1,8 +1,12 @@
 import 'package:flutter/foundation.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:google_sign_in/google_sign_in.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../models/user.dart';
+
+const webGoogleClientId =
+    '523510024166-g4se2aa356mnlmkotah178gss2efve3a.apps.googleusercontent.com';
 
 class UserRepository {
   UserRepository._();
@@ -28,8 +32,8 @@ class UserRepository {
             final banExpires = banExpiresValue is String
                 ? DateTime.tryParse(banExpiresValue)
                 : banExpiresValue is Timestamp
-                    ? banExpiresValue.toDate()
-                    : null;
+                ? banExpiresValue.toDate()
+                : null;
             return UserProfile(
               userId: doc.id,
               email: data['email'] as String? ?? '',
@@ -55,7 +59,22 @@ class UserRepository {
     }
   }
 
-Future<void> initializeUser() async {
+  Future<void> signOut() async {
+    try {
+      final googleSignIn = GoogleSignIn(
+        clientId: kIsWeb ? webGoogleClientId : null,
+      );
+      if (await googleSignIn.isSignedIn()) {
+        await googleSignIn.signOut();
+      }
+    } catch (e) {
+      debugPrint('Google sign-out error: $e');
+    }
+    await FirebaseAuth.instance.signOut();
+    currentUser.value = null;
+  }
+
+  Future<void> initializeUser() async {
     final user = FirebaseAuth.instance.currentUser;
     if (user != null) {
       try {
@@ -77,7 +96,9 @@ Future<void> initializeUser() async {
 
         final cachedTokens = await _getCachedTokens(refreshedUser.uid);
         final cachedRole = await _getCachedRole(refreshedUser.uid);
-        final cachedDisplayName = await _getCachedDisplayName(refreshedUser.uid);
+        final cachedDisplayName = await _getCachedDisplayName(
+          refreshedUser.uid,
+        );
 
         final currentTokens = data != null
             ? (data['tokens'] as int? ?? cachedTokens)
@@ -88,10 +109,10 @@ Future<void> initializeUser() async {
         final displayName = data != null && data['displayName'] != null
             ? data['displayName'] as String
             : (cachedDisplayName.isNotEmpty
-                ? cachedDisplayName
-                : (refreshedUser.displayName ??
-                    refreshedUser.email?.split('@').first ??
-                    'Usuario'));
+                  ? cachedDisplayName
+                  : (refreshedUser.displayName ??
+                        refreshedUser.email?.split('@').first ??
+                        'Usuario'));
         final currentCreatedDate = data != null && data['createdDate'] != null
             ? DateTime.tryParse(data['createdDate'] as String) ?? DateTime.now()
             : DateTime.now();
@@ -102,11 +123,13 @@ Future<void> initializeUser() async {
         final banExpires = banExpiresValue is String
             ? DateTime.tryParse(banExpiresValue)
             : banExpiresValue is Timestamp
-                ? banExpiresValue.toDate()
-                : null;
+            ? banExpiresValue.toDate()
+            : null;
         var banReason = data != null ? data['banReason'] as String? : null;
 
-        if (currentIsBanned && banExpires != null && banExpires.isBefore(DateTime.now())) {
+        if (currentIsBanned &&
+            banExpires != null &&
+            banExpires.isBefore(DateTime.now())) {
           await unbanUser(userId: refreshedUser.uid);
           currentIsBanned = false;
           banReason = null;
@@ -115,8 +138,8 @@ Future<void> initializeUser() async {
         final resolvedDisplayName = displayName.isNotEmpty
             ? displayName
             : refreshedUser.displayName ??
-                refreshedUser.email?.split('@').first ??
-                'Usuario';
+                  refreshedUser.email?.split('@').first ??
+                  'Usuario';
 
         currentUser.value = UserProfile(
           userId: refreshedUser.uid,
@@ -171,7 +194,7 @@ Future<void> initializeUser() async {
     try {
       await _firestore.collection('users').doc(userId).update({
         'displayName': displayName,
-        if (photoURL != null) 'photoURL': photoURL,
+        'photoURL': photoURL,
       });
     } catch (e) {
       debugPrint('Warning: failed to update profile in Firestore: $e');
@@ -184,7 +207,9 @@ Future<void> initializeUser() async {
     required int days,
     required String reason,
   }) async {
-    final banExpires = isPermanent ? null : DateTime.now().add(Duration(days: days));
+    final banExpires = isPermanent
+        ? null
+        : DateTime.now().add(Duration(days: days));
 
     await _firestore.collection('users').doc(userId).update({
       'isBanned': true,
@@ -193,9 +218,7 @@ Future<void> initializeUser() async {
     });
   }
 
-  Future<void> unbanUser({
-    required String userId,
-  }) async {
+  Future<void> unbanUser({required String userId}) async {
     await _firestore.collection('users').doc(userId).update({
       'isBanned': false,
       'banExpires': null,
@@ -215,7 +238,8 @@ Future<void> initializeUser() async {
     return UserProfile(
       userId: doc.id,
       email: data['email'] as String? ?? '',
-      displayName: data['displayName'] as String? ??
+      displayName:
+          data['displayName'] as String? ??
           (data['email'] as String? ?? '').split('@').first,
       photoURL: data['photoURL'] as String?,
       tokens: data['tokens'] as int? ?? 0,
@@ -224,10 +248,10 @@ Future<void> initializeUser() async {
       isBanned: data['isBanned'] as bool? ?? false,
       banExpires: data['banExpires'] != null
           ? (data['banExpires'] is String
-              ? DateTime.tryParse(data['banExpires'] as String)
-              : data['banExpires'] is Timestamp
-                  ? (data['banExpires'] as Timestamp).toDate()
-                  : null)
+                ? DateTime.tryParse(data['banExpires'] as String)
+                : data['banExpires'] is Timestamp
+                ? (data['banExpires'] as Timestamp).toDate()
+                : null)
           : null,
       banReason: data['banReason'] as String?,
     );

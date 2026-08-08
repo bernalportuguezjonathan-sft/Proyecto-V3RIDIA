@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'models/user.dart';
-import 'services/repositorioU.dart';
+import 'services/repositorio_u.dart';
 
 class BanManagementScreen extends StatefulWidget {
   const BanManagementScreen({super.key});
@@ -39,17 +39,28 @@ class _BanManagementScreenState extends State<BanManagementScreen> {
       context: context,
       builder: (context) => StatefulBuilder(
         builder: (context, setState) => AlertDialog(
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
-          title: const Text('Banear usuario', style: TextStyle(fontWeight: FontWeight.bold)),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(18),
+          ),
+          title: const Text(
+            'Banear usuario',
+            style: TextStyle(fontWeight: FontWeight.bold),
+          ),
           content: Form(
             key: formKey,
             child: Column(
               mainAxisSize: MainAxisSize.min,
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text('Usuario: ${user.displayName}', style: const TextStyle(fontWeight: FontWeight.w600)),
+                Text(
+                  'Usuario: ${user.displayName}',
+                  style: const TextStyle(fontWeight: FontWeight.w600),
+                ),
                 const SizedBox(height: 14),
-                const Text('Duración del baneo', style: TextStyle(fontSize: 14)),
+                const Text(
+                  'Duración del baneo',
+                  style: TextStyle(fontSize: 14),
+                ),
                 const SizedBox(height: 10),
                 Wrap(
                   spacing: 8,
@@ -87,7 +98,9 @@ class _BanManagementScreenState extends State<BanManagementScreen> {
                   decoration: InputDecoration(
                     labelText: 'Motivo del baneo',
                     alignLabelWithHint: true,
-                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(14)),
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(14),
+                    ),
                   ),
                   validator: (value) {
                     if (value == null || value.trim().isEmpty) {
@@ -105,25 +118,32 @@ class _BanManagementScreenState extends State<BanManagementScreen> {
               child: const Text('Cancelar'),
             ),
             ElevatedButton(
-              style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF1E5631)),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: const Color(0xFF1E5631),
+              ),
               onPressed: () async {
                 if (formKey.currentState?.validate() ?? false) {
+                  final dialogContext = context;
+                  final messenger = ScaffoldMessenger.maybeOf(context);
+                  if (Navigator.of(dialogContext).canPop()) {
+                    Navigator.of(dialogContext).pop();
+                  }
+
                   await UserRepository.instance.banUser(
                     userId: user.userId,
                     isPermanent: permanentBan,
                     days: selectedDays,
                     reason: reasonController.text.trim(),
                   );
-                  Navigator.pop(context);
+
                   await _loadUsers();
-                  if (mounted) {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(
-                        content: Text('Usuario baneado correctamente.'),
-                        backgroundColor: Color(0xFF1E5631),
-                      ),
-                    );
-                  }
+                  if (!mounted) return;
+                  messenger?.showSnackBar(
+                    const SnackBar(
+                      content: Text('Usuario baneado correctamente.'),
+                      backgroundColor: Color(0xFF1E5631),
+                    ),
+                  );
                 }
               },
               child: const Text('Confirmar'),
@@ -137,8 +157,8 @@ class _BanManagementScreenState extends State<BanManagementScreen> {
   Widget _buildUserRow(UserProfile user) {
     final banStatus = user.isBanned
         ? user.banExpires == null
-            ? 'Suspendido permanentemente'
-            : 'Suspendido hasta ${user.banExpires!.day}/${user.banExpires!.month}/${user.banExpires!.year}'
+              ? 'Suspendido permanentemente'
+              : 'Suspendido hasta ${user.banExpires!.day}/${user.banExpires!.month}/${user.banExpires!.year}'
         : 'Activo';
 
     return Container(
@@ -147,7 +167,11 @@ class _BanManagementScreenState extends State<BanManagementScreen> {
         color: Colors.white,
         borderRadius: BorderRadius.circular(18),
         boxShadow: const [
-          BoxShadow(color: Color.fromRGBO(0, 0, 0, 0.08), blurRadius: 8, offset: Offset(0, 3)),
+          BoxShadow(
+            color: Color.fromRGBO(0, 0, 0, 0.08),
+            blurRadius: 8,
+            offset: Offset(0, 3),
+          ),
         ],
       ),
       child: Column(
@@ -159,16 +183,29 @@ class _BanManagementScreenState extends State<BanManagementScreen> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(user.displayName, style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+                    Text(
+                      user.displayName,
+                      style: const TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
                     const SizedBox(height: 4),
-                    Text(user.email, style: const TextStyle(color: Colors.black54)),
+                    Text(
+                      user.email,
+                      style: const TextStyle(color: Colors.black54),
+                    ),
                   ],
                 ),
               ),
               ElevatedButton(
                 style: ElevatedButton.styleFrom(
-                  backgroundColor: user.isBanned ? const Color(0xFFB71C1C) : const Color(0xFF1E5631),
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                  backgroundColor: user.isBanned
+                      ? const Color(0xFFB71C1C)
+                      : const Color(0xFF1E5631),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(14),
+                  ),
                 ),
                 onPressed: () {
                   if (user.isBanned) {
@@ -192,7 +229,10 @@ class _BanManagementScreenState extends State<BanManagementScreen> {
           ),
           if (user.isBanned && user.banReason != null) ...[
             const SizedBox(height: 10),
-            Text('Motivo: ${user.banReason}', style: const TextStyle(color: Colors.black54, fontSize: 13)),
+            Text(
+              'Motivo: ${user.banReason}',
+              style: const TextStyle(color: Colors.black54, fontSize: 13),
+            ),
           ],
         ],
       ),
@@ -202,14 +242,13 @@ class _BanManagementScreenState extends State<BanManagementScreen> {
   Future<void> _unbanUser(UserProfile user) async {
     await UserRepository.instance.unbanUser(userId: user.userId);
     await _loadUsers();
-    if (mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Usuario desbaneado correctamente.'),
-          backgroundColor: Color(0xFF1E5631),
-        ),
-      );
-    }
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Text('Usuario desbaneado correctamente.'),
+        backgroundColor: Color(0xFF1E5631),
+      ),
+    );
   }
 
   @override
@@ -222,26 +261,29 @@ class _BanManagementScreenState extends State<BanManagementScreen> {
       body: _isLoading
           ? const Center(child: CircularProgressIndicator())
           : _users.isEmpty
-              ? Center(
-                  child: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    children: const [
-                      Icon(Icons.people_outline, size: 60, color: Colors.black38),
-                      SizedBox(height: 14),
-                      Text('No hay usuarios registrados aún.', style: TextStyle(color: Colors.black54)),
-                    ],
+          ? Center(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: const [
+                  Icon(Icons.people_outline, size: 60, color: Colors.black38),
+                  SizedBox(height: 14),
+                  Text(
+                    'No hay usuarios registrados aún.',
+                    style: TextStyle(color: Colors.black54),
                   ),
-                )
-              : RefreshIndicator(
-                  color: const Color(0xFF1E5631),
-                  onRefresh: _loadUsers,
-                  child: ListView.separated(
-                    padding: const EdgeInsets.all(16),
-                    itemCount: _users.length,
-                    separatorBuilder: (_, __) => const SizedBox(height: 14),
-                    itemBuilder: (_, index) => _buildUserRow(_users[index]),
-                  ),
-                ),
+                ],
+              ),
+            )
+          : RefreshIndicator(
+              color: const Color(0xFF1E5631),
+              onRefresh: _loadUsers,
+              child: ListView.separated(
+                padding: const EdgeInsets.all(16),
+                itemCount: _users.length,
+                separatorBuilder: (_, _) => const SizedBox(height: 14),
+                itemBuilder: (_, index) => _buildUserRow(_users[index]),
+              ),
+            ),
     );
   }
 }

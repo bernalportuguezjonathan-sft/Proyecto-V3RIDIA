@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:firebase_auth/firebase_auth.dart';
 import 'login.dart'; // Para redirigir al login
 import 'identify_species.dart';
 import 'mapa.dart';
@@ -7,7 +6,7 @@ import 'historial.dart';
 import 'perfil.dart';
 import 'desafios.dart';
 import 'models/user.dart';
-import 'services/repositorioU.dart';
+import 'services/repositorio_u.dart';
 import 'widgets/token_icon.dart';
 
 class HomeScreen extends StatefulWidget {
@@ -76,7 +75,7 @@ class _HomeScreenState extends State<HomeScreen> {
                     TextButton(
                       onPressed: () async {
                         final navigator = Navigator.of(dialogContext);
-                        await FirebaseAuth.instance.signOut();
+                        await UserRepository.instance.signOut();
                         if (!mounted) return;
                         navigator.pushAndRemoveUntil(
                           MaterialPageRoute(

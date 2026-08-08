@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_map/flutter_map.dart';
 import 'package:latlong2/latlong.dart';
-import 'package:firebase_auth/firebase_auth.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'login.dart';
 import 'home.dart';
@@ -10,6 +9,7 @@ import 'historial.dart';
 import 'perfil.dart';
 import 'detallemapa.dart';
 import 'models/bird_zone.dart';
+import 'services/repositorio_u.dart';
 
 class MapScreen extends StatefulWidget {
   const MapScreen({super.key});
@@ -83,7 +83,7 @@ class _MapScreenState extends State<MapScreen> {
           TextButton(
             onPressed: () async {
               final navigator = Navigator.of(context);
-              await FirebaseAuth.instance.signOut();
+              await UserRepository.instance.signOut();
               if (!mounted) return;
               navigator.pushAndRemoveUntil(
                 MaterialPageRoute(builder: (context) => const LoginScreen()),
@@ -306,7 +306,7 @@ class _MapScreenState extends State<MapScreen> {
           onPressed: () => Navigator.pop(context),
         ),
         title: const Text(
-          'Mapa de aves - Mosquera',
+          'Mapa De Especies - Cundinamarca',
           style: TextStyle(
             fontWeight: FontWeight.bold,
             fontSize: 18,
@@ -340,7 +340,7 @@ class _MapScreenState extends State<MapScreen> {
                 ),
                 const SizedBox(height: 8),
                 Text(
-                  'Recoge fotos de aves en la región de Mosquera y completa tus misiones.',
+                  'Recoge fotos de especies en la región y completa tus misiones.',
                   style: TextStyle(fontSize: 13, color: Colors.grey.shade700),
                 ),
                 const SizedBox(height: 10),

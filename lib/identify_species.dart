@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/foundation.dart';
-import 'package:firebase_auth/firebase_auth.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:permission_handler/permission_handler.dart';
@@ -11,7 +10,8 @@ import 'mapa.dart';
 import 'historial.dart';
 import 'perfil.dart';
 import 'models/observation.dart';
-import 'services/repositorioO.dart';
+import 'services/repositorio_o.dart';
+import 'services/repositorio_u.dart';
 
 class IdentifySpeciesScreen extends StatefulWidget {
   const IdentifySpeciesScreen({super.key});
@@ -35,7 +35,8 @@ class _IdentifySpeciesScreenState extends State<IdentifySpeciesScreen> {
       scientificName: 'Egretta thula',
       location: 'Humedal de Mosquera, sector este',
       description: 'Ave frecuente en humedales y zonas de agua quieta.',
-      imageUrl: 'https://images.unsplash.com/photo-1517849845537-4d257902454a?auto=format&fit=crop&w=800&q=80',
+      imageUrl:
+          'https://images.unsplash.com/photo-1517849845537-4d257902454a?auto=format&fit=crop&w=800&q=80',
       region: 'Humedal',
     ),
     _BirdSpeciesGuide(
@@ -43,15 +44,18 @@ class _IdentifySpeciesScreenState extends State<IdentifySpeciesScreen> {
       scientificName: 'Columbina talpacoti',
       location: 'Bosque del Cerro El Chical',
       description: 'Se observa en zonas abiertas y bordes de bosque.',
-      imageUrl: 'https://images.unsplash.com/photo-1500534623283-312aade485b7?auto=format&fit=crop&w=800&q=80',
+      imageUrl:
+          'https://images.unsplash.com/photo-1500534623283-312aade485b7?auto=format&fit=crop&w=800&q=80',
       region: 'Bosque',
     ),
     _BirdSpeciesGuide(
       name: 'Cotorra',
       scientificName: 'Amazona autumnalis',
       location: 'Laguna de la Vereda Norte',
-      description: 'Ave llamativa de áreas con árboles grandes y vegetación densa.',
-      imageUrl: 'https://images.unsplash.com/photo-1444464666168-49d633b86797?auto=format&fit=crop&w=800&q=80',
+      description:
+          'Ave llamativa de áreas con árboles grandes y vegetación densa.',
+      imageUrl:
+          'https://images.unsplash.com/photo-1444464666168-49d633b86797?auto=format&fit=crop&w=800&q=80',
       region: 'Laguna',
     ),
     _BirdSpeciesGuide(
@@ -59,7 +63,8 @@ class _IdentifySpeciesScreenState extends State<IdentifySpeciesScreen> {
       scientificName: 'Troglodytes aedon',
       location: 'Sendero El Jardín',
       description: 'Pequeña ave de sotobosque y jardines con vegetación alta.',
-      imageUrl: 'https://images.unsplash.com/photo-1470115636492-6d2b56f9596d?auto=format&fit=crop&w=800&q=80',
+      imageUrl:
+          'https://images.unsplash.com/photo-1470115636492-6d2b56f9596d?auto=format&fit=crop&w=800&q=80',
       region: 'Sendero',
     ),
   ];
@@ -83,11 +88,14 @@ class _IdentifySpeciesScreenState extends State<IdentifySpeciesScreen> {
 
     if (status.isGranted) {
       final position = await Geolocator.getCurrentPosition(
-        locationSettings: const LocationSettings(accuracy: LocationAccuracy.high),
+        locationSettings: const LocationSettings(
+          accuracy: LocationAccuracy.high,
+        ),
       );
       if (!mounted) return;
       setState(() {
-        _currentLocation = '${position.latitude.toStringAsFixed(4)}, ${position.longitude.toStringAsFixed(4)}';
+        _currentLocation =
+            '${position.latitude.toStringAsFixed(4)}, ${position.longitude.toStringAsFixed(4)}';
       });
     } else {
       if (!mounted) return;
@@ -156,15 +164,13 @@ class _IdentifySpeciesScreenState extends State<IdentifySpeciesScreen> {
           TextButton(
             onPressed: () async {
               final navigator = Navigator.of(context);
-              await FirebaseAuth.instance.signOut();
+              await UserRepository.instance.signOut();
               if (!mounted) return;
               if (navigator.canPop()) {
                 navigator.pop();
               }
               navigator.pushAndRemoveUntil(
-                MaterialPageRoute(
-                  builder: (context) => const LoginScreen(),
-                ),
+                MaterialPageRoute(builder: (context) => const LoginScreen()),
                 (route) => false,
               );
             },
@@ -231,17 +237,26 @@ class _IdentifySpeciesScreenState extends State<IdentifySpeciesScreen> {
                         children: [
                           const Text(
                             'Guía de observación en Mosquera',
-                            style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold),
+                            style: TextStyle(
+                              fontSize: 15,
+                              fontWeight: FontWeight.bold,
+                            ),
                           ),
                           const SizedBox(height: 6),
                           Text(
                             'Tu ubicación actual: $_currentLocation',
-                            style: TextStyle(fontSize: 12, color: Colors.grey.shade700),
+                            style: TextStyle(
+                              fontSize: 12,
+                              color: Colors.grey.shade700,
+                            ),
                           ),
                           const SizedBox(height: 8),
                           Text(
                             'Recomendación: dirige tu recorrido hacia humedales o zonas de bosque temprano en la mañana.',
-                            style: TextStyle(fontSize: 12, color: Colors.grey.shade700),
+                            style: TextStyle(
+                              fontSize: 12,
+                              color: Colors.grey.shade700,
+                            ),
                           ),
                         ],
                       ),
@@ -252,7 +267,11 @@ class _IdentifySpeciesScreenState extends State<IdentifySpeciesScreen> {
                     padding: const EdgeInsets.symmetric(horizontal: 16),
                     child: Text(
                       'Especies reales para identificar',
-                      style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: Colors.grey.shade800),
+                      style: TextStyle(
+                        fontSize: 14,
+                        fontWeight: FontWeight.bold,
+                        color: Colors.grey.shade800,
+                      ),
                     ),
                   ),
                   const SizedBox(height: 10),
@@ -266,7 +285,8 @@ class _IdentifySpeciesScreenState extends State<IdentifySpeciesScreen> {
                       itemBuilder: (context, index) {
                         final guide = _speciesGuides[index];
                         return GestureDetector(
-                          onTap: () => setState(() => _selectedSpecies = guide.name),
+                          onTap: () =>
+                              setState(() => _selectedSpecies = guide.name),
                           child: Container(
                             width: 180,
                             decoration: BoxDecoration(
@@ -284,7 +304,9 @@ class _IdentifySpeciesScreenState extends State<IdentifySpeciesScreen> {
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
                                 ClipRRect(
-                                  borderRadius: const BorderRadius.vertical(top: Radius.circular(16)),
+                                  borderRadius: const BorderRadius.vertical(
+                                    top: Radius.circular(16),
+                                  ),
                                   child: Image.network(
                                     guide.imageUrl,
                                     height: 110,
@@ -295,21 +317,32 @@ class _IdentifySpeciesScreenState extends State<IdentifySpeciesScreen> {
                                 Padding(
                                   padding: const EdgeInsets.all(10),
                                   child: Column(
-                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.start,
                                     children: [
                                       Text(
                                         guide.name,
-                                        style: const TextStyle(fontSize: 13, fontWeight: FontWeight.bold),
+                                        style: const TextStyle(
+                                          fontSize: 13,
+                                          fontWeight: FontWeight.bold,
+                                        ),
                                       ),
                                       const SizedBox(height: 4),
                                       Text(
                                         guide.scientificName,
-                                        style: TextStyle(fontSize: 11, color: Colors.grey.shade600),
+                                        style: TextStyle(
+                                          fontSize: 11,
+                                          color: Colors.grey.shade600,
+                                        ),
                                       ),
                                       const SizedBox(height: 6),
                                       Text(
                                         guide.region,
-                                        style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: Color(0xFF1E5631)),
+                                        style: const TextStyle(
+                                          fontSize: 11,
+                                          fontWeight: FontWeight.w600,
+                                          color: Color(0xFF1E5631),
+                                        ),
                                       ),
                                     ],
                                   ),
@@ -332,12 +365,17 @@ class _IdentifySpeciesScreenState extends State<IdentifySpeciesScreen> {
                             width: double.infinity,
                             padding: const EdgeInsets.all(12),
                             decoration: BoxDecoration(
-                              color: const Color(0xFF1E5631).withValues(alpha: 0.08),
+                              color: const Color(
+                                0xFF1E5631,
+                              ).withValues(alpha: 0.08),
                               borderRadius: BorderRadius.circular(12),
                             ),
                             child: Text(
                               'Seleccionada: $_selectedSpecies',
-                              style: const TextStyle(fontWeight: FontWeight.bold, color: Color(0xFF1E5631)),
+                              style: const TextStyle(
+                                fontWeight: FontWeight.bold,
+                                color: Color(0xFF1E5631),
+                              ),
                             ),
                           ),
                         const SizedBox(height: 12),
@@ -377,9 +415,21 @@ class _IdentifySpeciesScreenState extends State<IdentifySpeciesScreen> {
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            const Text('Sugerencia de ruta', style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold)),
+                            const Text(
+                              'Sugerencia de ruta',
+                              style: TextStyle(
+                                fontSize: 14,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
                             const SizedBox(height: 8),
-                            Text('Ve hacia el humedal en la mañana si buscas garzas y patos. Para otras aves, recorre el bosque y el sendero ecológico.', style: TextStyle(fontSize: 12, color: Colors.grey.shade700)),
+                            Text(
+                              'Ve hacia el humedal en la mañana si buscas garzas y patos. Para otras aves, recorre el bosque y el sendero ecológico.',
+                              style: TextStyle(
+                                fontSize: 12,
+                                color: Colors.grey.shade700,
+                              ),
+                            ),
                           ],
                         ),
                       ),
@@ -407,16 +457,22 @@ class _IdentifySpeciesScreenState extends State<IdentifySpeciesScreen> {
                                     ),
                                   )
                                 : _selectedImageFile != null
-                                    ? ClipRRect(
-                                        borderRadius: BorderRadius.circular(20),
-                                        child: Image.file(
-                                          _selectedImageFile!,
-                                          fit: BoxFit.cover,
-                                          width: double.infinity,
-                                          height: double.infinity,
-                                        ),
-                                      )
-                                    : const Center(child: Icon(Icons.image, size: 64, color: Colors.grey)),
+                                ? ClipRRect(
+                                    borderRadius: BorderRadius.circular(20),
+                                    child: Image.file(
+                                      _selectedImageFile!,
+                                      fit: BoxFit.cover,
+                                      width: double.infinity,
+                                      height: double.infinity,
+                                    ),
+                                  )
+                                : const Center(
+                                    child: Icon(
+                                      Icons.image,
+                                      size: 64,
+                                      color: Colors.grey,
+                                    ),
+                                  ),
                           ),
                           const SizedBox(height: 16),
                           SizedBox(
@@ -424,28 +480,50 @@ class _IdentifySpeciesScreenState extends State<IdentifySpeciesScreen> {
                             child: ElevatedButton(
                               onPressed: () {
                                 final observation = Observation(
-                                  id: DateTime.now().millisecondsSinceEpoch.toString(),
-                                  commonName: _selectedSpecies ?? 'Especie observada',
-                                  scientificName: _selectedSpecies != null ? 'Referencia visual' : 'Sin confirmar',
+                                  id: DateTime.now().millisecondsSinceEpoch
+                                      .toString(),
+                                  commonName:
+                                      _selectedSpecies ?? 'Especie observada',
+                                  scientificName: _selectedSpecies != null
+                                      ? 'Referencia visual'
+                                      : 'Sin confirmar',
                                   location: _currentLocation,
-                                  notes: 'Registrado desde la guía de observación en Mosquera',
+                                  notes:
+                                      'Registrado desde la guía de observación en Mosquera',
                                   dateTime: DateTime.now(),
-                                  imagePath: _selectedImageFile?.path ?? _selectedImageName,
+                                  imagePath:
+                                      _selectedImageFile?.path ??
+                                      _selectedImageName,
                                 );
-                                ObservationRepository.instance.addObservation(observation);
+                                ObservationRepository.instance.addObservation(
+                                  observation,
+                                );
                                 if (mounted) {
                                   Navigator.pushReplacement(
                                     context,
-                                    MaterialPageRoute(builder: (context) => const HistoryScreen()),
+                                    MaterialPageRoute(
+                                      builder: (context) =>
+                                          const HistoryScreen(),
+                                    ),
                                   );
                                 }
                               },
                               style: ElevatedButton.styleFrom(
                                 backgroundColor: const Color(0xFF1E5631),
-                                padding: const EdgeInsets.symmetric(vertical: 14),
-                                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                                padding: const EdgeInsets.symmetric(
+                                  vertical: 14,
+                                ),
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(10),
+                                ),
                               ),
-                              child: const Text('Guardar observación', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w600)),
+                              child: const Text(
+                                'Guardar observación',
+                                style: TextStyle(
+                                  color: Colors.white,
+                                  fontWeight: FontWeight.w600,
+                                ),
+                              ),
                             ),
                           ),
                         ],
@@ -465,9 +543,15 @@ class _IdentifySpeciesScreenState extends State<IdentifySpeciesScreen> {
         currentIndex: 1,
         items: const [
           BottomNavigationBarItem(icon: Icon(Icons.home), label: 'Inicio'),
-          BottomNavigationBarItem(icon: Icon(Icons.camera_alt), label: 'Cámara'),
+          BottomNavigationBarItem(
+            icon: Icon(Icons.camera_alt),
+            label: 'Cámara',
+          ),
           BottomNavigationBarItem(icon: Icon(Icons.map), label: 'Mapa'),
-          BottomNavigationBarItem(icon: Icon(Icons.history), label: 'Historial'),
+          BottomNavigationBarItem(
+            icon: Icon(Icons.history),
+            label: 'Historial',
+          ),
           BottomNavigationBarItem(icon: Icon(Icons.person), label: 'Perfil'),
         ],
         onTap: (index) {
@@ -528,7 +612,14 @@ class _IdentifySpeciesScreenState extends State<IdentifySpeciesScreen> {
           children: [
             Icon(icon, size: 24, color: const Color(0xFF1E5631)),
             const SizedBox(height: 6),
-            Text(label, style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: Color(0xFF1E5631))),
+            Text(
+              label,
+              style: const TextStyle(
+                fontSize: 12,
+                fontWeight: FontWeight.w600,
+                color: Color(0xFF1E5631),
+              ),
+            ),
           ],
         ),
       ),

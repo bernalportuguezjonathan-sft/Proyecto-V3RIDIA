@@ -1,11 +1,10 @@
 import 'package:flutter/material.dart';
-import 'package:firebase_auth/firebase_auth.dart';
 import 'models/desafio.dart';
 import 'models/user.dart';
 import 'models/asignacion.dart';
-import 'services/repositorioA.dart';
-import 'services/repositorioD.dart';
-import 'services/repositorioU.dart';
+import 'services/repositorio_a.dart';
+import 'services/repositorio_d.dart';
+import 'services/repositorio_u.dart';
 import 'admin_profile.dart';
 import 'ban_management.dart';
 import 'login.dart';
@@ -40,7 +39,7 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
   }
 
   void _cerrarSesion() async {
-    await FirebaseAuth.instance.signOut();
+    await UserRepository.instance.signOut();
     if (mounted) {
       Navigator.pushAndRemoveUntil(
         context,
@@ -48,26 +47,6 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
         (route) => false,
       );
     }
-  }
-
-  void _agregarDesafioDiario() {
-    final now = DateTime.now();
-    final id = 'admin-${now.millisecondsSinceEpoch}';
-    ChallengeRepository.instance.addChallenge(
-      Challenge(
-        id: id,
-        title: 'Desafío diario ${now.day}/${now.month}',
-        description: 'Desafío agregado por administrador',
-        targetSpecies: 'General',
-        targetGoal: 5,
-        dueDate: now.add(const Duration(days: 1)),
-        createdDate: now,
-        currentProgress: 0,
-        isCompleted: false,
-        tokensReward: 100,
-        assignedByAdmin: UserRepository.instance.currentUser.value?.email,
-      ),
-    );
   }
 
   void _mostrarPuntosDeInteres() {
@@ -82,8 +61,13 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
       context: context,
       builder: (context) => AlertDialog(
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-        title: const Text('Eliminar desafío', style: TextStyle(fontWeight: FontWeight.bold)),
-        content: const Text('¿Deseas eliminar este desafío de forma permanente?'),
+        title: const Text(
+          'Eliminar desafío',
+          style: TextStyle(fontWeight: FontWeight.bold),
+        ),
+        content: const Text(
+          '¿Deseas eliminar este desafío de forma permanente?',
+        ),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context),
@@ -115,9 +99,13 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
       context: context,
       builder: (context) => StatefulBuilder(
         builder: (context, setState) => AlertDialog(
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-          title: const Text('Crear o asignar desafío',
-              style: TextStyle(fontWeight: FontWeight.bold)),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(20),
+          ),
+          title: const Text(
+            'Crear o asignar desafío',
+            style: TextStyle(fontWeight: FontWeight.bold),
+          ),
           content: SingleChildScrollView(
             child: Form(
               key: formKey,
@@ -136,8 +124,9 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
                         borderSide: const BorderSide(color: Color(0xFFCAD2C5)),
                       ),
                     ),
-                    validator: (value) =>
-                        value == null || value.trim().isEmpty ? 'Requerido' : null,
+                    validator: (value) => value == null || value.trim().isEmpty
+                        ? 'Requerido'
+                        : null,
                   ),
                   const SizedBox(height: 12),
                   TextFormField(
@@ -167,8 +156,9 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
                         borderSide: const BorderSide(color: Color(0xFFCAD2C5)),
                       ),
                     ),
-                    validator: (value) =>
-                        value == null || value.trim().isEmpty ? 'Requerido' : null,
+                    validator: (value) => value == null || value.trim().isEmpty
+                        ? 'Requerido'
+                        : null,
                   ),
                   const SizedBox(height: 12),
                   Row(
@@ -178,17 +168,23 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
                           controller: goalController,
                           decoration: InputDecoration(
                             labelText: 'Meta',
-                            labelStyle: const TextStyle(color: Color(0xFF1E5631)),
+                            labelStyle: const TextStyle(
+                              color: Color(0xFF1E5631),
+                            ),
                             filled: true,
                             fillColor: Colors.grey.shade50,
                             border: OutlineInputBorder(
                               borderRadius: BorderRadius.circular(12),
-                              borderSide: const BorderSide(color: Color(0xFFCAD2C5)),
+                              borderSide: const BorderSide(
+                                color: Color(0xFFCAD2C5),
+                              ),
                             ),
                           ),
                           keyboardType: TextInputType.number,
                           validator: (value) =>
-                              value == null || value.trim().isEmpty ? 'Requerido' : null,
+                              value == null || value.trim().isEmpty
+                              ? 'Requerido'
+                              : null,
                         ),
                       ),
                       const SizedBox(width: 12),
@@ -197,17 +193,23 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
                           controller: tokensController,
                           decoration: InputDecoration(
                             labelText: 'Tokens',
-                            labelStyle: const TextStyle(color: Color(0xFF1E5631)),
+                            labelStyle: const TextStyle(
+                              color: Color(0xFF1E5631),
+                            ),
                             filled: true,
                             fillColor: Colors.grey.shade50,
                             border: OutlineInputBorder(
                               borderRadius: BorderRadius.circular(12),
-                              borderSide: const BorderSide(color: Color(0xFFCAD2C5)),
+                              borderSide: const BorderSide(
+                                color: Color(0xFFCAD2C5),
+                              ),
                             ),
                           ),
                           keyboardType: TextInputType.number,
                           validator: (value) =>
-                              value == null || value.trim().isEmpty ? 'Requerido' : null,
+                              value == null || value.trim().isEmpty
+                              ? 'Requerido'
+                              : null,
                         ),
                       ),
                     ],
@@ -227,14 +229,18 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
                             context: context,
                             initialDate: selectedDate,
                             firstDate: DateTime.now(),
-                            lastDate: DateTime.now().add(const Duration(days: 365)),
+                            lastDate: DateTime.now().add(
+                              const Duration(days: 365),
+                            ),
                           );
                           if (picked != null) {
                             setState(() => selectedDate = picked);
                           }
                         },
-                        child: const Text('Cambiar',
-                            style: TextStyle(color: Color(0xFF1E5631))),
+                        child: const Text(
+                          'Cambiar',
+                          style: TextStyle(color: Color(0xFF1E5631)),
+                        ),
                       ),
                     ],
                   ),
@@ -246,12 +252,16 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
                           dropdownColor: Colors.white,
                           decoration: InputDecoration(
                             labelText: 'Destino',
-                            labelStyle: const TextStyle(color: Color(0xFF1E5631)),
+                            labelStyle: const TextStyle(
+                              color: Color(0xFF1E5631),
+                            ),
                             filled: true,
                             fillColor: Colors.grey.shade50,
                             border: OutlineInputBorder(
                               borderRadius: BorderRadius.circular(12),
-                              borderSide: const BorderSide(color: Color(0xFFCAD2C5)),
+                              borderSide: const BorderSide(
+                                color: Color(0xFFCAD2C5),
+                              ),
                             ),
                           ),
                           items: [
@@ -259,10 +269,12 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
                               value: 'global',
                               child: Text('Global (todos)'),
                             ),
-                            ..._players.map((player) => DropdownMenuItem(
-                                  value: player.userId,
-                                  child: Text('Jugador: ${player.displayName}'),
-                                )),
+                            ..._players.map(
+                              (player) => DropdownMenuItem(
+                                value: player.userId,
+                                child: Text('Jugador: ${player.displayName}'),
+                              ),
+                            ),
                           ],
                           onChanged: (value) => setState(() {
                             selectedTarget = value ?? 'global';
@@ -275,7 +287,10 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
           actions: [
             TextButton(
               onPressed: () => Navigator.pop(context),
-              child: const Text('Cancelar', style: TextStyle(color: Colors.grey)),
+              child: const Text(
+                'Cancelar',
+                style: TextStyle(color: Colors.grey),
+              ),
             ),
             ElevatedButton(
               onPressed: () {
@@ -302,7 +317,8 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
                     assignedToUserId: selectedPlayer?.userId,
                     assignedToDisplayName: selectedPlayer?.displayName,
                     assignedToEmail: selectedPlayer?.email,
-                    assignedByAdmin: UserRepository.instance.currentUser.value?.email,
+                    assignedByAdmin:
+                        UserRepository.instance.currentUser.value?.email,
                   );
 
                   ChallengeRepository.instance.addChallenge(challenge);
@@ -325,9 +341,11 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
                   Navigator.pop(context);
                   ScaffoldMessenger.of(context).showSnackBar(
                     SnackBar(
-                      content: Text(isGlobal
-                          ? 'Desafío global creado'
-                          : 'Asignado a ${selectedPlayer?.displayName}'),
+                      content: Text(
+                        isGlobal
+                            ? 'Desafío global creado'
+                            : 'Asignado a ${selectedPlayer?.displayName}',
+                      ),
                       backgroundColor: const Color(0xFF1E5631),
                     ),
                   );
@@ -336,7 +354,8 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
               style: ElevatedButton.styleFrom(
                 backgroundColor: const Color(0xFF1E5631),
                 shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(12)),
+                  borderRadius: BorderRadius.circular(12),
+                ),
               ),
               child: const Text('Guardar'),
             ),
@@ -355,15 +374,19 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
       appBar: AppBar(
         backgroundColor: const Color(0xFF1E5631),
         elevation: 0,
-        title: const Text('Panel Administrador',
-            style: TextStyle(fontWeight: FontWeight.bold)),
+        title: const Text(
+          'Panel Administrador',
+          style: TextStyle(fontWeight: FontWeight.bold),
+        ),
         centerTitle: true,
         actions: [
           IconButton(
             onPressed: () {
               Navigator.push(
                 context,
-                MaterialPageRoute(builder: (context) => const AdminProfileScreen()),
+                MaterialPageRoute(
+                  builder: (context) => const AdminProfileScreen(),
+                ),
               );
             },
             icon: const Icon(Icons.person, color: Colors.white, size: 22),
@@ -397,7 +420,7 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
                   borderRadius: BorderRadius.circular(18),
                   boxShadow: [
                     BoxShadow(
-                      color: const Color(0xFF1E5631).withOpacity(0.25),
+                      color: const Color(0xFF1E5631).withValues(alpha: 0.25),
                       blurRadius: 12,
                       offset: const Offset(0, 4),
                     ),
@@ -406,18 +429,25 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text('¡Bienvenido, Administrador!',
-                        style: const TextStyle(
-                            fontSize: 20,
-                            fontWeight: FontWeight.bold,
-                            color: Colors.white)),
+                    Text(
+                      '¡Bienvenido, Administrador!',
+                      style: const TextStyle(
+                        fontSize: 20,
+                        fontWeight: FontWeight.bold,
+                        color: Colors.white,
+                      ),
+                    ),
                     const SizedBox(height: 8),
-                    Text(userProfile?.email ?? '',
-                        style: const TextStyle(color: Colors.white70)),
+                    Text(
+                      userProfile?.email ?? '',
+                      style: const TextStyle(color: Colors.white70),
+                    ),
                     const SizedBox(height: 12),
                     Container(
                       padding: const EdgeInsets.symmetric(
-                          horizontal: 12, vertical: 6),
+                        horizontal: 12,
+                        vertical: 6,
+                      ),
                       decoration: BoxDecoration(
                         color: Colors.white24,
                         borderRadius: BorderRadius.circular(20),
@@ -425,11 +455,16 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
                       child: Row(
                         mainAxisSize: MainAxisSize.min,
                         children: [
-                          const Icon(Icons.admin_panel_settings,
-                              color: Colors.white, size: 16),
+                          const Icon(
+                            Icons.admin_panel_settings,
+                            color: Colors.white,
+                            size: 16,
+                          ),
                           const SizedBox(width: 6),
-                          const Text('Administrador',
-                              style: TextStyle(color: Colors.white, fontSize: 12)),
+                          const Text(
+                            'Administrador',
+                            style: TextStyle(color: Colors.white, fontSize: 12),
+                          ),
                         ],
                       ),
                     ),
@@ -437,11 +472,14 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
                 ),
               ),
               const SizedBox(height: 24),
-              const Text('Acciones rápidas',
-                  style: TextStyle(
-                      fontSize: 18,
-                      fontWeight: FontWeight.bold,
-                      color: Colors.black87)),
+              const Text(
+                'Acciones rápidas',
+                style: TextStyle(
+                  fontSize: 18,
+                  fontWeight: FontWeight.bold,
+                  color: Colors.black87,
+                ),
+              ),
               const SizedBox(height: 16),
               GridView.count(
                 crossAxisCount: 2,
@@ -477,7 +515,8 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
                       Navigator.push(
                         context,
                         MaterialPageRoute(
-                            builder: (context) => const AssignmentHistoryScreen()),
+                          builder: (context) => const AssignmentHistoryScreen(),
+                        ),
                       );
                     },
                   ),
@@ -491,18 +530,22 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
                       Navigator.push(
                         context,
                         MaterialPageRoute(
-                            builder: (context) => const BanManagementScreen()),
+                          builder: (context) => const BanManagementScreen(),
+                        ),
                       );
                     },
                   ),
                 ],
               ),
               const SizedBox(height: 24),
-              const Text('Desafíos creados',
-                  style: TextStyle(
-                      fontSize: 18,
-                      fontWeight: FontWeight.bold,
-                      color: Colors.black87)),
+              const Text(
+                'Desafíos creados',
+                style: TextStyle(
+                  fontSize: 18,
+                  fontWeight: FontWeight.bold,
+                  color: Colors.black87,
+                ),
+              ),
               const SizedBox(height: 12),
               ValueListenableBuilder<List<Challenge>>(
                 valueListenable: ChallengeRepository.instance.challenges,
@@ -514,11 +557,16 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
                       child: const Column(
                         mainAxisSize: MainAxisSize.min,
                         children: [
-                          Icon(Icons.assignment_outlined,
-                              size: 64, color: Color(0xFF1E5631)),
+                          Icon(
+                            Icons.assignment_outlined,
+                            size: 64,
+                            color: Color(0xFF1E5631),
+                          ),
                           SizedBox(height: 12),
-                          Text('No hay desafíos creados',
-                              style: TextStyle(color: Colors.black54)),
+                          Text(
+                            'No hay desafíos creados',
+                            style: TextStyle(color: Colors.black54),
+                          ),
                         ],
                       ),
                     );
@@ -528,7 +576,7 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
                     shrinkWrap: true,
                     physics: const NeverScrollableScrollPhysics(),
                     itemCount: challenges.length,
-                    separatorBuilder: (_, __) => const SizedBox(height: 12),
+                    separatorBuilder: (_, _) => const SizedBox(height: 12),
                     itemBuilder: (context, index) {
                       final challenge = challenges[index];
                       final isGlobal = challenge.assignedToUserId == null;
@@ -539,8 +587,9 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
                           borderRadius: BorderRadius.circular(16),
                           boxShadow: const [
                             BoxShadow(
-                                color: Color.fromRGBO(0, 0, 0, 0.06),
-                                blurRadius: 8),
+                              color: Color.fromRGBO(0, 0, 0, 0.06),
+                              blurRadius: 8,
+                            ),
                           ],
                         ),
                         child: Row(
@@ -550,32 +599,47 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
                               child: Column(
                                 crossAxisAlignment: CrossAxisAlignment.start,
                                 children: [
-                                  Text(challenge.title,
-                                      style: const TextStyle(
-                                          fontSize: 16,
-                                          fontWeight: FontWeight.bold)),
+                                  Text(
+                                    challenge.title,
+                                    style: const TextStyle(
+                                      fontSize: 16,
+                                      fontWeight: FontWeight.bold,
+                                    ),
+                                  ),
                                   const SizedBox(height: 6),
-                                  Text(challenge.description,
-                                      style: const TextStyle(
-                                          fontSize: 13, color: Colors.black87)),
+                                  Text(
+                                    challenge.description,
+                                    style: const TextStyle(
+                                      fontSize: 13,
+                                      color: Colors.black87,
+                                    ),
+                                  ),
                                   const SizedBox(height: 8),
                                   Text(
-                                      isGlobal
-                                          ? 'Global: todos los jugadores'
-                                          : 'Asignado a: ${challenge.assignedToDisplayName}',
-                                      style: const TextStyle(
-                                          fontSize: 12, color: Colors.black54)),
+                                    isGlobal
+                                        ? 'Global: todos los jugadores'
+                                        : 'Asignado a: ${challenge.assignedToDisplayName}',
+                                    style: const TextStyle(
+                                      fontSize: 12,
+                                      color: Colors.black54,
+                                    ),
+                                  ),
                                   Text(
-                                      'Vence: ${challenge.dueDate.day}/${challenge.dueDate.month}',
-                                      style: const TextStyle(
-                                          fontSize: 12, color: Colors.black54)),
+                                    'Vence: ${challenge.dueDate.day}/${challenge.dueDate.month}',
+                                    style: const TextStyle(
+                                      fontSize: 12,
+                                      color: Colors.black54,
+                                    ),
+                                  ),
                                 ],
                               ),
                             ),
                             IconButton(
                               onPressed: () => _showDeleteConfirm(challenge.id),
-                              icon: const Icon(Icons.delete_outline,
-                                  color: Colors.redAccent),
+                              icon: const Icon(
+                                Icons.delete_outline,
+                                color: Colors.redAccent,
+                              ),
                             ),
                           ],
                         ),
@@ -610,7 +674,7 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
             borderRadius: BorderRadius.circular(20),
             boxShadow: [
               BoxShadow(
-                color: color.withOpacity(0.14),
+                color: color.withValues(alpha: 0.14),
                 blurRadius: 18,
                 offset: const Offset(0, 8),
               ),
@@ -623,17 +687,20 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
                 width: 52,
                 height: 52,
                 decoration: BoxDecoration(
-                  color: color.withOpacity(0.12),
+                  color: color.withValues(alpha: 0.12),
                   borderRadius: BorderRadius.circular(16),
                 ),
                 child: Icon(icon, color: color, size: 28),
               ),
               const SizedBox(height: 16),
-              Text(label,
-                  style: TextStyle(
-                      fontWeight: FontWeight.w700,
-                      color: Colors.black87,
-                      fontSize: 15)),
+              Text(
+                label,
+                style: TextStyle(
+                  fontWeight: FontWeight.w700,
+                  color: Colors.black87,
+                  fontSize: 15,
+                ),
+              ),
               const SizedBox(height: 10),
               Flexible(
                 child: Text(

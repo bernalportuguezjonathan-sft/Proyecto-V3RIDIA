@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:firebase_auth/firebase_auth.dart';
 import 'package:image_picker/image_picker.dart';
 import 'login.dart';
 import 'home.dart';
@@ -9,8 +8,8 @@ import 'historial.dart';
 import 'perfil.dart';
 import 'models/desafio.dart';
 import 'models/user.dart';
-import 'services/repositorioD.dart';
-import 'services/repositorioU.dart';
+import 'services/repositorio_d.dart';
+import 'services/repositorio_u.dart';
 import 'widgets/token_icon.dart';
 
 class ChallengesScreen extends StatefulWidget {
@@ -35,7 +34,7 @@ class _ChallengesScreenState extends State<ChallengesScreen> {
           TextButton(
             onPressed: () async {
               final navigator = Navigator.of(context);
-              await FirebaseAuth.instance.signOut();
+              await UserRepository.instance.signOut();
               if (!mounted) return;
               navigator.pushAndRemoveUntil(
                 MaterialPageRoute(builder: (context) => const LoginScreen()),
@@ -516,8 +515,8 @@ class _ChallengesScreenState extends State<ChallengesScreen> {
             ],
           );
         },
-),
-       bottomNavigationBar: BottomNavigationBar(
+      ),
+      bottomNavigationBar: BottomNavigationBar(
         backgroundColor: Colors.white,
         selectedItemColor: const Color(0xFF1E5631),
         unselectedItemColor: Colors.grey,

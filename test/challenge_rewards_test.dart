@@ -1,8 +1,8 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:veridia_app/models/desafio.dart';
 import 'package:veridia_app/models/user.dart';
-import 'package:veridia_app/services/repositorioD.dart';
-import 'package:veridia_app/services/repositorioU.dart';
+import 'package:veridia_app/services/repositorio_d.dart';
+import 'package:veridia_app/services/repositorio_u.dart';
 
 void main() {
   setUp(() {
@@ -21,33 +21,36 @@ void main() {
     ChallengeRepository.instance.challenges.value = [];
   });
 
-  test('otorga monedas por cada avance y solo descuenta al eliminar si no está completado', () {
-    final challenge = Challenge(
-      id: 'challenge-1',
-      title: 'Reto 1',
-      description: 'Descripción',
-      targetSpecies: 'Ave',
-      targetGoal: 3,
-      dueDate: DateTime.now().add(const Duration(days: 7)),
-      createdDate: DateTime.now(),
-      currentProgress: 0,
-      isCompleted: false,
-      tokensReward: 100,
-    );
+  test(
+    'otorga monedas por cada avance y solo descuenta al eliminar si no está completado',
+    () {
+      final challenge = Challenge(
+        id: 'challenge-1',
+        title: 'Reto 1',
+        description: 'Descripción',
+        targetSpecies: 'Ave',
+        targetGoal: 3,
+        dueDate: DateTime.now().add(const Duration(days: 7)),
+        createdDate: DateTime.now(),
+        currentProgress: 0,
+        isCompleted: false,
+        tokensReward: 100,
+      );
 
-    ChallengeRepository.instance.addChallenge(challenge);
-    ChallengeRepository.instance.updateProgress(challenge.id, 1);
-    expect(UserRepository.instance.getTokens(), 34);
+      ChallengeRepository.instance.addChallenge(challenge);
+      ChallengeRepository.instance.updateProgress(challenge.id, 1);
+      expect(UserRepository.instance.getTokens(), 34);
 
-    ChallengeRepository.instance.updateProgress(challenge.id, 2);
-    expect(UserRepository.instance.getTokens(), 67);
+      ChallengeRepository.instance.updateProgress(challenge.id, 2);
+      expect(UserRepository.instance.getTokens(), 67);
 
-    ChallengeRepository.instance.updateProgress(challenge.id, 3);
-    expect(UserRepository.instance.getTokens(), 100);
+      ChallengeRepository.instance.updateProgress(challenge.id, 3);
+      expect(UserRepository.instance.getTokens(), 100);
 
-    ChallengeRepository.instance.deleteChallenge(challenge.id);
-    expect(UserRepository.instance.getTokens(), 100);
-  });
+      ChallengeRepository.instance.deleteChallenge(challenge.id);
+      expect(UserRepository.instance.getTokens(), 100);
+    },
+  );
 
   test('no permite acumular más de 100 monedas por los desafíos', () {
     final firstChallenge = Challenge(

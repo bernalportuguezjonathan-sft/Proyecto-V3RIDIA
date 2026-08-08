@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
-import 'package:firebase_auth/firebase_auth.dart';
 import 'login.dart';
 import 'models/bird_zone.dart';
+import 'services/repositorio_u.dart';
 
 class MapDetailScreen extends StatefulWidget {
   final BirdZone zone;
@@ -26,7 +26,7 @@ class _MapDetailScreenState extends State<MapDetailScreen> {
           ),
           TextButton(
             onPressed: () async {
-              await FirebaseAuth.instance.signOut();
+              await UserRepository.instance.signOut();
               if (!mounted) return;
               Navigator.pushAndRemoveUntil(
                 context,

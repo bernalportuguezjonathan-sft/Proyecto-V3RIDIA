@@ -1,12 +1,12 @@
 import 'package:flutter/material.dart';
-import 'package:firebase_auth/firebase_auth.dart';
 import 'login.dart';
 import 'home.dart';
 import 'identify_species.dart';
 import 'mapa.dart';
 import 'perfil.dart';
 import 'models/observation.dart';
-import 'services/repositorioO.dart';
+import 'services/repositorio_o.dart';
+import 'services/repositorio_u.dart';
 
 class HistoryScreen extends StatefulWidget {
   const HistoryScreen({super.key});
@@ -32,7 +32,7 @@ class _HistoryScreenState extends State<HistoryScreen>
           ),
           TextButton(
             onPressed: () async {
-              await FirebaseAuth.instance.signOut();
+              await UserRepository.instance.signOut();
               if (!mounted) return;
               Navigator.pushAndRemoveUntil(
                 context,

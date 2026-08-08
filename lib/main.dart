@@ -6,7 +6,7 @@ import 'login.dart';
 import 'home.dart';
 import 'admin_home.dart';
 import 'banned_screen.dart';
-import 'services/repositorioU.dart';
+import 'services/repositorio_u.dart';
 
 // Convertimos el main en 'async' porque iniciar Firebase toma un instante
 Future<void> main() async {
@@ -224,18 +224,13 @@ class WelcomeScreen extends StatelessWidget {
                 ),
                 const Spacer(flex: 3),
                 Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 16,
+                    vertical: 8,
+                  ),
                   decoration: BoxDecoration(
                     color: const Color(0xFF1E5631).withValues(alpha: 0.12),
                     borderRadius: BorderRadius.circular(999),
-                  ),
-                  child: const Text(
-                    'Actualización: mapa con especies reales y captura de imágenes',
-                    style: TextStyle(
-                      fontSize: 12,
-                      fontWeight: FontWeight.w700,
-                      color: Color(0xFF1E5631),
-                    ),
                   ),
                 ),
                 const SizedBox(height: 16),
@@ -273,7 +268,7 @@ class WelcomeScreen extends StatelessWidget {
                         elevation: 2,
                       ),
                       child: const Text(
-                        'Entrar a Veridia',
+                        'Conocer Veridia',
                         style: TextStyle(
                           fontSize: 16,
                           fontWeight: FontWeight.bold,

@@ -7,7 +7,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_storage/firebase_storage.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import 'services/repositorioU.dart';
+import 'services/repositorio_u.dart';
 import 'login.dart';
 
 class AdminProfileScreen extends StatefulWidget {
@@ -331,7 +331,7 @@ class _AdminProfileScreenState extends State<AdminProfileScreen> {
     );
 
     if (confirmed == true) {
-      await FirebaseAuth.instance.signOut();
+      await UserRepository.instance.signOut();
       if (mounted) {
         Navigator.pushAndRemoveUntil(
           context,

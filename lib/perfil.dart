@@ -15,8 +15,8 @@ import 'mapa.dart';
 import 'historial.dart';
 import 'models/observation.dart';
 import 'models/user.dart';
-import 'services/repositorioO.dart';
-import 'services/repositorioU.dart';
+import 'services/repositorio_o.dart';
+import 'services/repositorio_u.dart';
 
 class ProfileScreen extends StatefulWidget {
   const ProfileScreen({super.key});
@@ -402,7 +402,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
           ),
           TextButton(
             onPressed: () async {
-              await FirebaseAuth.instance.signOut();
+              await UserRepository.instance.signOut();
               if (mounted) {
                 Navigator.pushAndRemoveUntil(
                   context,

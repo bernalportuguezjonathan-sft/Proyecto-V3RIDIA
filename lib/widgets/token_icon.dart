@@ -4,11 +4,7 @@ class TokenIcon extends StatelessWidget {
   final double size;
   final Color? color;
 
-  const TokenIcon({
-    super.key,
-    this.size = 24,
-    this.color,
-  });
+  const TokenIcon({super.key, this.size = 24, this.color});
 
   @override
   Widget build(BuildContext context) {
@@ -20,14 +16,11 @@ class TokenIcon extends StatelessWidget {
         gradient: LinearGradient(
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
-          colors: [
-            const Color(0xFFFFD700),
-            const Color(0xFFFFA500),
-          ],
+          colors: [const Color(0xFFFFD700), const Color(0xFFFFA500)],
         ),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.2),
+            color: Colors.black.withValues(alpha: 0.2),
             blurRadius: 2,
             offset: const Offset(0, 1),
           ),
