@@ -715,13 +715,46 @@ class _ProfileScreenState extends State<ProfileScreen> {
                           ),
                         ),
                         const SizedBox(height: 12),
-                        Row(
-                          mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-                          children: [
-                            _crearEstadistica('58', 'Especies'),
-                            _crearEstadistica('12', 'Rutas'),
-                            _crearEstadistica('1,250', 'Puntos'),
-                          ],
+                        StreamBuilder<List<Observation>>(
+                          stream: ObservationRepository.instance
+                              .streamForUser(
+                                UserRepository
+                                        .instance
+                                        .currentUser
+                                        .value
+                                        ?.userId ??
+                                    '',
+                              ),
+                          builder: (context, snapshot) {
+                            final observations = snapshot.data ?? [];
+                            final especies = observations
+                                .map((o) => o.commonName.toLowerCase())
+                                .toSet()
+                                .length;
+                            final lugares = observations
+                                .map((o) => o.location)
+                                .where((l) => l.isNotEmpty)
+                                .toSet()
+                                .length;
+                            return ValueListenableBuilder<UserProfile?>(
+                              valueListenable:
+                                  UserRepository.instance.currentUser,
+                              builder: (context, profile, child) {
+                                return Row(
+                                  mainAxisAlignment:
+                                      MainAxisAlignment.spaceEvenly,
+                                  children: [
+                                    _crearEstadistica('$especies', 'Especies'),
+                                    _crearEstadistica('$lugares', 'Lugares'),
+                                    _crearEstadistica(
+                                      '${profile?.tokens ?? 0}',
+                                      'Veridiums',
+                                    ),
+                                  ],
+                                );
+                              },
+                            );
+                          },
                         ),
                       ],
                     ),
@@ -970,9 +1003,12 @@ class ActivityScreen extends StatelessWidget {
         title: const Text('Mi actividad'),
         backgroundColor: const Color(0xFF1E5631),
       ),
-      body: ValueListenableBuilder<List<Observation>>(
-        valueListenable: ObservationRepository.instance.observations,
-        builder: (context, observations, child) {
+      body: StreamBuilder<List<Observation>>(
+        stream: ObservationRepository.instance.streamForUser(
+          UserRepository.instance.currentUser.value?.userId ?? '',
+        ),
+        builder: (context, snapshot) {
+          final observations = snapshot.data ?? [];
           final totalObservations = observations.length;
           final uniqueSpecies = observations
               .map((observation) => observation.commonName)
@@ -1137,9 +1173,12 @@ class PublicationsScreen extends StatelessWidget {
         title: const Text('Mis publicaciones'),
         backgroundColor: const Color(0xFF1E5631),
       ),
-      body: ValueListenableBuilder<List<Observation>>(
-        valueListenable: ObservationRepository.instance.observations,
-        builder: (context, observations, child) {
+      body: StreamBuilder<List<Observation>>(
+        stream: ObservationRepository.instance.streamForUser(
+          UserRepository.instance.currentUser.value?.userId ?? '',
+        ),
+        builder: (context, snapshot) {
+          final observations = snapshot.data ?? [];
           return Padding(
             padding: const EdgeInsets.all(16),
             child: Column(
@@ -1543,9 +1582,12 @@ class AboutVeridiaScreen extends StatelessWidget {
         title: const Text('Acerca de Veridia'),
         backgroundColor: const Color(0xFF1E5631),
       ),
-      body: ValueListenableBuilder<List<Observation>>(
-        valueListenable: ObservationRepository.instance.observations,
-        builder: (context, observations, child) {
+      body: StreamBuilder<List<Observation>>(
+        stream: ObservationRepository.instance.streamForUser(
+          UserRepository.instance.currentUser.value?.userId ?? '',
+        ),
+        builder: (context, snapshot) {
+          final observations = snapshot.data ?? [];
           final totalObservations = observations.length;
           final uniqueSpecies = observations
               .map((observation) => observation.commonName)

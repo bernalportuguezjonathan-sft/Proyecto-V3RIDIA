@@ -662,9 +662,9 @@ class _AdminProfileScreenState extends State<AdminProfileScreen> {
                     onTap: () => Navigator.pop(context),
                   ),
                   _buildActionButton(
-                    icon: Icons.settings,
-                    label: 'Configuración',
-                    onTap: () {},
+                    icon: Icons.logout,
+                    label: 'Cerrar sesión',
+                    onTap: _cerrarSesion,
                   ),
                 ],
               ),

@@ -1,4 +1,5 @@
-import 'package:flutter/foundation.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
+
 import '../models/observation.dart';
 
 class ObservationRepository {
@@ -6,22 +7,42 @@ class ObservationRepository {
 
   static final ObservationRepository instance = ObservationRepository._();
 
-  final ValueNotifier<List<Observation>> observations = ValueNotifier<List<Observation>>([]);
+  CollectionReference<Map<String, dynamic>> get _collection =>
+      FirebaseFirestore.instance.collection('avistamientos');
 
-  void addObservation(Observation observation) {
-    observations.value = [observation, ...observations.value];
+  Stream<List<Observation>> streamForUser(String userId) {
+    return _collection.where('userId', isEqualTo: userId).snapshots().map((
+      snapshot,
+    ) {
+      final list = snapshot.docs
+          .map((doc) => Observation.fromMap(doc.id, doc.data()))
+          .toList();
+      list.sort((a, b) => b.dateTime.compareTo(a.dateTime));
+      return list;
+    });
   }
 
-  void updateObservation(Observation observation) {
-    final index = observations.value.indexWhere((item) => item.id == observation.id);
-    if (index >= 0) {
-      final updated = List<Observation>.from(observations.value);
-      updated[index] = observation;
-      observations.value = updated;
-    }
+  Stream<List<Observation>> streamAll({int limit = 300}) {
+    return _collection
+        .orderBy('dateTime', descending: true)
+        .limit(limit)
+        .snapshots()
+        .map(
+          (snapshot) => snapshot.docs
+              .map((doc) => Observation.fromMap(doc.id, doc.data()))
+              .toList(),
+        );
   }
 
-  void deleteObservation(String id) {
-    observations.value = observations.value.where((item) => item.id != id).toList();
+  Future<void> addObservation(Observation observation) async {
+    await _collection.doc(observation.id).set(observation.toMap());
+  }
+
+  Future<void> updateObservation(Observation observation) async {
+    await _collection.doc(observation.id).update(observation.toMap());
+  }
+
+  Future<void> deleteObservation(String id) async {
+    await _collection.doc(id).delete();
   }
 }

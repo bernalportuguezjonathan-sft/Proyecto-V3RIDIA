@@ -8,6 +8,7 @@ import 'historial.dart';
 import 'perfil.dart';
 import 'models/desafio.dart';
 import 'models/user.dart';
+import 'services/especie_ia_service.dart';
 import 'services/repositorio_d.dart';
 import 'services/repositorio_u.dart';
 import 'widgets/token_icon.dart';
@@ -20,6 +21,8 @@ class ChallengesScreen extends StatefulWidget {
 }
 
 class _ChallengesScreenState extends State<ChallengesScreen> {
+  final EspecieIAService _especieIAService = EspecieIAService();
+  final Set<String> _analizando = {};
   void _cerrarSesion() {
     showDialog(
       context: context,
@@ -143,38 +146,47 @@ class _ChallengesScreenState extends State<ChallengesScreen> {
             child: const Text('Cancelar'),
           ),
           ElevatedButton(
-            onPressed: () {
+            onPressed: () async {
               if (formKey.currentState?.validate() ?? false) {
-                if (challenge == null) {
-                  ChallengeRepository.instance.addChallenge(
-                    Challenge(
-                      id: DateTime.now().millisecondsSinceEpoch.toString(),
-                      title: titleController.text.trim(),
-                      description: descriptionController.text.trim(),
-                      targetSpecies: speciesController.text.trim(),
-                      targetGoal: int.parse(goalController.text),
-                      dueDate: selectedDate,
-                      createdDate: DateTime.now(),
-                      currentProgress: 0,
-                      isCompleted: false,
-                    ),
+                final navigator = Navigator.of(context);
+                final messenger = ScaffoldMessenger.of(context);
+                try {
+                  if (challenge == null) {
+                    await ChallengeRepository.instance.addChallenge(
+                      Challenge(
+                        id: DateTime.now().millisecondsSinceEpoch.toString(),
+                        title: titleController.text.trim(),
+                        description: descriptionController.text.trim(),
+                        targetSpecies: speciesController.text.trim(),
+                        targetGoal: int.parse(goalController.text),
+                        dueDate: selectedDate,
+                        createdDate: DateTime.now(),
+                        currentProgress: 0,
+                        isCompleted: false,
+                      ),
+                    );
+                  } else {
+                    await ChallengeRepository.instance.updateChallenge(
+                      Challenge(
+                        id: challenge.id,
+                        title: titleController.text.trim(),
+                        description: descriptionController.text.trim(),
+                        targetSpecies: speciesController.text.trim(),
+                        targetGoal: int.parse(goalController.text),
+                        dueDate: selectedDate,
+                        createdDate: challenge.createdDate,
+                        currentProgress: challenge.currentProgress,
+                        isCompleted: challenge.isCompleted,
+                      ),
+                    );
+                  }
+                } catch (e) {
+                  messenger.showSnackBar(
+                    SnackBar(content: Text('No se pudo guardar: $e')),
                   );
-                } else {
-                  ChallengeRepository.instance.updateChallenge(
-                    Challenge(
-                      id: challenge.id,
-                      title: titleController.text.trim(),
-                      description: descriptionController.text.trim(),
-                      targetSpecies: speciesController.text.trim(),
-                      targetGoal: int.parse(goalController.text),
-                      dueDate: selectedDate,
-                      createdDate: challenge.createdDate,
-                      currentProgress: challenge.currentProgress,
-                      isCompleted: challenge.isCompleted,
-                    ),
-                  );
+                  return;
                 }
-                Navigator.pop(context);
+                navigator.pop();
               }
             },
             style: ElevatedButton.styleFrom(
@@ -192,22 +204,89 @@ class _ChallengesScreenState extends State<ChallengesScreen> {
     );
   }
 
+  /// Sube una foto y solo cuenta como progreso si la IA confirma que
+  /// muestra la especie objetivo del desafío. Ya no basta con subir
+  /// cualquier imagen.
   Future<void> _pickImageFromGallery(Challenge challenge) async {
+    if (_analizando.contains(challenge.id)) return;
+
     final picker = ImagePicker();
     final pickedFile = await picker.pickImage(source: ImageSource.gallery);
-    if (!mounted) return;
-    if (pickedFile != null) {
+    if (!mounted || pickedFile == null) return;
+
+    final messenger = ScaffoldMessenger.of(context);
+    setState(() => _analizando.add(challenge.id));
+
+    try {
+      final bytes = await pickedFile.readAsBytes();
+      final mimeType = pickedFile.mimeType ?? 'image/jpeg';
+
+      final SpeciesIdentification resultado;
+      try {
+        resultado = await _especieIAService.identify(bytes, mimeType);
+      } on SpeciesIdentificationException catch (e) {
+        messenger.showSnackBar(
+          SnackBar(
+            content: Text(e.message),
+            backgroundColor: Colors.red.shade700,
+          ),
+        );
+        return;
+      } catch (_) {
+        messenger.showSnackBar(
+          SnackBar(
+            content: const Text('No se pudo analizar la foto con IA.'),
+            backgroundColor: Colors.red.shade700,
+          ),
+        );
+        return;
+      }
+
+      final coincide =
+          resultado.identified &&
+          especieCoincide(challenge.targetSpecies, resultado);
+
+      if (!coincide) {
+        messenger.showSnackBar(
+          SnackBar(
+            content: Text(
+              resultado.identified
+                  ? 'La IA detectó "${resultado.commonName}", no "${challenge.targetSpecies}". No cuenta para este desafío.'
+                  : 'La IA no identificó ninguna especie en esta foto.',
+            ),
+            backgroundColor: Colors.red.shade700,
+          ),
+        );
+        return;
+      }
+
       final newProgress = (challenge.currentProgress + 1).clamp(
         0,
         challenge.targetGoal,
       );
-      ChallengeRepository.instance.updateProgress(challenge.id, newProgress);
+      try {
+        await ChallengeRepository.instance.updateProgress(
+          challenge.id,
+          newProgress,
+        );
+      } catch (e) {
+        messenger.showSnackBar(
+          SnackBar(content: Text('No se pudo actualizar el progreso: $e')),
+        );
+        return;
+      }
+
       final message = newProgress >= challenge.targetGoal
-          ? 'Desafío completado! Has ganado monedas extra.'
-          : 'Foto subida: progreso $newProgress/${challenge.targetGoal}';
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text(message)));
+          ? '¡Desafío completado! Bono entregado.'
+          : 'IA confirmó "${resultado.commonName}". Progreso: $newProgress/${challenge.targetGoal}';
+      messenger.showSnackBar(
+        SnackBar(
+          content: Text(message),
+          backgroundColor: const Color(0xFF1E5631),
+        ),
+      );
+    } finally {
+      if (mounted) setState(() => _analizando.remove(challenge.id));
     }
   }
 
@@ -223,9 +302,18 @@ class _ChallengesScreenState extends State<ChallengesScreen> {
             child: const Text('Cancelar'),
           ),
           TextButton(
-            onPressed: () {
-              ChallengeRepository.instance.deleteChallenge(id);
-              Navigator.pop(context);
+            onPressed: () async {
+              final navigator = Navigator.of(context);
+              final messenger = ScaffoldMessenger.of(context);
+              try {
+                await ChallengeRepository.instance.deleteChallenge(id);
+              } catch (e) {
+                messenger.showSnackBar(
+                  SnackBar(content: Text('No se pudo eliminar: $e')),
+                );
+                return;
+              }
+              navigator.pop();
             },
             child: const Text('Eliminar', style: TextStyle(color: Colors.red)),
           ),
@@ -287,7 +375,12 @@ class _ChallengesScreenState extends State<ChallengesScreen> {
       ),
       body: ValueListenableBuilder<List<Challenge>>(
         valueListenable: ChallengeRepository.instance.challenges,
-        builder: (context, challenges, child) {
+        builder: (context, allChallenges, child) {
+          final profile = UserRepository.instance.currentUser.value;
+          // Un explorador solo ve los desafíos globales y los suyos.
+          final challenges = profile?.role == 'Administrador'
+              ? allChallenges
+              : ChallengeRepository.instance.challengesForUser(profile?.userId);
           return Stack(
             children: [
               Container(color: const Color(0xFFF5F9F7)),
@@ -453,13 +546,35 @@ class _ChallengesScreenState extends State<ChallengesScreen> {
                                     children: [
                                       Expanded(
                                         child: ElevatedButton.icon(
-                                          onPressed: () =>
-                                              _pickImageFromGallery(challenge),
-                                          icon: const Icon(
-                                            Icons.photo_library,
-                                            size: 18,
+                                          onPressed:
+                                              _analizando.contains(
+                                                challenge.id,
+                                              )
+                                              ? null
+                                              : () => _pickImageFromGallery(
+                                                  challenge,
+                                                ),
+                                          icon:
+                                              _analizando.contains(
+                                                challenge.id,
+                                              )
+                                              ? const SizedBox(
+                                                  width: 16,
+                                                  height: 16,
+                                                  child: CircularProgressIndicator(
+                                                    strokeWidth: 2,
+                                                    color: Colors.white,
+                                                  ),
+                                                )
+                                              : const Icon(
+                                                  Icons.photo_library,
+                                                  size: 18,
+                                                ),
+                                          label: Text(
+                                            _analizando.contains(challenge.id)
+                                                ? 'Analizando...'
+                                                : 'Subir foto',
                                           ),
-                                          label: const Text('Subir foto'),
                                           style: ElevatedButton.styleFrom(
                                             backgroundColor: const Color(
                                               0xFF1E5631,
@@ -475,34 +590,42 @@ class _ChallengesScreenState extends State<ChallengesScreen> {
                                           ),
                                         ),
                                       ),
-                                      Row(
-                                        children: [
-                                          IconButton(
-                                            onPressed: () => _showChallengeForm(
-                                              challenge: challenge,
+                                      if (UserRepository
+                                              .instance
+                                              .currentUser
+                                              .value
+                                              ?.role ==
+                                          'Administrador')
+                                        Row(
+                                          children: [
+                                            IconButton(
+                                              onPressed: () =>
+                                                  _showChallengeForm(
+                                                    challenge: challenge,
+                                                  ),
+                                              icon: const Icon(
+                                                Icons.edit,
+                                                size: 18,
+                                              ),
+                                              color: const Color(0xFF1E5631),
+                                              visualDensity:
+                                                  VisualDensity.compact,
                                             ),
-                                            icon: const Icon(
-                                              Icons.edit,
-                                              size: 18,
+                                            IconButton(
+                                              onPressed: () =>
+                                                  _showDeleteConfirm(
+                                                    challenge.id,
+                                                  ),
+                                              icon: const Icon(
+                                                Icons.delete,
+                                                size: 18,
+                                              ),
+                                              color: Colors.red,
+                                              visualDensity:
+                                                  VisualDensity.compact,
                                             ),
-                                            color: const Color(0xFF1E5631),
-                                            visualDensity:
-                                                VisualDensity.compact,
-                                          ),
-                                          IconButton(
-                                            onPressed: () => _showDeleteConfirm(
-                                              challenge.id,
-                                            ),
-                                            icon: const Icon(
-                                              Icons.delete,
-                                              size: 18,
-                                            ),
-                                            color: Colors.red,
-                                            visualDensity:
-                                                VisualDensity.compact,
-                                          ),
-                                        ],
-                                      ),
+                                          ],
+                                        ),
                                     ],
                                   ),
                                 ],

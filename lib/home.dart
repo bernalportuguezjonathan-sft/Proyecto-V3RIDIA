@@ -149,6 +149,18 @@ class _HomeScreenState extends State<HomeScreen> {
                       ],
                     ),
                     child: TextField(
+                      textInputAction: TextInputAction.search,
+                      onSubmitted: (query) {
+                        final texto = query.trim();
+                        if (texto.isEmpty) return;
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (context) =>
+                                MapScreen(initialQuery: texto),
+                          ),
+                        );
+                      },
                       decoration: InputDecoration(
                         hintText: 'Buscar especies, rutas, etc.',
                         hintStyle: TextStyle(color: Colors.grey.shade400),

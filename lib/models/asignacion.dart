@@ -31,4 +31,35 @@ class AssignmentRecord {
     final minute = dateTime.minute.toString().padLeft(2, '0');
     return '$day/$month/$year $hour:$minute';
   }
+
+  Map<String, dynamic> toMap() {
+    return {
+      'challengeId': challengeId,
+      'challengeTitle': challengeTitle,
+      'eventType': eventType,
+      'note': note,
+      'dateTime': dateTime.toIso8601String(),
+      'targetUserId': targetUserId,
+      'targetUserDisplayName': targetUserDisplayName,
+      'targetUserEmail': targetUserEmail,
+      'assignedByAdmin': assignedByAdmin,
+    };
+  }
+
+  factory AssignmentRecord.fromMap(String id, Map<String, dynamic> map) {
+    return AssignmentRecord(
+      id: id,
+      challengeId: map['challengeId'] as String? ?? '',
+      challengeTitle: map['challengeTitle'] as String? ?? '',
+      eventType: map['eventType'] as String? ?? '',
+      note: map['note'] as String? ?? '',
+      dateTime:
+          DateTime.tryParse(map['dateTime'] as String? ?? '') ??
+          DateTime.now(),
+      targetUserId: map['targetUserId'] as String?,
+      targetUserDisplayName: map['targetUserDisplayName'] as String?,
+      targetUserEmail: map['targetUserEmail'] as String?,
+      assignedByAdmin: map['assignedByAdmin'] as String?,
+    );
+  }
 }

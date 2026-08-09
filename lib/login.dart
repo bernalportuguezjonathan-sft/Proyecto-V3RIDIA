@@ -109,17 +109,9 @@ class _LoginScreenState extends State<LoginScreen>
       return;
     }
 
-    if (_selectedRole == 'Administrador') {
-      final adminCode = _adminCodeController.text.trim();
-      if (adminCode.isEmpty) {
-        _mostrarAlerta('Ingresa el código de administrador.');
-        return;
-      }
-      if (adminCode != 'SDNJ') {
-        _mostrarAlerta('El código de administrador es incorrecto.');
-        return;
-      }
-    }
+    // El rol real vive en Firestore y ya no se puede autoasignar (ver
+    // firestore.rules); _handleAuthenticatedUser rechaza el login si el rol
+    // elegido aquí no coincide con el guardado.
 
     showDialog(
       context: context,
@@ -184,6 +176,8 @@ class _LoginScreenState extends State<LoginScreen>
     }
 
     if (userProfile == null) {
+      // Sin documento en Firestore no hay forma de confiar en ningún rol
+      // elegido en pantalla; se crea siempre como Explorador.
       userProfile = UserProfile(
         userId: firebaseUser.uid,
         email: firebaseUser.email ?? '',
@@ -193,7 +187,7 @@ class _LoginScreenState extends State<LoginScreen>
             'Usuario',
         photoURL: firebaseUser.photoURL,
         tokens: 0,
-        role: _selectedRole,
+        role: 'Explorador',
         createdDate: DateTime.now(),
         isBanned: false,
         banExpires: null,

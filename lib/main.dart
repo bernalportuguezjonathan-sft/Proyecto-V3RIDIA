@@ -6,6 +6,7 @@ import 'login.dart';
 import 'home.dart';
 import 'admin_home.dart';
 import 'banned_screen.dart';
+import 'services/foto_service.dart';
 import 'services/repositorio_u.dart';
 
 // Convertimos el main en 'async' porque iniciar Firebase toma un instante
@@ -13,6 +14,7 @@ Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
   await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
+  await FotoService.initSupabase();
 
   runApp(const VeridiaApp());
 }

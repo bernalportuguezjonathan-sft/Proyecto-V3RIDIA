@@ -1,89 +1,73 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:veridia_app/models/desafio.dart';
-import 'package:veridia_app/models/user.dart';
-import 'package:veridia_app/services/repositorio_d.dart';
-import 'package:veridia_app/services/repositorio_u.dart';
 
+/// Economía de Veridiums: 1 por cada foto verificada por la IA, más un bono
+/// del 10% de la meta al completar el desafío.
 void main() {
-  setUp(() {
-    UserRepository.instance.currentUser.value = UserProfile(
-      userId: 'user-1',
-      email: 'user@test.com',
-      displayName: 'Usuario',
-      photoURL: null,
-      tokens: 0,
-      role: 'Explorador',
-      createdDate: DateTime.now(),
-      isBanned: false,
-      banExpires: null,
-      banReason: null,
-    );
-    ChallengeRepository.instance.challenges.value = [];
+  group('calcularBonoCompletar', () {
+    test('da el 10% de la meta redondeado hacia arriba', () {
+      expect(calcularBonoCompletar(10), 1);
+      expect(calcularBonoCompletar(20), 2);
+      expect(calcularBonoCompletar(100), 10);
+    });
+
+    test('redondea hacia arriba cuando no es múltiplo de 10', () {
+      expect(calcularBonoCompletar(15), 2);
+      expect(calcularBonoCompletar(11), 2);
+    });
+
+    test('nunca da menos de 1 Veridium', () {
+      expect(calcularBonoCompletar(1), 1);
+      expect(calcularBonoCompletar(5), 1);
+      expect(calcularBonoCompletar(0), 1);
+      expect(calcularBonoCompletar(-3), 1);
+    });
   });
 
-  test(
-    'otorga monedas por cada avance y solo descuenta al eliminar si no está completado',
-    () {
-      final challenge = Challenge(
-        id: 'challenge-1',
-        title: 'Reto 1',
-        description: 'Descripción',
-        targetSpecies: 'Ave',
-        targetGoal: 3,
-        dueDate: DateTime.now().add(const Duration(days: 7)),
-        createdDate: DateTime.now(),
-        currentProgress: 0,
-        isCompleted: false,
-        tokensReward: 100,
-      );
-
-      ChallengeRepository.instance.addChallenge(challenge);
-      ChallengeRepository.instance.updateProgress(challenge.id, 1);
-      expect(UserRepository.instance.getTokens(), 34);
-
-      ChallengeRepository.instance.updateProgress(challenge.id, 2);
-      expect(UserRepository.instance.getTokens(), 67);
-
-      ChallengeRepository.instance.updateProgress(challenge.id, 3);
-      expect(UserRepository.instance.getTokens(), 100);
-
-      ChallengeRepository.instance.deleteChallenge(challenge.id);
-      expect(UserRepository.instance.getTokens(), 100);
-    },
-  );
-
-  test('no permite acumular más de 100 monedas por los desafíos', () {
-    final firstChallenge = Challenge(
-      id: 'challenge-1',
-      title: 'Reto 1',
-      description: 'Descripción',
+  group('Challenge', () {
+    Challenge crear({required int meta, int? premio}) => Challenge(
+      id: 'c1',
+      title: 'Fotografía aves',
+      description: 'Registra aves de la Sabana',
       targetSpecies: 'Ave',
-      targetGoal: 3,
-      dueDate: DateTime.now().add(const Duration(days: 7)),
-      createdDate: DateTime.now(),
+      targetGoal: meta,
+      dueDate: DateTime(2026, 9, 1),
+      createdDate: DateTime(2026, 8, 1),
       currentProgress: 0,
       isCompleted: false,
-      tokensReward: 100,
-    );
-    final secondChallenge = Challenge(
-      id: 'challenge-2',
-      title: 'Reto 2',
-      description: 'Descripción',
-      targetSpecies: 'Flor',
-      targetGoal: 3,
-      dueDate: DateTime.now().add(const Duration(days: 7)),
-      createdDate: DateTime.now(),
-      currentProgress: 0,
-      isCompleted: false,
-      tokensReward: 100,
+      tokensReward: premio,
     );
 
-    ChallengeRepository.instance.addChallenge(firstChallenge);
-    ChallengeRepository.instance.addChallenge(secondChallenge);
+    test('calcula el bono a partir de la meta si no se indica', () {
+      expect(crear(meta: 10).tokensReward, 1);
+      expect(crear(meta: 50).tokensReward, 5);
+    });
 
-    ChallengeRepository.instance.updateProgress(firstChallenge.id, 3);
-    ChallengeRepository.instance.updateProgress(secondChallenge.id, 1);
+    test('respeta un premio explícito', () {
+      expect(crear(meta: 10, premio: 42).tokensReward, 42);
+    });
 
-    expect(UserRepository.instance.getTokens(), 100);
+    test('un desafío sin usuario asignado es global', () {
+      expect(crear(meta: 10).isGlobal, isTrue);
+    });
+
+    test('sobrevive el viaje de ida y vuelta a Firestore', () {
+      final original = crear(meta: 30);
+      final copia = Challenge.fromMap('c1', original.toMap());
+
+      expect(copia.id, original.id);
+      expect(copia.title, original.title);
+      expect(copia.targetSpecies, original.targetSpecies);
+      expect(copia.targetGoal, original.targetGoal);
+      expect(copia.tokensReward, original.tokensReward);
+      expect(copia.currentProgress, original.currentProgress);
+      expect(copia.isCompleted, original.isCompleted);
+      expect(copia.dueDate, original.dueDate);
+    });
+
+    test('un documento viejo sin tokensReward deriva el bono de la meta', () {
+      final map = crear(meta: 40).toMap()..remove('tokensReward');
+      expect(Challenge.fromMap('c1', map).tokensReward, 4);
+    });
   });
 }

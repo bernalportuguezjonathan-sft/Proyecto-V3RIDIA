@@ -10,6 +10,9 @@ import 'mapa.dart';
 import 'historial.dart';
 import 'perfil.dart';
 import 'models/observation.dart';
+import 'services/especie_ia_service.dart';
+import 'services/foto_service.dart';
+import 'services/repositorio_d.dart';
 import 'services/repositorio_o.dart';
 import 'services/repositorio_u.dart';
 
@@ -24,10 +27,18 @@ class _IdentifySpeciesScreenState extends State<IdentifySpeciesScreen> {
   bool _photoTaken = false;
   File? _selectedImageFile;
   Uint8List? _selectedImageBytes;
-  String? _selectedImageName;
+  String? _selectedImageMimeType;
   String _currentLocation = 'Obteniendo ubicación...';
+  double? _latitude;
+  double? _longitude;
   String? _selectedSpecies;
   final ImagePicker _imagePicker = ImagePicker();
+  final EspecieIAService _especieIAService = EspecieIAService();
+
+  bool _isAnalyzing = false;
+  bool _isSaving = false;
+  SpeciesIdentification? _aiResult;
+  String? _aiError;
 
   final List<_BirdSpeciesGuide> _speciesGuides = [
     _BirdSpeciesGuide(
@@ -77,9 +88,37 @@ class _IdentifySpeciesScreenState extends State<IdentifySpeciesScreen> {
 
   Future<void> _requestLocationPermission() async {
     if (kIsWeb) {
-      setState(() {
-        _currentLocation = 'Ubicación web no disponible en esta sesión';
-      });
+      try {
+        LocationPermission permission = await Geolocator.checkPermission();
+        if (permission == LocationPermission.denied) {
+          permission = await Geolocator.requestPermission();
+        }
+        if (permission == LocationPermission.denied ||
+            permission == LocationPermission.deniedForever) {
+          if (!mounted) return;
+          setState(() {
+            _currentLocation = 'Permiso de ubicación no otorgado';
+          });
+          return;
+        }
+        final position = await Geolocator.getCurrentPosition(
+          locationSettings: const LocationSettings(
+            accuracy: LocationAccuracy.high,
+          ),
+        );
+        if (!mounted) return;
+        setState(() {
+          _latitude = position.latitude;
+          _longitude = position.longitude;
+          _currentLocation =
+              '${position.latitude.toStringAsFixed(4)}, ${position.longitude.toStringAsFixed(4)}';
+        });
+      } catch (e) {
+        if (!mounted) return;
+        setState(() {
+          _currentLocation = 'No se pudo obtener la ubicación en el navegador';
+        });
+      }
       return;
     }
 
@@ -94,6 +133,8 @@ class _IdentifySpeciesScreenState extends State<IdentifySpeciesScreen> {
       );
       if (!mounted) return;
       setState(() {
+        _latitude = position.latitude;
+        _longitude = position.longitude;
         _currentLocation =
             '${position.latitude.toStringAsFixed(4)}, ${position.longitude.toStringAsFixed(4)}';
       });
@@ -123,22 +164,28 @@ class _IdentifySpeciesScreenState extends State<IdentifySpeciesScreen> {
         return;
       }
 
+      final mimeType = photo.mimeType ?? 'image/jpeg';
+
       if (kIsWeb) {
         final bytes = await photo.readAsBytes();
         if (!mounted) return;
         setState(() {
           _selectedImageBytes = bytes;
           _selectedImageFile = null;
-          _selectedImageName = photo.name;
+          _selectedImageMimeType = mimeType;
           _photoTaken = true;
+          _aiResult = null;
+          _aiError = null;
         });
       } else {
         if (!mounted) return;
         setState(() {
           _selectedImageFile = File(photo.path);
           _selectedImageBytes = null;
-          _selectedImageName = photo.name;
+          _selectedImageMimeType = mimeType;
           _photoTaken = true;
+          _aiResult = null;
+          _aiError = null;
         });
       }
     } catch (e) {
@@ -148,6 +195,186 @@ class _IdentifySpeciesScreenState extends State<IdentifySpeciesScreen> {
         );
       }
     }
+  }
+
+  Future<void> _analizarConIA() async {
+    final bytes =
+        _selectedImageBytes ?? await _selectedImageFile?.readAsBytes();
+    if (bytes == null) return;
+
+    setState(() {
+      _isAnalyzing = true;
+      _aiResult = null;
+      _aiError = null;
+    });
+
+    try {
+      final result = await _especieIAService.identify(
+        bytes,
+        _selectedImageMimeType ?? 'image/jpeg',
+      );
+      if (!mounted) return;
+      setState(() {
+        _aiResult = result;
+        if (result.identified && result.commonName != null) {
+          _selectedSpecies = result.commonName;
+        }
+      });
+    } on SpeciesIdentificationException catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _aiError = e.message;
+      });
+    } catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _aiError = 'Ocurrió un error inesperado analizando la foto.';
+      });
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isAnalyzing = false;
+        });
+      }
+    }
+  }
+
+  Future<void> _guardarObservacion() async {
+    final aiIdentified = _aiResult?.identified == true;
+    final currentUser = UserRepository.instance.currentUser.value;
+    if (currentUser == null) {
+      _mostrarError('Debes iniciar sesión para guardar observaciones.');
+      return;
+    }
+
+    setState(() => _isSaving = true);
+
+    final observationId = DateTime.now().millisecondsSinceEpoch.toString();
+
+    String? imageUrl;
+    final bytes =
+        _selectedImageBytes ?? await _selectedImageFile?.readAsBytes();
+    if (bytes != null) {
+      imageUrl = await FotoService.instance.subirFotoObservacion(
+        bytes: bytes,
+        userId: currentUser.userId,
+        observationId: observationId,
+        mimeType: _selectedImageMimeType ?? 'image/jpeg',
+      );
+    }
+
+    final observation = Observation(
+      id: observationId,
+      commonName: aiIdentified
+          ? _aiResult!.commonName ?? 'Especie observada'
+          : _selectedSpecies ?? 'Especie observada',
+      scientificName: aiIdentified
+          ? _aiResult!.scientificName ?? 'Sin confirmar'
+          : _selectedSpecies != null
+          ? 'Referencia visual'
+          : 'Sin confirmar',
+      location: _currentLocation,
+      notes: aiIdentified
+          ? (_aiResult!.description ?? 'Identificado con IA')
+          : 'Registrado desde la guía de observación',
+      dateTime: DateTime.now(),
+      imagePath: imageUrl,
+      latitude: _latitude,
+      longitude: _longitude,
+      type: aiIdentified ? _aiResult!.type : null,
+      userId: currentUser.userId,
+      userDisplayName: currentUser.displayName,
+    );
+
+    try {
+      await ObservationRepository.instance.addObservation(observation);
+    } catch (e) {
+      if (mounted) setState(() => _isSaving = false);
+      _mostrarError('No se pudo guardar la observación: $e');
+      return;
+    }
+
+    final mensajesDesafios = aiIdentified
+        ? await _actualizarDesafios(_aiResult!)
+        : <String>[];
+
+    if (mounted) setState(() => _isSaving = false);
+    if (!mounted) return;
+
+    if (mensajesDesafios.isNotEmpty) {
+      await showDialog(
+        context: context,
+        builder: (dialogContext) => AlertDialog(
+          title: const Text('¡Desafío actualizado!'),
+          content: Text(mensajesDesafios.join('\n\n')),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(dialogContext),
+              child: const Text('Genial'),
+            ),
+          ],
+        ),
+      );
+    }
+
+    if (!mounted) return;
+    Navigator.pushReplacement(
+      context,
+      MaterialPageRoute(builder: (context) => const HistoryScreen()),
+    );
+  }
+
+  /// Suma progreso a los desafíos activos cuya especie objetivo coincide con
+  /// lo que identificó la IA. Devuelve los mensajes a mostrar al usuario.
+  Future<List<String>> _actualizarDesafios(SpeciesIdentification ia) async {
+    final mensajes = <String>[];
+    final currentUserId = UserRepository.instance.currentUser.value?.userId;
+
+    final coincidencias = ChallengeRepository.instance.challenges.value.where((
+      c,
+    ) {
+      if (c.isCompleted) return false;
+      // Solo desafíos globales o asignados a este usuario.
+      if (!c.isGlobal && c.assignedToUserId != currentUserId) return false;
+      return especieCoincide(c.targetSpecies, ia);
+    }).toList();
+
+    for (final challenge in coincidencias) {
+      final nuevoProgreso = (challenge.currentProgress + 1).clamp(
+        0,
+        challenge.targetGoal,
+      );
+      final ganados = nuevoProgreso - challenge.currentProgress;
+      if (ganados <= 0) continue;
+
+      try {
+        await ChallengeRepository.instance.updateProgress(
+          challenge.id,
+          nuevoProgreso,
+        );
+      } catch (e) {
+        debugPrint('No se pudo actualizar el desafío ${challenge.id}: $e');
+        continue;
+      }
+
+      final completado = nuevoProgreso >= challenge.targetGoal;
+      final premio = completado ? challenge.tokensReward : ganados;
+      final palabra = premio == 1 ? 'Veridium' : 'Veridiums';
+      mensajes.add(
+        completado
+            ? '🏆 Completaste "${challenge.title}" — ¡+$premio $palabra!'
+            : '🎯 Avanzaste en "${challenge.title}": $nuevoProgreso/${challenge.targetGoal} (+$premio $palabra)',
+      );
+    }
+
+    return mensajes;
+  }
+
+  void _mostrarError(String mensaje) {
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text(mensaje), backgroundColor: Colors.red.shade700),
+    );
   }
 
   void _cerrarSesion() {
@@ -477,37 +704,149 @@ class _IdentifySpeciesScreenState extends State<IdentifySpeciesScreen> {
                           const SizedBox(height: 16),
                           SizedBox(
                             width: double.infinity,
-                            child: ElevatedButton(
-                              onPressed: () {
-                                final observation = Observation(
-                                  id: DateTime.now().millisecondsSinceEpoch
-                                      .toString(),
-                                  commonName:
-                                      _selectedSpecies ?? 'Especie observada',
-                                  scientificName: _selectedSpecies != null
-                                      ? 'Referencia visual'
-                                      : 'Sin confirmar',
-                                  location: _currentLocation,
-                                  notes:
-                                      'Registrado desde la guía de observación en Mosquera',
-                                  dateTime: DateTime.now(),
-                                  imagePath:
-                                      _selectedImageFile?.path ??
-                                      _selectedImageName,
-                                );
-                                ObservationRepository.instance.addObservation(
-                                  observation,
-                                );
-                                if (mounted) {
-                                  Navigator.pushReplacement(
-                                    context,
-                                    MaterialPageRoute(
-                                      builder: (context) =>
-                                          const HistoryScreen(),
+                            child: OutlinedButton.icon(
+                              onPressed: _isAnalyzing ? null : _analizarConIA,
+                              icon: _isAnalyzing
+                                  ? const SizedBox(
+                                      width: 16,
+                                      height: 16,
+                                      child: CircularProgressIndicator(
+                                        strokeWidth: 2,
+                                        color: Color(0xFF1E5631),
+                                      ),
+                                    )
+                                  : const Icon(
+                                      Icons.auto_awesome,
+                                      color: Color(0xFF1E5631),
                                     ),
-                                  );
-                                }
-                              },
+                              label: Text(
+                                _isAnalyzing
+                                    ? 'Analizando foto...'
+                                    : _aiResult == null
+                                    ? 'Analizar con IA'
+                                    : 'Analizar de nuevo',
+                              ),
+                              style: OutlinedButton.styleFrom(
+                                foregroundColor: const Color(0xFF1E5631),
+                                side: const BorderSide(
+                                  color: Color(0xFF1E5631),
+                                ),
+                                padding: const EdgeInsets.symmetric(
+                                  vertical: 12,
+                                ),
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(10),
+                                ),
+                              ),
+                            ),
+                          ),
+                          if (_aiError != null) ...[
+                            const SizedBox(height: 12),
+                            Container(
+                              width: double.infinity,
+                              padding: const EdgeInsets.all(12),
+                              decoration: BoxDecoration(
+                                color: Colors.red.shade50,
+                                borderRadius: BorderRadius.circular(12),
+                                border: Border.all(color: Colors.red.shade200),
+                              ),
+                              child: Text(
+                                _aiError!,
+                                style: TextStyle(
+                                  color: Colors.red.shade700,
+                                  fontSize: 12,
+                                ),
+                              ),
+                            ),
+                          ],
+                          if (_aiResult != null) ...[
+                            const SizedBox(height: 12),
+                            Container(
+                              width: double.infinity,
+                              padding: const EdgeInsets.all(14),
+                              decoration: BoxDecoration(
+                                color: const Color(
+                                  0xFF1E5631,
+                                ).withValues(alpha: 0.08),
+                                borderRadius: BorderRadius.circular(14),
+                              ),
+                              child: _aiResult!.identified
+                                  ? Column(
+                                      crossAxisAlignment:
+                                          CrossAxisAlignment.start,
+                                      children: [
+                                        Row(
+                                          children: [
+                                            const Icon(
+                                              Icons.auto_awesome,
+                                              size: 18,
+                                              color: Color(0xFF1E5631),
+                                            ),
+                                            const SizedBox(width: 6),
+                                            Expanded(
+                                              child: Text(
+                                                _aiResult!.commonName ??
+                                                    'Especie identificada',
+                                                style: const TextStyle(
+                                                  fontWeight: FontWeight.bold,
+                                                  color: Color(0xFF1E5631),
+                                                ),
+                                              ),
+                                            ),
+                                            Text(
+                                              'Confianza: ${_aiResult!.confidence}',
+                                              style: TextStyle(
+                                                fontSize: 11,
+                                                color: Colors.grey.shade600,
+                                              ),
+                                            ),
+                                          ],
+                                        ),
+                                        if (_aiResult!.scientificName != null)
+                                          Padding(
+                                            padding: const EdgeInsets.only(
+                                              top: 4,
+                                            ),
+                                            child: Text(
+                                              _aiResult!.scientificName!,
+                                              style: TextStyle(
+                                                fontStyle: FontStyle.italic,
+                                                fontSize: 12,
+                                                color: Colors.grey.shade700,
+                                              ),
+                                            ),
+                                          ),
+                                        if (_aiResult!.description != null)
+                                          Padding(
+                                            padding: const EdgeInsets.only(
+                                              top: 8,
+                                            ),
+                                            child: Text(
+                                              _aiResult!.description!,
+                                              style: const TextStyle(
+                                                fontSize: 12,
+                                              ),
+                                            ),
+                                          ),
+                                      ],
+                                    )
+                                  : Text(
+                                      _aiResult!.reason ??
+                                          'La IA no pudo identificar una especie en esta foto.',
+                                      style: TextStyle(
+                                        fontSize: 12,
+                                        color: Colors.grey.shade700,
+                                      ),
+                                    ),
+                            ),
+                          ],
+                          const SizedBox(height: 16),
+                          SizedBox(
+                            width: double.infinity,
+                            child: ElevatedButton(
+                              onPressed: _isSaving
+                                  ? null
+                                  : _guardarObservacion,
                               style: ElevatedButton.styleFrom(
                                 backgroundColor: const Color(0xFF1E5631),
                                 padding: const EdgeInsets.symmetric(
@@ -517,13 +856,22 @@ class _IdentifySpeciesScreenState extends State<IdentifySpeciesScreen> {
                                   borderRadius: BorderRadius.circular(10),
                                 ),
                               ),
-                              child: const Text(
-                                'Guardar observación',
-                                style: TextStyle(
-                                  color: Colors.white,
-                                  fontWeight: FontWeight.w600,
-                                ),
-                              ),
+                              child: _isSaving
+                                  ? const SizedBox(
+                                      width: 20,
+                                      height: 20,
+                                      child: CircularProgressIndicator(
+                                        strokeWidth: 2,
+                                        color: Colors.white,
+                                      ),
+                                    )
+                                  : const Text(
+                                      'Guardar observación',
+                                      style: TextStyle(
+                                        color: Colors.white,
+                                        fontWeight: FontWeight.w600,
+                                      ),
+                                    ),
                             ),
                           ),
                         ],

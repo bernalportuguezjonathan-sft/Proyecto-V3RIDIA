@@ -10,6 +10,7 @@ import 'ban_management.dart';
 import 'login.dart';
 import 'mapa.dart';
 import 'assignment_history.dart';
+import 'users_status.dart';
 
 class AdminHomeScreen extends StatefulWidget {
   const AdminHomeScreen({super.key});
@@ -74,9 +75,18 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
             child: const Text('Cancelar'),
           ),
           TextButton(
-            onPressed: () {
-              ChallengeRepository.instance.deleteChallenge(id);
-              Navigator.pop(context);
+            onPressed: () async {
+              final navigator = Navigator.of(context);
+              final messenger = ScaffoldMessenger.of(context);
+              try {
+                await ChallengeRepository.instance.deleteChallenge(id);
+              } catch (e) {
+                messenger.showSnackBar(
+                  SnackBar(content: Text('No se pudo eliminar: $e')),
+                );
+                return;
+              }
+              navigator.pop();
             },
             child: const Text('Eliminar', style: TextStyle(color: Colors.red)),
           ),
@@ -90,7 +100,6 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
     final descriptionController = TextEditingController();
     final speciesController = TextEditingController();
     final goalController = TextEditingController(text: '5');
-    final tokensController = TextEditingController(text: '100');
     final formKey = GlobalKey<FormState>();
     DateTime selectedDate = DateTime.now().add(const Duration(days: 7));
     String selectedTarget = 'global';
@@ -161,58 +170,48 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
                         : null,
                   ),
                   const SizedBox(height: 12),
-                  Row(
-                    children: [
-                      Expanded(
-                        child: TextFormField(
-                          controller: goalController,
-                          decoration: InputDecoration(
-                            labelText: 'Meta',
-                            labelStyle: const TextStyle(
-                              color: Color(0xFF1E5631),
-                            ),
-                            filled: true,
-                            fillColor: Colors.grey.shade50,
-                            border: OutlineInputBorder(
-                              borderRadius: BorderRadius.circular(12),
-                              borderSide: const BorderSide(
-                                color: Color(0xFFCAD2C5),
-                              ),
-                            ),
-                          ),
-                          keyboardType: TextInputType.number,
-                          validator: (value) =>
-                              value == null || value.trim().isEmpty
-                              ? 'Requerido'
-                              : null,
-                        ),
+                  TextFormField(
+                    controller: goalController,
+                    onChanged: (_) => setState(() {}),
+                    decoration: InputDecoration(
+                      labelText: 'Meta (fotos a capturar)',
+                      labelStyle: const TextStyle(color: Color(0xFF1E5631)),
+                      filled: true,
+                      fillColor: Colors.grey.shade50,
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(12),
+                        borderSide: const BorderSide(color: Color(0xFFCAD2C5)),
                       ),
-                      const SizedBox(width: 12),
-                      Expanded(
-                        child: TextFormField(
-                          controller: tokensController,
-                          decoration: InputDecoration(
-                            labelText: 'Tokens',
-                            labelStyle: const TextStyle(
-                              color: Color(0xFF1E5631),
-                            ),
-                            filled: true,
-                            fillColor: Colors.grey.shade50,
-                            border: OutlineInputBorder(
-                              borderRadius: BorderRadius.circular(12),
-                              borderSide: const BorderSide(
-                                color: Color(0xFFCAD2C5),
-                              ),
-                            ),
+                    ),
+                    keyboardType: TextInputType.number,
+                    validator: (value) => value == null || value.trim().isEmpty
+                        ? 'Requerido'
+                        : null,
+                  ),
+                  const SizedBox(height: 10),
+                  Builder(
+                    builder: (context) {
+                      final meta = int.tryParse(goalController.text) ?? 0;
+                      final bono = calcularBonoCompletar(meta);
+                      return Container(
+                        width: double.infinity,
+                        padding: const EdgeInsets.all(10),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFF1E5631).withValues(
+                            alpha: 0.08,
                           ),
-                          keyboardType: TextInputType.number,
-                          validator: (value) =>
-                              value == null || value.trim().isEmpty
-                              ? 'Requerido'
-                              : null,
+                          borderRadius: BorderRadius.circular(10),
                         ),
-                      ),
-                    ],
+                        child: Text(
+                          '1 Veridium por cada foto verificada por la IA '
+                          '+ $bono de bono al completar el desafío ($meta/$meta).',
+                          style: const TextStyle(
+                            fontSize: 12,
+                            color: Color(0xFF1E5631),
+                          ),
+                        ),
+                      );
+                    },
                   ),
                   const SizedBox(height: 12),
                   Row(
@@ -293,7 +292,7 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
               ),
             ),
             ElevatedButton(
-              onPressed: () {
+              onPressed: () async {
                 if (formKey.currentState?.validate() ?? false) {
                   final bool isGlobal = selectedTarget == 'global';
                   final selectedPlayer = isGlobal
@@ -313,7 +312,6 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
                     createdDate: now,
                     currentProgress: 0,
                     isCompleted: false,
-                    tokensReward: int.parse(tokensController.text),
                     assignedToUserId: selectedPlayer?.userId,
                     assignedToDisplayName: selectedPlayer?.displayName,
                     assignedToEmail: selectedPlayer?.email,
@@ -321,25 +319,38 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
                         UserRepository.instance.currentUser.value?.email,
                   );
 
-                  ChallengeRepository.instance.addChallenge(challenge);
-                  AssignmentRepository.instance.addRecord(
-                    AssignmentRecord(
-                      id: 'assignment-${now.millisecondsSinceEpoch}',
-                      challengeId: challenge.id,
-                      challengeTitle: challenge.title,
-                      eventType: isGlobal ? 'Creación global' : 'Asignación',
-                      note: isGlobal
-                          ? 'Disponible para todos los jugadores.'
-                          : 'Asignado a ${selectedPlayer?.displayName}',
-                      targetUserId: selectedPlayer?.userId,
-                      targetUserDisplayName: selectedPlayer?.displayName,
-                      targetUserEmail: selectedPlayer?.email,
-                      assignedByAdmin: challenge.assignedByAdmin,
-                      dateTime: now,
-                    ),
-                  );
-                  Navigator.pop(context);
-                  ScaffoldMessenger.of(context).showSnackBar(
+                  final navigator = Navigator.of(context);
+                  final messenger = ScaffoldMessenger.of(context);
+
+                  try {
+                    await ChallengeRepository.instance.addChallenge(
+                      challenge,
+                    );
+                    await AssignmentRepository.instance.addRecord(
+                      AssignmentRecord(
+                        id: 'assignment-${now.millisecondsSinceEpoch}',
+                        challengeId: challenge.id,
+                        challengeTitle: challenge.title,
+                        eventType: isGlobal ? 'Creación global' : 'Asignación',
+                        note: isGlobal
+                            ? 'Disponible para todos los jugadores.'
+                            : 'Asignado a ${selectedPlayer?.displayName}',
+                        targetUserId: selectedPlayer?.userId,
+                        targetUserDisplayName: selectedPlayer?.displayName,
+                        targetUserEmail: selectedPlayer?.email,
+                        assignedByAdmin: challenge.assignedByAdmin,
+                        dateTime: now,
+                      ),
+                    );
+                  } catch (e) {
+                    messenger.showSnackBar(
+                      SnackBar(content: Text('No se pudo guardar: $e')),
+                    );
+                    return;
+                  }
+
+                  navigator.pop();
+                  messenger.showSnackBar(
                     SnackBar(
                       content: Text(
                         isGlobal
@@ -522,9 +533,9 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
                   ),
                   _buildActionCard(
                     icon: Icons.gavel,
-                    label: 'Moderación & Gamificación de Comunidad',
+                    label: 'Moderación de Comunidad',
                     subtitle:
-                        'Gestionar reportes de contenido, moderar usuarios y visualizar ranking de gamificación',
+                        'Suspender o reactivar usuarios que incumplan las normas',
                     color: const Color(0xFF4CAF50),
                     onTap: () {
                       Navigator.push(
@@ -534,6 +545,29 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
                         ),
                       );
                     },
+                  ),
+                  _buildActionCard(
+                    icon: Icons.leaderboard,
+                    label: 'Ranking & Veridiums',
+                    subtitle:
+                        'Ver la clasificación de exploradores por Veridiums ganados',
+                    color: const Color(0xFF0F766E),
+                    onTap: () {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (context) => const UsersStatusScreen(),
+                        ),
+                      );
+                    },
+                  ),
+                  _buildActionCard(
+                    icon: Icons.travel_explore,
+                    label: 'Avistamientos Registrados',
+                    subtitle:
+                        'Ver en el mapa todas las especies fotografiadas por los exploradores',
+                    color: const Color(0xFFB45309),
+                    onTap: _mostrarPuntosDeInteres,
                   ),
                 ],
               ),

@@ -16,12 +16,53 @@ service cloud.firestore {
         get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'Administrador';
     }
 
+    // Un Explorador nunca puede leer esto. isAdminCodeValid() sí puede,
+    // porque get() dentro de las reglas ignora el permiso de lectura del
+    // documento. Un admin puede leerlo/cambiarlo desde la consola de
+    // Firebase para rotar el código sin tocar el código de la app.
+    match /config/{doc} {
+      allow read, write: if isAdmin();
+    }
+
+    function isAdminCodeValid(code) {
+      return code ==
+        get(/databases/$(database)/documents/config/secrets).data.adminCode;
+    }
+
     match /users/{userId} {
       allow get: if isOwner(userId) || isAdmin();
       allow list: if isAdmin();
-      allow create: if isOwner(userId);
-      allow update: if isOwner(userId) || isAdmin();
+      // Crear tu propio perfil como Administrador exige el código correcto;
+      // el código real vive solo en config/secrets, nunca en la app.
+      allow create: if isOwner(userId) &&
+        (request.resource.data.role != 'Administrador' ||
+          isAdminCodeValid(request.resource.data.adminCode));
+      // Nadie puede cambiar su propio rol después de creado; solo un admin.
+      allow update: if isAdmin() ||
+        (isOwner(userId) &&
+          request.resource.data.role == resource.data.role);
       allow delete: if isAdmin();
+    }
+
+    match /avistamientos/{sightingId} {
+      allow read: if isSignedIn();
+      allow create: if isSignedIn() &&
+        request.resource.data.userId == request.auth.uid;
+      allow update, delete: if isAdmin() ||
+        (isSignedIn() && resource.data.userId == request.auth.uid);
+    }
+
+    match /challenges/{challengeId} {
+      allow read: if isSignedIn();
+      allow create, delete: if isAdmin();
+      allow update: if isAdmin() ||
+        (isSignedIn() &&
+          request.resource.data.diff(resource.data).affectedKeys()
+            .hasOnly(['currentProgress', 'isCompleted', 'tokensAwarded']));
+    }
+
+    match /assignments/{assignmentId} {
+      allow read, write: if isAdmin();
     }
   }
 }

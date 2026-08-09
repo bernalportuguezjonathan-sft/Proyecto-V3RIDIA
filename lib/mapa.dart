@@ -1,7 +1,9 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_map/flutter_map.dart';
+import 'package:geolocator/geolocator.dart';
 import 'package:latlong2/latlong.dart';
-import 'package:shared_preferences/shared_preferences.dart';
 import 'login.dart';
 import 'home.dart';
 import 'identify_species.dart';
@@ -9,10 +11,16 @@ import 'historial.dart';
 import 'perfil.dart';
 import 'detallemapa.dart';
 import 'models/bird_zone.dart';
+import 'models/observation.dart';
+import 'services/repositorio_o.dart';
 import 'services/repositorio_u.dart';
 
 class MapScreen extends StatefulWidget {
-  const MapScreen({super.key});
+  const MapScreen({super.key, this.initialQuery});
+
+  /// Búsqueda con la que abrir el mapa (por ejemplo desde el buscador de
+  /// Inicio). Filtra zonas y especies apenas se carga la pantalla.
+  final String? initialQuery;
 
   @override
   State<MapScreen> createState() => _MapScreenState();
@@ -27,22 +35,95 @@ class _MapScreenState extends State<MapScreen> {
   bool _isLoadingZones = true;
   final LatLng _defaultCenter = const LatLng(4.7120, -74.2000);
 
+  List<Observation> _sightings = [];
+  StreamSubscription<List<Observation>>? _sightingsSub;
+  bool _showSightings = true;
+
+  LatLng? _userLocation;
+  String? _locationMessage;
+  static const Distance _distance = Distance();
+
   @override
   void initState() {
     super.initState();
-    _searchController = TextEditingController();
+    _searchController = TextEditingController(text: widget.initialQuery ?? '');
     _mapController = MapController();
-    _clearLocalCache();
     _loadBirdZones();
+    _locateUser();
+    _sightingsSub = ObservationRepository.instance.streamAll().listen((
+      sightings,
+    ) {
+      if (!mounted) return;
+      setState(() {
+        _sightings = sightings.where((s) => s.hasCoordinates).toList();
+      });
+    }, onError: (_) {});
   }
 
-  Future<void> _clearLocalCache() async {
+  /// Pide permiso de ubicación y guarda la posición del usuario para poder
+  /// ordenar las zonas por cercanía.
+  Future<void> _locateUser({bool moveCamera = false}) async {
     try {
-      final prefs = await SharedPreferences.getInstance();
-      await prefs.clear();
-    } catch (_) {
-      // If cache cleanup fails, ignore so the map can still load.
+      if (!await Geolocator.isLocationServiceEnabled()) {
+        if (mounted) {
+          setState(() => _locationMessage = 'Activa el GPS para ver zonas cercanas');
+        }
+        return;
+      }
+
+      var permission = await Geolocator.checkPermission();
+      if (permission == LocationPermission.denied) {
+        permission = await Geolocator.requestPermission();
+      }
+      if (permission == LocationPermission.denied ||
+          permission == LocationPermission.deniedForever) {
+        if (mounted) {
+          setState(() => _locationMessage = 'Permiso de ubicación denegado');
+        }
+        return;
+      }
+
+      final position = await Geolocator.getCurrentPosition(
+        locationSettings: const LocationSettings(
+          accuracy: LocationAccuracy.high,
+        ),
+      );
+      if (!mounted) return;
+      final location = LatLng(position.latitude, position.longitude);
+      setState(() {
+        _userLocation = location;
+        _locationMessage = null;
+      });
+      if (moveCamera) {
+        _mapController.move(location, 14.0);
+      }
+    } catch (e) {
+      if (!mounted) return;
+      setState(() => _locationMessage = 'No se pudo obtener tu ubicación');
     }
+  }
+
+  /// Distancia en kilómetros entre el usuario y una zona (null si no hay GPS).
+  double? _distanciaKm(double lat, double lng) {
+    final user = _userLocation;
+    if (user == null) return null;
+    return _distance.as(LengthUnit.Kilometer, user, LatLng(lat, lng))
+        .toDouble();
+  }
+
+  String _etiquetaDistancia(double km) =>
+      km < 1 ? '${(km * 1000).round()} m' : '${km.toStringAsFixed(1)} km';
+
+  /// Zonas visibles ordenadas por cercanía al usuario (si hay ubicación).
+  List<BirdZone> get _zonasOrdenadas {
+    final zones = List<BirdZone>.from(_filteredZones);
+    if (_userLocation == null) return zones;
+    zones.sort((a, b) {
+      final da = _distanciaKm(a.latitude, a.longitude) ?? double.infinity;
+      final db = _distanciaKm(b.latitude, b.longitude) ?? double.infinity;
+      return da.compareTo(db);
+    });
+    return zones;
   }
 
   Future<void> _loadBirdZones() async {
@@ -50,7 +131,11 @@ class _MapScreenState extends State<MapScreen> {
     if (!mounted) return;
     setState(() {
       _birdZones = zones;
-      _filteredZones = zones;
+      _filteredZones = filterBirdZones(
+        zones,
+        query: _searchController.text,
+        selectedSpecies: _selectedSpecies,
+      );
       _isLoadingZones = false;
     });
 
@@ -64,9 +149,87 @@ class _MapScreenState extends State<MapScreen> {
 
   @override
   void dispose() {
+    _sightingsSub?.cancel();
     _searchController.dispose();
     _mapController.dispose();
     super.dispose();
+  }
+
+  void _showSightingSheet(Observation sighting) {
+    showModalBottomSheet(
+      context: context,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (context) => Padding(
+        padding: const EdgeInsets.fromLTRB(16, 16, 16, 24),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                const CircleAvatar(
+                  backgroundColor: Color(0xFFB45309),
+                  child: Icon(Icons.camera_alt, color: Colors.white, size: 18),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        sighting.commonName,
+                        style: const TextStyle(
+                          fontSize: 16,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                      Text(
+                        sighting.scientificName,
+                        style: TextStyle(
+                          fontSize: 12,
+                          fontStyle: FontStyle.italic,
+                          color: Colors.grey.shade600,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 12),
+            if (sighting.hasPhoto) ...[
+              ClipRRect(
+                borderRadius: BorderRadius.circular(12),
+                child: Image.network(
+                  sighting.imagePath!,
+                  height: 160,
+                  width: double.infinity,
+                  fit: BoxFit.cover,
+                  errorBuilder: (_, _, _) => const SizedBox.shrink(),
+                ),
+              ),
+              const SizedBox(height: 12),
+            ],
+            if (sighting.notes.isNotEmpty)
+              Text(
+                sighting.notes,
+                style: TextStyle(fontSize: 13, color: Colors.grey.shade700),
+              ),
+            const SizedBox(height: 8),
+            Text(
+              'Avistado por: ${sighting.userDisplayName ?? 'Explorador'}',
+              style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600),
+            ),
+            Text(
+              '${sighting.dateTime.day}/${sighting.dateTime.month}/${sighting.dateTime.year}',
+              style: TextStyle(fontSize: 11, color: Colors.grey.shade600),
+            ),
+          ],
+        ),
+      ),
+    );
   }
 
   void _cerrarSesion() {
@@ -227,6 +390,78 @@ class _MapScreenState extends State<MapScreen> {
     }).toList();
   }
 
+  List<Marker> _buildUserMarker() {
+    final user = _userLocation;
+    if (user == null) return [];
+    return [
+      Marker(
+        point: user,
+        width: 90,
+        height: 60,
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Container(
+              width: 22,
+              height: 22,
+              decoration: BoxDecoration(
+                color: const Color(0xFF1D4ED8),
+                shape: BoxShape.circle,
+                border: Border.all(color: Colors.white, width: 3),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withValues(alpha: 0.25),
+                    blurRadius: 6,
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 2),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(999),
+              ),
+              child: const Text(
+                'Tú',
+                style: TextStyle(fontSize: 9, fontWeight: FontWeight.w700),
+              ),
+            ),
+          ],
+        ),
+      ),
+    ];
+  }
+
+  List<Marker> _buildSightingMarkers() {
+    if (!_showSightings) return [];
+    return _sightings.map((sighting) {
+      return Marker(
+        point: LatLng(sighting.latitude!, sighting.longitude!),
+        width: 40,
+        height: 40,
+        child: GestureDetector(
+          onTap: () => _showSightingSheet(sighting),
+          child: Container(
+            decoration: BoxDecoration(
+              color: const Color(0xFFB45309),
+              shape: BoxShape.circle,
+              border: Border.all(color: Colors.white, width: 2),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withValues(alpha: 0.2),
+                  blurRadius: 4,
+                ),
+              ],
+            ),
+            child: const Icon(Icons.camera_alt, color: Colors.white, size: 18),
+          ),
+        ),
+      );
+    }).toList();
+  }
+
   List<Marker> _buildMarkers() {
     return _filteredZones.map((zone) {
       return Marker(
@@ -285,7 +520,7 @@ class _MapScreenState extends State<MapScreen> {
         backgroundColor: const Color(0xFFF5F9F7),
         appBar: AppBar(
           backgroundColor: const Color(0xFF1E5631),
-          title: const Text('Mapa de aves - Mosquera'),
+          title: const Text('Mapa de especies - Cundinamarca'),
           centerTitle: true,
           leading: IconButton(
             icon: const Icon(Icons.arrow_back),
@@ -423,6 +658,8 @@ class _MapScreenState extends State<MapScreen> {
                     ),
                     PolygonLayer(polygons: _buildPolygons()),
                     MarkerLayer(markers: _buildMarkers()),
+                    MarkerLayer(markers: _buildSightingMarkers()),
+                    MarkerLayer(markers: _buildUserMarker()),
                   ],
                 ),
                 Positioned(
@@ -441,7 +678,7 @@ class _MapScreenState extends State<MapScreen> {
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         const Text(
-                          'Mapa híbrido de Mosquera',
+                          'Mapa híbrido de la Sabana de Bogotá',
                           style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold),
                         ),
                         Text(
@@ -474,8 +711,31 @@ class _MapScreenState extends State<MapScreen> {
                       FloatingActionButton.small(
                         heroTag: 'center-map',
                         backgroundColor: const Color(0xFF1E5631),
-                        onPressed: () => _mapController.move(const LatLng(4.7092, -74.2183), 12.0),
+                        tooltip: 'Ir a mi ubicación',
+                        onPressed: () {
+                          final user = _userLocation;
+                          if (user != null) {
+                            _mapController.move(user, 14.0);
+                          } else {
+                            _locateUser(moveCamera: true);
+                          }
+                        },
                         child: const Icon(Icons.my_location, color: Colors.white),
+                      ),
+                      const SizedBox(height: 8),
+                      FloatingActionButton.small(
+                        heroTag: 'toggle-sightings',
+                        backgroundColor: _showSightings
+                            ? const Color(0xFFB45309)
+                            : Colors.white,
+                        onPressed: () =>
+                            setState(() => _showSightings = !_showSightings),
+                        child: Icon(
+                          Icons.camera_alt,
+                          color: _showSightings
+                              ? Colors.white
+                              : const Color(0xFFB45309),
+                        ),
                       ),
                     ],
                   ),
@@ -496,22 +756,49 @@ class _MapScreenState extends State<MapScreen> {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        const Text(
-                          'Zonas destacadas',
-                          style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold),
+                        Row(
+                          children: [
+                            Text(
+                              _userLocation != null
+                                  ? 'Zonas más cercanas a ti'
+                                  : 'Zonas destacadas',
+                              style: const TextStyle(
+                                fontSize: 14,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                            const Spacer(),
+                            if (_locationMessage != null)
+                              Flexible(
+                                child: Text(
+                                  _locationMessage!,
+                                  textAlign: TextAlign.end,
+                                  style: TextStyle(
+                                    fontSize: 10,
+                                    color: Colors.grey.shade600,
+                                  ),
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                ),
+                              ),
+                          ],
                         ),
                         const SizedBox(height: 8),
-                        if (_filteredZones.isEmpty)
+                        if (_zonasOrdenadas.isEmpty)
                           const Text('No hay zonas para esta búsqueda.')
                         else
                           SizedBox(
                             height: 90,
                             child: ListView.separated(
                               scrollDirection: Axis.horizontal,
-                              itemCount: _filteredZones.length,
+                              itemCount: _zonasOrdenadas.length,
                               separatorBuilder: (_, _) => const SizedBox(width: 8),
                               itemBuilder: (context, index) {
-                                final zone = _filteredZones[index];
+                                final zone = _zonasOrdenadas[index];
+                                final km = _distanciaKm(
+                                  zone.latitude,
+                                  zone.longitude,
+                                );
                                 return GestureDetector(
                                   onTap: () => _focusZone(zone),
                                   child: Container(
@@ -553,9 +840,30 @@ class _MapScreenState extends State<MapScreen> {
                                         Text(
                                           zone.location,
                                           style: TextStyle(fontSize: 10, color: Colors.grey.shade700),
-                                          maxLines: 2,
+                                          maxLines: 1,
                                           overflow: TextOverflow.ellipsis,
                                         ),
+                                        if (km != null) ...[
+                                          const SizedBox(height: 4),
+                                          Row(
+                                            children: [
+                                              const Icon(
+                                                Icons.near_me,
+                                                size: 11,
+                                                color: Color(0xFF1D4ED8),
+                                              ),
+                                              const SizedBox(width: 3),
+                                              Text(
+                                                'a ${_etiquetaDistancia(km)}',
+                                                style: const TextStyle(
+                                                  fontSize: 10,
+                                                  fontWeight: FontWeight.w700,
+                                                  color: Color(0xFF1D4ED8),
+                                                ),
+                                              ),
+                                            ],
+                                          ),
+                                        ],
                                       ],
                                     ),
                                   ),

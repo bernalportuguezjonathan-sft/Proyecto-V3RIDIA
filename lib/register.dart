@@ -146,45 +146,29 @@ class _RegisterScreenState extends State<RegisterScreen>
       return;
     }
 
-    if (_selectedRole == 'Administrador') {
-      final adminCode = _adminCodeController.text.trim();
-      if (adminCode.isEmpty) {
-        await showDialog(
-          context: context,
-          builder: (context) => AlertDialog(
-            title: const Text('Código requerido'),
-            content: const Text(
-              'Ingresa el código privado de administrador para continuar.',
-            ),
-            actions: [
-              TextButton(
-                onPressed: () => Navigator.pop(context),
-                child: const Text('Aceptar'),
-              ),
-            ],
+    final adminCode = _adminCodeController.text.trim();
+    if (_selectedRole == 'Administrador' && adminCode.isEmpty) {
+      await showDialog(
+        context: context,
+        builder: (context) => AlertDialog(
+          title: const Text('Código requerido'),
+          content: const Text(
+            'Ingresa el código privado de administrador para continuar.',
           ),
-        );
-        return;
-      }
-      if (adminCode != 'SDNJ') {
-        await showDialog(
-          context: context,
-          builder: (context) => AlertDialog(
-            title: const Text('Código inválido'),
-            content: const Text(
-              'El código no es correcto. Solicita a tus superiores el código de administrador.',
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text('Aceptar'),
             ),
-            actions: [
-              TextButton(
-                onPressed: () => Navigator.pop(context),
-                child: const Text('Aceptar'),
-              ),
-            ],
-          ),
-        );
-        return;
-      }
+          ],
+        ),
+      );
+      return;
     }
+    // El código NO se valida aquí: Firestore lo compara del lado del
+    // servidor (ver firestore.rules) contra config/secrets, que ningún
+    // cliente puede leer. Si es incorrecto, createUserProfile lanzará
+    // permission-denied más abajo.
 
     // Si todo está perfecto, mostramos el círculo de carga
     showDialog(
@@ -217,15 +201,30 @@ class _RegisterScreenState extends State<RegisterScreen>
 
         UserRepository.instance.currentUser.value = localProfile;
 
-        // Attempt to persist the profile, but don't block navigation on failure
         try {
           await UserRepository.instance.createUserProfile(
             userId: credential.user!.uid,
             email: email,
             displayName: name,
             role: _selectedRole!,
+            adminCode: adminCode.isEmpty ? null : adminCode,
           );
-        } catch (e) {
+        } on FirebaseException catch (e) {
+          if (_selectedRole == 'Administrador' && e.code == 'permission-denied') {
+            // Código de administrador incorrecto: no dejamos el perfil a
+            // medias, deshacemos la cuenta recién creada.
+            UserRepository.instance.currentUser.value = null;
+            try {
+              await credential.user!.delete();
+            } catch (_) {
+              await FirebaseAuth.instance.signOut();
+            }
+            if (mounted) Navigator.pop(context);
+            _mostrarAlerta(
+              'El código de administrador es incorrecto. Intenta de nuevo.',
+            );
+            return;
+          }
           debugPrint('Could not persist user profile to Firestore: $e');
           await UserRepository.instance.cacheUserProfile(
             credential.user!.uid,
@@ -313,8 +312,23 @@ class _RegisterScreenState extends State<RegisterScreen>
           email: userProfile.email,
           displayName: userProfile.displayName,
           role: role,
+          adminCode: role == 'Administrador'
+              ? _adminCodeController.text.trim()
+              : null,
         );
-      } catch (e) {
+      } on FirebaseException catch (e) {
+        if (role == 'Administrador' && e.code == 'permission-denied') {
+          UserRepository.instance.currentUser.value = null;
+          try {
+            await firebaseUser.delete();
+          } catch (_) {
+            await FirebaseAuth.instance.signOut();
+          }
+          _mostrarAlerta(
+            'El código de administrador es incorrecto. Intenta de nuevo.',
+          );
+          return;
+        }
         debugPrint('Could not persist Google profile to Firestore: $e');
       }
     } else {

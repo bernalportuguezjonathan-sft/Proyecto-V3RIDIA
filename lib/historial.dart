@@ -18,6 +18,22 @@ class HistoryScreen extends StatefulWidget {
 class _HistoryScreenState extends State<HistoryScreen>
     with SingleTickerProviderStateMixin {
   late TabController _tabController;
+  final TextEditingController _searchController = TextEditingController();
+  String _searchQuery = '';
+
+  List<Observation> _filtrar(List<Observation> items) {
+    final q = _searchQuery.trim().toLowerCase();
+    if (q.isEmpty) return items;
+    return items
+        .where(
+          (o) =>
+              o.commonName.toLowerCase().contains(q) ||
+              o.scientificName.toLowerCase().contains(q) ||
+              o.location.toLowerCase().contains(q) ||
+              o.notes.toLowerCase().contains(q),
+        )
+        .toList();
+  }
 
   void _cerrarSesion() {
     showDialog(
@@ -56,6 +72,7 @@ class _HistoryScreenState extends State<HistoryScreen>
   @override
   void dispose() {
     _tabController.dispose();
+    _searchController.dispose();
     super.dispose();
   }
 
@@ -115,9 +132,10 @@ class _HistoryScreenState extends State<HistoryScreen>
             child: const Text('Cancelar'),
           ),
           ElevatedButton(
-            onPressed: () {
+            onPressed: () async {
               if (formKey.currentState?.validate() ?? false) {
-                ObservationRepository.instance.updateObservation(
+                final navigator = Navigator.of(context);
+                await ObservationRepository.instance.updateObservation(
                   Observation(
                     id: captura.id,
                     commonName: commonNameController.text.trim(),
@@ -125,9 +143,15 @@ class _HistoryScreenState extends State<HistoryScreen>
                     location: locationController.text.trim(),
                     notes: notesController.text.trim(),
                     dateTime: captura.dateTime,
+                    imagePath: captura.imagePath,
+                    latitude: captura.latitude,
+                    longitude: captura.longitude,
+                    type: captura.type,
+                    userId: captura.userId,
+                    userDisplayName: captura.userDisplayName,
                   ),
                 );
-                Navigator.pop(context);
+                navigator.pop();
               }
             },
             style: ElevatedButton.styleFrom(
@@ -152,9 +176,10 @@ class _HistoryScreenState extends State<HistoryScreen>
             child: const Text('Cancelar'),
           ),
           TextButton(
-            onPressed: () {
-              ObservationRepository.instance.deleteObservation(id);
-              Navigator.pop(context);
+            onPressed: () async {
+              final navigator = Navigator.of(context);
+              await ObservationRepository.instance.deleteObservation(id);
+              navigator.pop();
             },
             child: const Text('Eliminar', style: TextStyle(color: Colors.red)),
           ),
@@ -224,50 +249,63 @@ class _HistoryScreenState extends State<HistoryScreen>
   }
 
   Widget _buildHistorialTab() {
-    return ValueListenableBuilder<List<Observation>>(
-      valueListenable: ObservationRepository.instance.observations,
-      builder: (context, observations, child) {
+    final userId = UserRepository.instance.currentUser.value?.userId;
+    if (userId == null) {
+      return const Center(
+        child: Padding(
+          padding: EdgeInsets.only(top: 24),
+          child: Text('Inicia sesión para ver tu historial.'),
+        ),
+      );
+    }
+    return StreamBuilder<List<Observation>>(
+      stream: ObservationRepository.instance.streamForUser(userId),
+      builder: (context, snapshot) {
+        if (snapshot.connectionState == ConnectionState.waiting) {
+          return const Center(child: CircularProgressIndicator());
+        }
+        if (snapshot.hasError) {
+          return Center(
+            child: Padding(
+              padding: const EdgeInsets.all(24),
+              child: Text('No se pudo cargar el historial: ${snapshot.error}'),
+            ),
+          );
+        }
+        final observations = snapshot.data ?? [];
         return SingleChildScrollView(
           padding: const EdgeInsets.all(16),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               // Filtros
-              Row(
-                children: [
-                  Expanded(
-                    child: TextField(
-                      decoration: InputDecoration(
-                        hintText: 'Buscar',
-                        prefixIcon: const Icon(
-                          Icons.search,
-                          color: Color(0xFF1E5631),
-                        ),
-                        border: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(10),
-                          borderSide: const BorderSide(
-                            color: Color(0xFFD3D3D3),
-                          ),
-                        ),
-                        enabledBorder: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(10),
-                          borderSide: const BorderSide(
-                            color: Color(0xFFD3D3D3),
-                          ),
-                        ),
-                      ),
-                    ),
+              TextField(
+                controller: _searchController,
+                onChanged: (value) => setState(() => _searchQuery = value),
+                decoration: InputDecoration(
+                  hintText: 'Buscar por especie, lugar o nota',
+                  prefixIcon: const Icon(
+                    Icons.search,
+                    color: Color(0xFF1E5631),
                   ),
-                  const SizedBox(width: 12),
-                  Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 12),
-                    decoration: BoxDecoration(
-                      border: Border.all(color: const Color(0xFFD3D3D3)),
-                      borderRadius: BorderRadius.circular(10),
-                    ),
-                    child: const Icon(Icons.tune, color: Color(0xFF1E5631)),
+                  suffixIcon: _searchQuery.isEmpty
+                      ? null
+                      : IconButton(
+                          icon: const Icon(Icons.close),
+                          onPressed: () {
+                            _searchController.clear();
+                            setState(() => _searchQuery = '');
+                          },
+                        ),
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(10),
+                    borderSide: const BorderSide(color: Color(0xFFD3D3D3)),
                   ),
-                ],
+                  enabledBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(10),
+                    borderSide: const BorderSide(color: Color(0xFFD3D3D3)),
+                  ),
+                ),
               ),
               const SizedBox(height: 20),
               if (observations.isEmpty)
@@ -277,9 +315,16 @@ class _HistoryScreenState extends State<HistoryScreen>
                     child: Text('No hay especies en el historial aún.'),
                   ),
                 )
+              else if (_filtrar(observations).isEmpty)
+                const Center(
+                  child: Padding(
+                    padding: EdgeInsets.only(top: 24),
+                    child: Text('Ninguna observación coincide con tu búsqueda.'),
+                  ),
+                )
               else
                 Column(
-                  children: observations.map((captura) {
+                  children: _filtrar(observations).map((captura) {
                     return _crearTarjetaCaptura(captura);
                   }).toList(),
                 ),
@@ -291,32 +336,100 @@ class _HistoryScreenState extends State<HistoryScreen>
   }
 
   Widget _buildAlmacenamientosTab() {
-    return SingleChildScrollView(
+    final userId = UserRepository.instance.currentUser.value?.userId;
+    if (userId == null) {
+      return const Center(child: Text('Inicia sesión para ver tus insignias.'));
+    }
+
+    return StreamBuilder<List<Observation>>(
+      stream: ObservationRepository.instance.streamForUser(userId),
+      builder: (context, snapshot) {
+        final observations = snapshot.data ?? [];
+        final total = observations.length;
+        final especiesUnicas = observations
+            .map((o) => o.commonName.toLowerCase())
+            .toSet()
+            .length;
+
+        return SingleChildScrollView(
+          padding: const EdgeInsets.all(16),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  Expanded(
+                    child: _resumenCard('Observaciones', '$total'),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: _resumenCard('Especies distintas', '$especiesUnicas'),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 20),
+              const Text(
+                'Insignias',
+                style: TextStyle(
+                  fontSize: 14,
+                  fontWeight: FontWeight.bold,
+                  color: Colors.black87,
+                ),
+              ),
+              const SizedBox(height: 12),
+              GridView.count(
+                crossAxisCount: 4,
+                mainAxisSpacing: 16,
+                crossAxisSpacing: 16,
+                shrinkWrap: true,
+                physics: const NeverScrollableScrollPhysics(),
+                children: [
+                  _crearInsignia('Primera captura', Icons.star, total >= 1),
+                  _crearInsignia('5 observaciones', Icons.star, total >= 5),
+                  _crearInsignia(
+                    '10 especies',
+                    Icons.emoji_events,
+                    especiesUnicas >= 10,
+                  ),
+                  _crearInsignia(
+                    '50 observaciones',
+                    Icons.military_tech,
+                    total >= 50,
+                  ),
+                ],
+              ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
+  Widget _resumenCard(String titulo, String valor) {
+    return Container(
       padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(12),
+        boxShadow: const [
+          BoxShadow(color: Color.fromRGBO(0, 0, 0, 0.05), blurRadius: 8),
+        ],
+      ),
       child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Text(
-            'Insignias',
-            style: TextStyle(
-              fontSize: 14,
+          Text(
+            valor,
+            style: const TextStyle(
+              fontSize: 24,
               fontWeight: FontWeight.bold,
-              color: Colors.black87,
+              color: Color(0xFF1E5631),
             ),
           ),
-          const SizedBox(height: 12),
-          GridView.count(
-            crossAxisCount: 4,
-            mainAxisSpacing: 16,
-            crossAxisSpacing: 16,
-            shrinkWrap: true,
-            physics: const NeverScrollableScrollPhysics(),
-            children: [
-              _crearInsignia('Explorador novato', Icons.star),
-              _crearInsignia('Observador experto', Icons.star_outline),
-              _crearInsignia('Capturador 10 especies', Icons.star),
-              _crearInsignia('Observador 50 especies', Icons.star_outline),
-            ],
+          const SizedBox(height: 4),
+          Text(
+            titulo,
+            textAlign: TextAlign.center,
+            style: TextStyle(fontSize: 11, color: Colors.grey.shade700),
           ),
         ],
       ),
@@ -324,9 +437,16 @@ class _HistoryScreenState extends State<HistoryScreen>
   }
 
   Widget _buildLugaresTab() {
-    return ValueListenableBuilder<List<Observation>>(
-      valueListenable: ObservationRepository.instance.observations,
-      builder: (context, observations, child) {
+    final userId = UserRepository.instance.currentUser.value?.userId;
+    if (userId == null) {
+      return const Center(
+        child: Text('Inicia sesión para ver tus lugares.'),
+      );
+    }
+    return StreamBuilder<List<Observation>>(
+      stream: ObservationRepository.instance.streamForUser(userId),
+      builder: (context, snapshot) {
+        final observations = snapshot.data ?? [];
         if (observations.isEmpty) {
           return const Padding(
             padding: EdgeInsets.all(16),
@@ -366,14 +486,36 @@ class _HistoryScreenState extends State<HistoryScreen>
         padding: const EdgeInsets.all(12),
         child: Row(
           children: [
-            Container(
-              width: 80,
-              height: 80,
-              decoration: BoxDecoration(
+            ClipRRect(
+              borderRadius: BorderRadius.circular(10),
+              child: Container(
+                width: 80,
+                height: 80,
                 color: Colors.grey.shade200,
-                borderRadius: BorderRadius.circular(10),
+                child: captura.hasPhoto
+                    ? Image.network(
+                        captura.imagePath!,
+                        fit: BoxFit.cover,
+                        errorBuilder: (_, _, _) => const Icon(
+                          Icons.broken_image,
+                          color: Colors.grey,
+                          size: 36,
+                        ),
+                        loadingBuilder: (context, child, progress) =>
+                            progress == null
+                            ? child
+                            : const Center(
+                                child: SizedBox(
+                                  width: 18,
+                                  height: 18,
+                                  child: CircularProgressIndicator(
+                                    strokeWidth: 2,
+                                  ),
+                                ),
+                              ),
+                      )
+                    : const Icon(Icons.image, color: Colors.grey, size: 40),
               ),
-              child: const Icon(Icons.image, color: Colors.grey, size: 40),
             ),
             const SizedBox(width: 12),
             Expanded(
@@ -428,7 +570,7 @@ class _HistoryScreenState extends State<HistoryScreen>
     );
   }
 
-  Widget _crearInsignia(String titulo, IconData icon) {
+  Widget _crearInsignia(String titulo, IconData icon, bool desbloqueada) {
     return Container(
       decoration: BoxDecoration(
         color: Colors.white,
@@ -437,26 +579,33 @@ class _HistoryScreenState extends State<HistoryScreen>
           BoxShadow(color: Color.fromRGBO(0, 0, 0, 0.05), blurRadius: 8),
         ],
       ),
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          Icon(icon, size: 32, color: const Color(0xFF1E5631)),
-          const SizedBox(height: 8),
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 8),
-            child: Text(
-              titulo,
-              style: const TextStyle(
-                fontSize: 10,
-                fontWeight: FontWeight.w600,
-                color: Colors.black87,
-              ),
-              textAlign: TextAlign.center,
-              maxLines: 2,
-              overflow: TextOverflow.ellipsis,
+      child: Opacity(
+        opacity: desbloqueada ? 1 : 0.35,
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(
+              desbloqueada ? icon : Icons.lock_outline,
+              size: 32,
+              color: const Color(0xFF1E5631),
             ),
-          ),
-        ],
+            const SizedBox(height: 8),
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 8),
+              child: Text(
+                titulo,
+                style: const TextStyle(
+                  fontSize: 10,
+                  fontWeight: FontWeight.w600,
+                  color: Colors.black87,
+                ),
+                textAlign: TextAlign.center,
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }

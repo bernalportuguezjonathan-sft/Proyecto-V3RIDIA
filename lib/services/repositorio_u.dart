@@ -161,28 +161,32 @@ class UserRepository {
     }
   }
 
+  /// Crea el perfil del usuario en Firestore.
+  ///
+  /// Si `role` es 'Administrador', `adminCode` viaja en el documento para que
+  /// la regla de seguridad lo compare contra `config/secrets` (que ningún
+  /// cliente puede leer). Si no coincide, Firestore rechaza la escritura con
+  /// `permission-denied` y NO se guarda el perfil como admin.
   Future<void> createUserProfile({
     required String userId,
     required String email,
     required String displayName,
     required String role,
+    String? adminCode,
   }) async {
     final now = DateTime.now();
-    try {
-      await _firestore.collection('users').doc(userId).set({
-        'email': email,
-        'displayName': displayName,
-        'role': role,
-        'tokens': 0,
-        'createdDate': now.toIso8601String(),
-        'photoURL': null,
-        'isBanned': false,
-        'banExpires': null,
-        'banReason': null,
-      });
-    } catch (e) {
-      debugPrint('Warning: Firestore profile write failed: $e');
-    }
+    await _firestore.collection('users').doc(userId).set({
+      'email': email,
+      'displayName': displayName,
+      'role': role,
+      'tokens': 0,
+      'createdDate': now.toIso8601String(),
+      'photoURL': null,
+      'isBanned': false,
+      'banExpires': null,
+      'banReason': null,
+      if (role == 'Administrador') 'adminCode': adminCode,
+    });
     await _cacheUserProfile(userId, 0, role, displayName);
   }
 
@@ -257,37 +261,29 @@ class UserRepository {
     );
   }
 
-  void addTokens(int amount) {
-    if (currentUser.value != null) {
-      final newTokens = (currentUser.value!.tokens + amount).toInt();
-      currentUser.value = currentUser.value!.copyWith(tokens: newTokens);
-      _cacheTokens(currentUser.value!.userId, newTokens);
+  Future<void> addTokens(int amount) => _setTokens(
+    (currentUser.value?.tokens ?? 0) + amount,
+  );
 
-      // Persist token change to Firestore; do not throw on failure
-      try {
-        final uid = currentUser.value!.userId;
-        _firestore.collection('users').doc(uid).update({'tokens': newTokens});
-      } catch (e) {
-        debugPrint('Warning: failed to persist tokens for addTokens: $e');
-      }
-    }
-  }
+  Future<void> removeTokens(int amount) => _setTokens(
+    (currentUser.value?.tokens ?? 0) - amount,
+  );
 
-  void removeTokens(int amount) {
-    if (currentUser.value != null) {
-      final newTokens = (currentUser.value!.tokens - amount)
-          .clamp(0, double.maxFinite)
-          .toInt();
-      currentUser.value = currentUser.value!.copyWith(tokens: newTokens);
-      _cacheTokens(currentUser.value!.userId, newTokens);
+  Future<void> _setTokens(int rawTotal) async {
+    final user = currentUser.value;
+    if (user == null) return;
 
-      // Persist token change to Firestore; do not throw on failure
-      try {
-        final uid = currentUser.value!.userId;
-        _firestore.collection('users').doc(uid).update({'tokens': newTokens});
-      } catch (e) {
-        debugPrint('Warning: failed to persist tokens for removeTokens: $e');
-      }
+    final newTokens = rawTotal < 0 ? 0 : rawTotal;
+    currentUser.value = user.copyWith(tokens: newTokens);
+    await _cacheTokens(user.userId, newTokens);
+
+    // Persistimos en Firestore; si falla, el valor queda al menos en caché.
+    try {
+      await _firestore.collection('users').doc(user.userId).update({
+        'tokens': newTokens,
+      });
+    } catch (e) {
+      debugPrint('Warning: failed to persist tokens: $e');
     }
   }
 

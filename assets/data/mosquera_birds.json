@@ -94,5 +94,187 @@
         "url_imagen": "https://upload.wikimedia.org/wikipedia/commons/3/3a/Sparkling_Violetear_%28Colibri_coruscans%29_-_Colibr%C3%AD_chill%C3%B3n.jpg"
       }
     ]
+  },
+  {
+    "id": "cordoba_bogota",
+    "nombre_zona": "Humedal Córdoba",
+    "municipio": "Bogotá",
+    "descripcion_zona": "Humedal urbano al norte de Bogotá, uno de los más visitados de la Sabana para el avistamiento de aves acuáticas.",
+    "coordenadas": {
+      "latitud": 4.6786,
+      "longitud": -74.0736
+    },
+    "especies_destacadas": [
+      {
+        "id_especie": "tingua_bogotana_cordoba",
+        "nombre_comun": "Tingua Bogotana",
+        "nombre_cientifico": "Rallus semiplumbeus",
+        "descripcion": "Ave endémica y en peligro, propia de los humedales de la Sabana de Bogotá.",
+        "url_imagen": "https://upload.wikimedia.org/wikipedia/commons/e/ed/Tingua_Bogotana_-_Humedal_La_Conejera.jpg"
+      },
+      {
+        "id_especie": "monjita_bogotana_cordoba",
+        "nombre_comun": "Monjita Bogotana",
+        "nombre_cientifico": "Chrysomus icterocephalus bogotensis",
+        "descripcion": "Macho con cabeza amarilla brillante y cuerpo negro, común en los juncales del humedal.",
+        "url_imagen": "https://upload.wikimedia.org/wikipedia/commons/2/23/Yellow-hooded_Blackbird_at_Humedal_La_Conejera%2C_Colombia.jpg"
+      }
+    ]
+  },
+  {
+    "id": "rural_madrid",
+    "nombre_zona": "Zona rural de Madrid",
+    "municipio": "Madrid",
+    "descripcion_zona": "Área rural y de cultivos de flores en Madrid, Cundinamarca, con presencia de aves comunes de la Sabana de Bogotá.",
+    "coordenadas": {
+      "latitud": 4.7333,
+      "longitud": -74.2667
+    },
+    "especies_destacadas": [
+      {
+        "id_especie": "copeton_madrid",
+        "nombre_comun": "Copetón",
+        "nombre_cientifico": "Zonotrichia capensis",
+        "descripcion": "Pequeño gorrión muy común en jardines y potreros de toda la Sabana.",
+        "url_imagen": "https://upload.wikimedia.org/wikipedia/commons/d/dc/Rufous-collared_Sparrow_%28Zonotrichia_capensis%29_-_Copet%C3%B3n.jpg"
+      },
+      {
+        "id_especie": "mirla_madrid",
+        "nombre_comun": "Mirla",
+        "nombre_cientifico": "Turdus fuscater",
+        "descripcion": "Tordo grande de color negro o gris oscuro, frecuente en zonas rurales y urbanas.",
+        "url_imagen": "https://upload.wikimedia.org/wikipedia/commons/e/ee/Great_Thrush_%28Turdus_fuscater%29_at_Humedal_La_Conejera.jpg"
+      }
+    ]
+  },
+  {
+    "id": "rural_funza",
+    "nombre_zona": "Zona rural de Funza",
+    "municipio": "Funza",
+    "descripcion_zona": "Área rural de Funza, Cundinamarca, cercana a los humedales de la Sabana, con aves de potrero y borde de agua.",
+    "coordenadas": {
+      "latitud": 4.7167,
+      "longitud": -74.2100
+    },
+    "especies_destacadas": [
+      {
+        "id_especie": "garza_real_funza",
+        "nombre_comun": "Garza Real",
+        "nombre_cientifico": "Ardea alba",
+        "descripcion": "Gran garza blanca con pico amarillo y patas negras, visible en potreros inundables.",
+        "url_imagen": "https://upload.wikimedia.org/wikipedia/commons/0/03/Great_Egret_%28Ardea_alba%29.jpg"
+      },
+      {
+        "id_especie": "colibri_chillon_funza",
+        "nombre_comun": "Colibrí chillón",
+        "nombre_cientifico": "Colibri coruscans",
+        "descripcion": "Gran colibrí verde brillante, común en cercas vivas y jardines rurales.",
+        "url_imagen": "https://upload.wikimedia.org/wikipedia/commons/3/3a/Sparkling_Violetear_%28Colibri_coruscans%29_-_Colibr%C3%AD_chill%C3%B3n.jpg"
+      }
+    ]
+  },
+  {
+    "id": "humedal_neuta_chia",
+    "nombre_zona": "Humedal Neuta",
+    "municipio": "Chía",
+    "descripcion_zona": "Humedal urbano de Chía, refugio de aves acuáticas dentro de la Sabana de Bogotá.",
+    "coordenadas": {
+      "latitud": 4.8611,
+      "longitud": -74.0583
+    },
+    "especies_destacadas": [
+      {
+        "id_especie": "tingua_azul_chia",
+        "nombre_comun": "Tingua Azul",
+        "nombre_cientifico": "Porphyrio martinica",
+        "descripcion": "Ave de plumaje azul púrpura brillante, frecuente en juncales de humedales urbanos.",
+        "url_imagen": "https://upload.wikimedia.org/wikipedia/commons/8/8e/Purple_Gallinule_-_Porphyrio_martinica.jpg"
+      },
+      {
+        "id_especie": "garza_real_chia",
+        "nombre_comun": "Garza Real",
+        "nombre_cientifico": "Ardea alba",
+        "descripcion": "Gran garza blanca que forrajea en aguas poco profundas del humedal.",
+        "url_imagen": "https://upload.wikimedia.org/wikipedia/commons/0/03/Great_Egret_%28Ardea_alba%29.jpg"
+      }
+    ]
+  },
+  {
+    "id": "humedal_tierra_blanca_cota",
+    "nombre_zona": "Humedal Tierra Blanca",
+    "municipio": "Cota",
+    "descripcion_zona": "Zona húmeda del municipio de Cota, parte del corredor ecológico del río Bogotá.",
+    "coordenadas": {
+      "latitud": 4.8087,
+      "longitud": -74.0997
+    },
+    "especies_destacadas": [
+      {
+        "id_especie": "pato_turrio_cota",
+        "nombre_comun": "Pato Turrio",
+        "nombre_cientifico": "Oxyura jamaicensis andina",
+        "descripcion": "Pequeño pato zambullidor de cola rígida, típico de humedales de la Sabana.",
+        "url_imagen": "https://upload.wikimedia.org/wikipedia/commons/a/a2/Pato_Turrio_en_Humedal_Guali.jpg"
+      },
+      {
+        "id_especie": "monjita_bogotana_cota",
+        "nombre_comun": "Monjita Bogotana",
+        "nombre_cientifico": "Chrysomus icterocephalus bogotensis",
+        "descripcion": "Macho de cabeza amarilla brillante, común en la vegetación de borde de agua.",
+        "url_imagen": "https://upload.wikimedia.org/wikipedia/commons/2/23/Yellow-hooded_Blackbird_at_Humedal_La_Conejera%2C_Colombia.jpg"
+      }
+    ]
+  },
+  {
+    "id": "cerros_soacha",
+    "nombre_zona": "Cerros de Soacha",
+    "municipio": "Soacha",
+    "descripcion_zona": "Zona de cerros y bosque seco al sur de la Sabana de Bogotá, límite con Bogotá.",
+    "coordenadas": {
+      "latitud": 4.5794,
+      "longitud": -74.2178
+    },
+    "especies_destacadas": [
+      {
+        "id_especie": "copeton_soacha",
+        "nombre_comun": "Copetón",
+        "nombre_cientifico": "Zonotrichia capensis",
+        "descripcion": "Pequeño gorrión con cresta y collar naranja rojizo, muy común en toda la Sabana.",
+        "url_imagen": "https://upload.wikimedia.org/wikipedia/commons/d/dc/Rufous-collared_Sparrow_%28Zonotrichia_capensis%29_-_Copet%C3%B3n.jpg"
+      },
+      {
+        "id_especie": "mirla_soacha",
+        "nombre_comun": "Mirla",
+        "nombre_cientifico": "Turdus fuscater",
+        "descripcion": "Tordo grande de color oscuro, pico y anillo ocular naranjas.",
+        "url_imagen": "https://upload.wikimedia.org/wikipedia/commons/e/ee/Great_Thrush_%28Turdus_fuscater%29_at_Humedal_La_Conejera.jpg"
+      }
+    ]
+  },
+  {
+    "id": "paramo_zipaquira",
+    "nombre_zona": "Ecoparque Guerrero",
+    "municipio": "Zipaquirá",
+    "descripcion_zona": "Área de páramo y humedal alto en Zipaquirá, hábitat de aves de altura.",
+    "coordenadas": {
+      "latitud": 5.0167,
+      "longitud": -73.9333
+    },
+    "especies_destacadas": [
+      {
+        "id_especie": "colibri_chillon_zipa",
+        "nombre_comun": "Colibrí chillón",
+        "nombre_cientifico": "Colibri coruscans",
+        "descripcion": "Gran colibrí verde brillante, frecuente en flores de zonas altas.",
+        "url_imagen": "https://upload.wikimedia.org/wikipedia/commons/3/3a/Sparkling_Violetear_%28Colibri_coruscans%29_-_Colibr%C3%AD_chill%C3%B3n.jpg"
+      },
+      {
+        "id_especie": "tingua_bogotana_zipa",
+        "nombre_comun": "Tingua Bogotana",
+        "nombre_cientifico": "Rallus semiplumbeus",
+        "descripcion": "Ave endémica y en peligro, propia de humedales altoandinos de Cundinamarca.",
+        "url_imagen": "https://upload.wikimedia.org/wikipedia/commons/e/ed/Tingua_Bogotana_-_Humedal_La_Conejera.jpg"
+      }
+    ]
   }
 ]
