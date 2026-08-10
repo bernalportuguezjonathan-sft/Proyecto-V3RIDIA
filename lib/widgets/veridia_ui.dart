@@ -576,6 +576,48 @@ class VeridiaProgressBar extends StatelessWidget {
   }
 }
 
+/// SnackBar de error legible.
+///
+/// El fondo [VeridiaColors.error] es un salmón claro, pero el texto que pone
+/// el tema por defecto también es claro: el aviso quedaba a 1.3:1 de
+/// contraste, ilegible. Aquí se usa [VeridiaColors.onError], su color de
+/// contraste en la paleta, que sube la relación a 7.7:1.
+///
+/// Se expone como constructor (y no solo como función que lo muestra) para
+/// las pantallas que capturan el `ScaffoldMessenger` antes de un `await`.
+SnackBar veridiaSnackBarError(String mensaje) {
+  return SnackBar(
+    backgroundColor: VeridiaColors.error,
+    // Los errores de la IA son frases largas; 3 s no alcanzan a leerse.
+    duration: const Duration(seconds: 5),
+    margin: const EdgeInsets.all(16),
+    content: Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const Icon(Icons.error_outline, color: VeridiaColors.onError, size: 20),
+        const SizedBox(width: 12),
+        Expanded(
+          child: Text(
+            mensaje,
+            style: const TextStyle(
+              color: VeridiaColors.onError,
+              fontWeight: FontWeight.w600,
+              height: 1.35,
+            ),
+          ),
+        ),
+      ],
+    ),
+  );
+}
+
+/// Muestra [veridiaSnackBarError] reemplazando el aviso anterior.
+void mostrarErrorVeridia(BuildContext context, String mensaje) {
+  ScaffoldMessenger.of(context)
+    ..clearSnackBars()
+    ..showSnackBar(veridiaSnackBarError(mensaje));
+}
+
 /// SnackBar unificado del sistema.
 void mostrarMensajeVeridia(
   BuildContext context,

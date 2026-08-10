@@ -52,27 +52,75 @@ forma:
   "identificado": true o false,
   "nombre_comun": "nombre común en español, o null",
   "nombre_cientifico": "nombre científico, o null",
-  "tipo": "ave", "planta", "insecto" u "otro" (o null),
+  "tipo": uno de "ave", "mamifero", "reptil", "anfibio", "pez", "insecto",
+          "aracnido", "planta", "hongo" u "otro" (o null),
   "confianza": "alta", "media" o "baja",
   "descripcion": "1 o 2 frases sobre la especie y su hábitat en Cundinamarca, o null",
   "motivo": "si identificado es false, explica brevemente por qué (ej: no se ve un ser vivo, imagen borrosa)"
 }
 ''';
 
-/// Compara la especie objetivo de un desafío con lo que identificó la IA.
-/// Coincidencia por texto (insensible a mayúsculas), sobre nombre común,
-/// científico o tipo.
+/// Palabras que no aportan nada al comparar nombres de especies.
+const _palabrasVacias = {'de', 'del', 'la', 'el', 'los', 'las', 'un', 'una'};
+
+/// Parte un nombre en palabras comparables: minúsculas, sin tildes y sin
+/// signos. "Perro doméstico (Raza Golden Retriever)" ->
+/// [perro, domestico, raza, golden, retriever].
+List<String> _palabrasDe(String texto) {
+  const conTilde = 'áàäâãéèëêíìïîóòöôõúùüûñç';
+  const sinTilde = 'aaaaaeeeeiiiiooooouuuunc';
+  final buffer = StringBuffer();
+  for (final rune in texto.toLowerCase().runes) {
+    final caracter = String.fromCharCode(rune);
+    final i = conTilde.indexOf(caracter);
+    buffer.write(i >= 0 ? sinTilde[i] : caracter);
+  }
+  return buffer
+      .toString()
+      .split(RegExp(r'[^a-z0-9]+'))
+      .where((p) => p.isNotEmpty && !_palabrasVacias.contains(p))
+      .toList();
+}
+
+/// Formas singular/plural de una palabra.
+///
+/// Se devuelven TODAS las variantes en vez de "corregir" a una sola: recortar
+/// de más rompería casos como "aves" -> "av", que ya no coincidiría con "ave".
+Set<String> _formasDe(String palabra) {
+  final formas = {palabra};
+  if (palabra.length > 3 && palabra.endsWith('es')) {
+    formas.add(palabra.substring(0, palabra.length - 2));
+  }
+  if (palabra.length > 2 && palabra.endsWith('s')) {
+    formas.add(palabra.substring(0, palabra.length - 1));
+  }
+  return formas;
+}
+
+/// Compara la especie objetivo de un desafío con lo que identificó la IA,
+/// sobre el nombre común, el científico o el tipo.
+///
+/// Compara palabra por palabra y no cadenas completas. Con `contains` sobre la
+/// cadena entera, un desafío de "Perros" no daba por válido un
+/// "Perro doméstico (Raza Golden Retriever)" por la simple `s` del plural,
+/// mientras que "Aves" sí colaba porque contiene literalmente "ave".
 bool especieCoincide(String especieObjetivo, SpeciesIdentification ia) {
-  final objetivo = especieObjetivo.toLowerCase().trim();
+  final objetivo = _palabrasDe(especieObjetivo);
   if (objetivo.isEmpty) return false;
-  final candidatos = [
-    ia.commonName,
-    ia.scientificName,
-    ia.type,
-  ].whereType<String>().map((s) => s.toLowerCase().trim());
-  return candidatos.any(
-    (c) => c.isNotEmpty && (c.contains(objetivo) || objetivo.contains(c)),
-  );
+
+  bool coincideCon(String? candidato) {
+    if (candidato == null) return false;
+    final palabras = _palabrasDe(candidato);
+    if (palabras.isEmpty) return false;
+    final formasCandidato = palabras.expand(_formasDe).toSet();
+    // Deben aparecer TODAS las palabras del objetivo: así un desafío de
+    // "Garza Real" no se da por cumplido con una "Garza Morena".
+    return objetivo.every((p) => _formasDe(p).any(formasCandidato.contains));
+  }
+
+  return coincideCon(ia.commonName) ||
+      coincideCon(ia.scientificName) ||
+      coincideCon(ia.type);
 }
 
 /// Espera que pide la API en un 429 (`retryDelay: "7s"`), acotada para no

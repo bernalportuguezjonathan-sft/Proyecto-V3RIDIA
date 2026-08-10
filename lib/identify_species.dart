@@ -352,9 +352,7 @@ class _IdentifySpeciesScreenState extends State<IdentifySpeciesScreen> {
 
   void _mostrarError(String mensaje) {
     if (!mounted) return;
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text(mensaje), backgroundColor: VeridiaColors.error),
-    );
+    mostrarErrorVeridia(context, mensaje);
   }
 
   void _cerrarSesion() {

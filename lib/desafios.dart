@@ -195,19 +195,11 @@ class _ChallengesScreenState extends State<ChallengesScreen> {
       try {
         resultado = await _especieIAService.identify(bytes, mimeType);
       } on SpeciesIdentificationException catch (e) {
-        messenger.showSnackBar(
-          SnackBar(
-            content: Text(e.message),
-            backgroundColor: VeridiaColors.error,
-          ),
-        );
+        messenger.showSnackBar(veridiaSnackBarError(e.message));
         return;
       } catch (_) {
         messenger.showSnackBar(
-          SnackBar(
-            content: const Text('No se pudo analizar la foto con IA.'),
-            backgroundColor: VeridiaColors.error,
-          ),
+          veridiaSnackBarError('No se pudo analizar la foto con IA.'),
         );
         return;
       }
@@ -218,13 +210,10 @@ class _ChallengesScreenState extends State<ChallengesScreen> {
 
       if (!coincide) {
         messenger.showSnackBar(
-          SnackBar(
-            content: Text(
-              resultado.identified
-                  ? 'La IA detectó "${resultado.commonName}", no "${challenge.targetSpecies}". No cuenta para este desafío.'
-                  : 'La IA no identificó ninguna especie en esta foto.',
-            ),
-            backgroundColor: VeridiaColors.error,
+          veridiaSnackBarError(
+            resultado.identified
+                ? 'La IA detectó "${resultado.commonName}", no "${challenge.targetSpecies}". No cuenta para este desafío.'
+                : 'La IA no identificó ninguna especie en esta foto.',
           ),
         );
         return;

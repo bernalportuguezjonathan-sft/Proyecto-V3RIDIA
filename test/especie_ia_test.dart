@@ -72,5 +72,58 @@ void main() {
     test('rechaza cuando la IA no devolvió ningún nombre', () {
       expect(especieCoincide('Garza', identificada()), isFalse);
     });
+
+    test('acepta el desafío en plural contra la especie en singular', () {
+      // El caso real que fallaba: desafío "Perros" contra lo que devuelve la
+      // IA. Comparando cadenas enteras, la `s` del plural lo tumbaba.
+      expect(
+        especieCoincide(
+          'Perros',
+          identificada(
+            comun: 'Perro doméstico (Raza Golden Retriever)',
+            cientifico: 'Canis lupus familiaris',
+            tipo: 'mamifero',
+          ),
+        ),
+        isTrue,
+      );
+      expect(
+        especieCoincide('Ratas', identificada(comun: 'Rata noruega')),
+        isTrue,
+      );
+      expect(
+        especieCoincide('AVES', identificada(comun: 'Copetón', tipo: 'ave')),
+        isTrue,
+      );
+    });
+
+    test('acepta por categoría más allá de las aves', () {
+      expect(
+        especieCoincide(
+          'Mamíferos',
+          identificada(comun: 'Rata noruega', tipo: 'mamifero'),
+        ),
+        isTrue,
+      );
+    });
+
+    test('ignora tildes en cualquiera de los dos lados', () {
+      expect(
+        especieCoincide('colibri', identificada(comun: 'Colibrí chillón')),
+        isTrue,
+      );
+    });
+
+    test('no confunde dos especies que comparten una palabra', () {
+      // "Garza Real" no puede darse por cumplida con una "Garza Morena".
+      expect(
+        especieCoincide('Garza Real', identificada(comun: 'Garza Morena')),
+        isFalse,
+      );
+      expect(
+        especieCoincide('Perros', identificada(comun: 'Gato doméstico')),
+        isFalse,
+      );
+    });
   });
 }
