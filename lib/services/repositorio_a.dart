@@ -32,16 +32,13 @@ class AssignmentRepository {
       return;
     }
 
-    _sub = _collection.snapshots().listen(
-      (snapshot) {
-        final list = snapshot.docs
-            .map((doc) => AssignmentRecord.fromMap(doc.id, doc.data()))
-            .toList();
-        list.sort((a, b) => b.dateTime.compareTo(a.dateTime));
-        records.value = list;
-      },
-      onError: (e) => debugPrint('AssignmentRepository stream error: $e'),
-    );
+    _sub = _collection.snapshots().listen((snapshot) {
+      final list = snapshot.docs
+          .map((doc) => AssignmentRecord.fromMap(doc.id, doc.data()))
+          .toList();
+      list.sort((a, b) => b.dateTime.compareTo(a.dateTime));
+      records.value = list;
+    }, onError: (e) => debugPrint('AssignmentRepository stream error: $e'));
   }
 
   Future<void> addRecord(AssignmentRecord record) async {

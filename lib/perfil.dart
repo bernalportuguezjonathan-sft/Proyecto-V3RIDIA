@@ -8,15 +8,18 @@ import 'package:firebase_storage/firebase_storage.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:app_settings/app_settings.dart';
-import 'login.dart';
 import 'home.dart';
 import 'identify_species.dart';
 import 'mapa.dart';
 import 'historial.dart';
 import 'models/observation.dart';
 import 'models/user.dart';
+import 'privacidad_seguridad.dart';
 import 'services/repositorio_o.dart';
 import 'services/repositorio_u.dart';
+import 'theme/veridia_theme.dart';
+import 'navegacion.dart';
+import 'widgets/veridia_ui.dart';
 
 class ProfileScreen extends StatefulWidget {
   const ProfileScreen({super.key});
@@ -273,7 +276,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
               height: 18,
               child: CircularProgressIndicator(
                 strokeWidth: 2,
-                color: Colors.white,
+                color: VeridiaColors.onSurface,
               ),
             ),
             SizedBox(width: 12),
@@ -386,50 +389,16 @@ class _ProfileScreenState extends State<ProfileScreen> {
     }
   }
 
-  void _cerrarSesion() async {
-    showDialog(
-      context: context,
-      builder: (dialogContext) => AlertDialog(
-        title: const Text(
-          '¿Cerrar sesión?',
-          style: TextStyle(fontWeight: FontWeight.bold),
-        ),
-        content: const Text('¿Estás seguro de que quieres cerrar sesión?'),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('Cancelar'),
-          ),
-          TextButton(
-            onPressed: () async {
-              await UserRepository.instance.signOut();
-              if (mounted) {
-                Navigator.pushAndRemoveUntil(
-                  context,
-                  MaterialPageRoute(builder: (context) => const LoginScreen()),
-                  (route) => false,
-                );
-              }
-            },
-            child: const Text(
-              'Cerrar sesión',
-              style: TextStyle(color: Colors.red),
-            ),
-          ),
-        ],
-      ),
-    );
+  void _cerrarSesion() {
+    VeridiaNav.cerrarSesion(context);
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFFF5F9F7),
       appBar: AppBar(
-        backgroundColor: const Color(0xFF1E5631),
-        elevation: 0,
         leading: IconButton(
-          icon: const Icon(Icons.arrow_back, color: Colors.white),
+          icon: const Icon(Icons.arrow_back, color: VeridiaColors.onSurface),
           onPressed: () => Navigator.pop(context),
         ),
         title: const Text(
@@ -437,20 +406,22 @@ class _ProfileScreenState extends State<ProfileScreen> {
           style: TextStyle(
             fontWeight: FontWeight.bold,
             fontSize: 18,
-            color: Colors.white,
+            color: VeridiaColors.onSurface,
           ),
         ),
         centerTitle: true,
         actions: [
-          IconButton(
+          VeridiaAppBarAction(
+            icon: Icons.logout_rounded,
+            tooltip: 'Cerrar sesión',
             onPressed: _cerrarSesion,
-            icon: const Icon(Icons.logout, color: Colors.white, size: 20),
           ),
+          const SizedBox(width: 12),
         ],
       ),
       body: Stack(
         children: [
-          Container(color: const Color(0xFFF5F9F7)),
+          Container(color: VeridiaColors.background),
           SafeArea(
             child: SingleChildScrollView(
               child: Column(
@@ -463,8 +434,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
                     decoration: BoxDecoration(
                       gradient: LinearGradient(
                         colors: [
-                          const Color(0xFF1E5631),
-                          const Color(0xFF2D7A3F),
+                          VeridiaColors.primary,
+                          VeridiaColors.primaryContainer,
                         ],
                       ),
                       borderRadius: BorderRadius.circular(16),
@@ -485,7 +456,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                               width: 80,
                               height: 80,
                               decoration: BoxDecoration(
-                                color: Colors.white,
+                                color: VeridiaColors.surfaceContainer,
                                 shape: BoxShape.circle,
                                 boxShadow: const [
                                   BoxShadow(
@@ -516,7 +487,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
                                                   child: Icon(
                                                     Icons.person,
                                                     size: 48,
-                                                    color: Color(0xFF1E5631),
+                                                    color:
+                                                        VeridiaColors.primary,
                                                   ),
                                                 ),
                                       )
@@ -524,7 +496,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                                         child: Icon(
                                           Icons.person,
                                           size: 48,
-                                          color: Color(0xFF1E5631),
+                                          color: VeridiaColors.primary,
                                         ),
                                       ),
                               ),
@@ -538,11 +510,11 @@ class _ProfileScreenState extends State<ProfileScreen> {
                                 height: 32,
                                 decoration: BoxDecoration(
                                   color: _isEditingProfile
-                                      ? Colors.white
-                                      : Colors.white54,
+                                      ? VeridiaColors.onSurface
+                                      : VeridiaColors.onSurfaceVariant,
                                   shape: BoxShape.circle,
                                   border: Border.all(
-                                    color: const Color(0xFF1E5631),
+                                    color: VeridiaColors.primary,
                                     width: 1.5,
                                   ),
                                 ),
@@ -550,8 +522,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
                                   Icons.camera_alt,
                                   size: 18,
                                   color: _isEditingProfile
-                                      ? const Color(0xFF1E5631)
-                                      : Colors.grey,
+                                      ? VeridiaColors.primary
+                                      : VeridiaColors.onSurfaceVariant,
                                 ),
                               ),
                             ),
@@ -563,7 +535,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                           style: const TextStyle(
                             fontSize: 20,
                             fontWeight: FontWeight.bold,
-                            color: Colors.white,
+                            color: VeridiaColors.onSurface,
                           ),
                         ),
                         const SizedBox(height: 4),
@@ -571,19 +543,23 @@ class _ProfileScreenState extends State<ProfileScreen> {
                           _currentUser?.email ?? 'email@example.com',
                           style: const TextStyle(
                             fontSize: 14,
-                            color: Colors.white70,
+                            color: VeridiaColors.onSurfaceVariant,
                           ),
                         ),
                         const SizedBox(height: 16),
                         if (_isEditingProfile) ...[
                           TextField(
                             controller: _nameController,
-                            style: const TextStyle(color: Colors.white),
+                            style: const TextStyle(
+                              color: VeridiaColors.onSurface,
+                            ),
                             decoration: InputDecoration(
                               filled: true,
-                              fillColor: Colors.white24,
+                              fillColor: VeridiaColors.surfaceContainerHighest,
                               hintText: 'Nombre de usuario',
-                              hintStyle: const TextStyle(color: Colors.white70),
+                              hintStyle: const TextStyle(
+                                color: VeridiaColors.onSurfaceVariant,
+                              ),
                               border: OutlineInputBorder(
                                 borderRadius: BorderRadius.circular(12),
                                 borderSide: BorderSide.none,
@@ -603,8 +579,9 @@ class _ProfileScreenState extends State<ProfileScreen> {
                                       ? null
                                       : _saveProfileChanges,
                                   style: ElevatedButton.styleFrom(
-                                    backgroundColor: Colors.white,
-                                    foregroundColor: const Color(0xFF1E5631),
+                                    backgroundColor:
+                                        VeridiaColors.surfaceContainer,
+                                    foregroundColor: VeridiaColors.primary,
                                     shape: RoundedRectangleBorder(
                                       borderRadius: BorderRadius.circular(12),
                                     ),
@@ -619,7 +596,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                                             width: 18,
                                             height: 18,
                                             child: CircularProgressIndicator(
-                                              color: Color(0xFF1E5631),
+                                              color: VeridiaColors.primary,
                                               strokeWidth: 2,
                                             ),
                                           )
@@ -646,9 +623,9 @@ class _ProfileScreenState extends State<ProfileScreen> {
                                           });
                                         },
                                   style: OutlinedButton.styleFrom(
-                                    foregroundColor: Colors.white,
+                                    foregroundColor: VeridiaColors.onSurface,
                                     side: const BorderSide(
-                                      color: Colors.white70,
+                                      color: VeridiaColors.outlineVariant,
                                     ),
                                     shape: RoundedRectangleBorder(
                                       borderRadius: BorderRadius.circular(12),
@@ -673,8 +650,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
                               });
                             },
                             style: ElevatedButton.styleFrom(
-                              backgroundColor: Colors.white,
-                              foregroundColor: const Color(0xFF1E5631),
+                              backgroundColor: VeridiaColors.surfaceContainer,
+                              foregroundColor: VeridiaColors.primary,
                               shape: RoundedRectangleBorder(
                                 borderRadius: BorderRadius.circular(16),
                               ),
@@ -711,20 +688,15 @@ class _ProfileScreenState extends State<ProfileScreen> {
                           style: TextStyle(
                             fontSize: 16,
                             fontWeight: FontWeight.bold,
-                            color: Colors.black87,
+                            color: VeridiaColors.onSurface,
                           ),
                         ),
                         const SizedBox(height: 12),
                         StreamBuilder<List<Observation>>(
-                          stream: ObservationRepository.instance
-                              .streamForUser(
-                                UserRepository
-                                        .instance
-                                        .currentUser
-                                        .value
-                                        ?.userId ??
-                                    '',
-                              ),
+                          stream: ObservationRepository.instance.streamForUser(
+                            UserRepository.instance.currentUser.value?.userId ??
+                                '',
+                          ),
                           builder: (context, snapshot) {
                             final observations = snapshot.data ?? [];
                             final especies = observations
@@ -772,7 +744,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                           style: TextStyle(
                             fontSize: 14,
                             fontWeight: FontWeight.bold,
-                            color: Colors.black87,
+                            color: VeridiaColors.onSurface,
                           ),
                         ),
                         const SizedBox(height: 12),
@@ -817,7 +789,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                           style: TextStyle(
                             fontSize: 14,
                             fontWeight: FontWeight.bold,
-                            color: Colors.black87,
+                            color: VeridiaColors.onSurface,
                           ),
                         ),
                         const SizedBox(height: 12),
@@ -860,9 +832,9 @@ class _ProfileScreenState extends State<ProfileScreen> {
         ],
       ),
       bottomNavigationBar: BottomNavigationBar(
-        backgroundColor: Colors.white,
-        selectedItemColor: const Color(0xFF1E5631),
-        unselectedItemColor: Colors.grey,
+        backgroundColor: VeridiaColors.surfaceContainer,
+        selectedItemColor: VeridiaColors.primary,
+        unselectedItemColor: VeridiaColors.onSurfaceVariant,
         type: BottomNavigationBarType.fixed,
         currentIndex: 4,
         items: const [
@@ -918,10 +890,10 @@ class _ProfileScreenState extends State<ProfileScreen> {
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: VeridiaColors.surfaceContainer,
         borderRadius: BorderRadius.circular(16),
         boxShadow: const [
-          BoxShadow(color: Color.fromRGBO(0, 0, 0, 0.05), blurRadius: 8),
+          BoxShadow(color: Color.fromRGBO(0, 0, 0, 0.35), blurRadius: 8),
         ],
       ),
       child: Column(
@@ -931,13 +903,16 @@ class _ProfileScreenState extends State<ProfileScreen> {
             style: const TextStyle(
               fontSize: 18,
               fontWeight: FontWeight.bold,
-              color: Color(0xFF1E5631),
+              color: VeridiaColors.primary,
             ),
           ),
           const SizedBox(height: 4),
           Text(
             label,
-            style: TextStyle(fontSize: 12, color: Colors.grey.shade600),
+            style: TextStyle(
+              fontSize: 12,
+              color: VeridiaColors.onSurfaceVariant,
+            ),
           ),
         ],
       ),
@@ -952,10 +927,10 @@ class _ProfileScreenState extends State<ProfileScreen> {
     return Container(
       margin: const EdgeInsets.only(bottom: 12),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: VeridiaColors.surfaceContainer,
         borderRadius: BorderRadius.circular(16),
         boxShadow: const [
-          BoxShadow(color: Color.fromRGBO(0, 0, 0, 0.05), blurRadius: 8),
+          BoxShadow(color: Color.fromRGBO(0, 0, 0, 0.35), blurRadius: 8),
         ],
       ),
       child: Material(
@@ -967,7 +942,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
             child: Row(
               children: [
-                Icon(icon, color: const Color(0xFF1E5631), size: 24),
+                Icon(icon, color: VeridiaColors.primary, size: 24),
                 const SizedBox(width: 16),
                 Expanded(
                   child: Text(
@@ -975,14 +950,14 @@ class _ProfileScreenState extends State<ProfileScreen> {
                     style: const TextStyle(
                       fontSize: 14,
                       fontWeight: FontWeight.w600,
-                      color: Colors.black87,
+                      color: VeridiaColors.onSurface,
                     ),
                   ),
                 ),
                 const Icon(
                   Icons.arrow_forward_ios,
                   size: 16,
-                  color: Colors.grey,
+                  color: VeridiaColors.onSurfaceVariant,
                 ),
               ],
             ),
@@ -999,10 +974,7 @@ class ActivityScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('Mi actividad'),
-        backgroundColor: const Color(0xFF1E5631),
-      ),
+      appBar: AppBar(title: const Text('Mi actividad')),
       body: StreamBuilder<List<Observation>>(
         stream: ObservationRepository.instance.streamForUser(
           UserRepository.instance.currentUser.value?.userId ?? '',
@@ -1030,7 +1002,10 @@ class ActivityScreen extends StatelessWidget {
                 const SizedBox(height: 16),
                 const Text(
                   'Sigue tus descubrimientos y comprueba cómo cada aporte suma al cuidado de la flora y fauna.',
-                  style: TextStyle(fontSize: 15, color: Colors.black87),
+                  style: TextStyle(
+                    fontSize: 15,
+                    color: VeridiaColors.onSurface,
+                  ),
                 ),
                 const SizedBox(height: 24),
                 Row(
@@ -1092,16 +1067,16 @@ class ActivityScreen extends StatelessWidget {
         padding: const EdgeInsets.all(16),
         margin: const EdgeInsets.only(right: 8),
         decoration: BoxDecoration(
-          color: Colors.white,
+          color: VeridiaColors.surfaceContainer,
           borderRadius: BorderRadius.circular(18),
           boxShadow: const [
-            BoxShadow(color: Color.fromRGBO(0, 0, 0, 0.05), blurRadius: 10),
+            BoxShadow(color: Color.fromRGBO(0, 0, 0, 0.35), blurRadius: 10),
           ],
         ),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Icon(icon, color: const Color(0xFF1E5631), size: 28),
+            Icon(icon, color: VeridiaColors.primary, size: 28),
             const SizedBox(height: 12),
             Text(
               title,
@@ -1110,7 +1085,10 @@ class ActivityScreen extends StatelessWidget {
             const SizedBox(height: 8),
             Text(
               subtitle,
-              style: const TextStyle(fontSize: 13, color: Colors.black54),
+              style: const TextStyle(
+                fontSize: 13,
+                color: VeridiaColors.onSurfaceVariant,
+              ),
             ),
           ],
         ),
@@ -1127,16 +1105,16 @@ class ActivityScreen extends StatelessWidget {
       margin: const EdgeInsets.only(bottom: 16),
       padding: const EdgeInsets.all(18),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: VeridiaColors.surfaceContainer,
         borderRadius: BorderRadius.circular(18),
         boxShadow: const [
-          BoxShadow(color: Color.fromRGBO(0, 0, 0, 0.05), blurRadius: 10),
+          BoxShadow(color: Color.fromRGBO(0, 0, 0, 0.35), blurRadius: 10),
         ],
       ),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Icon(icon, color: const Color(0xFF1E5631), size: 28),
+          Icon(icon, color: VeridiaColors.primary, size: 28),
           const SizedBox(width: 16),
           Expanded(
             child: Column(
@@ -1152,7 +1130,10 @@ class ActivityScreen extends StatelessWidget {
                 const SizedBox(height: 8),
                 Text(
                   description,
-                  style: const TextStyle(fontSize: 14, color: Colors.black87),
+                  style: const TextStyle(
+                    fontSize: 14,
+                    color: VeridiaColors.onSurface,
+                  ),
                 ),
               ],
             ),
@@ -1169,10 +1150,7 @@ class PublicationsScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('Mis publicaciones'),
-        backgroundColor: const Color(0xFF1E5631),
-      ),
+      appBar: AppBar(title: const Text('Mis publicaciones')),
       body: StreamBuilder<List<Observation>>(
         stream: ObservationRepository.instance.streamForUser(
           UserRepository.instance.currentUser.value?.userId ?? '',
@@ -1189,7 +1167,7 @@ class PublicationsScreen extends StatelessWidget {
                   children: [
                     const Icon(
                       Icons.bookmark_outline,
-                      color: Color(0xFF1E5631),
+                      color: VeridiaColors.primary,
                       size: 24,
                     ),
                     const SizedBox(width: 12),
@@ -1205,7 +1183,10 @@ class PublicationsScreen extends StatelessWidget {
                 const SizedBox(height: 12),
                 const Text(
                   'Tus observaciones más recientes están aquí. Revísalas, edítalas o compártelas con tu comunidad.',
-                  style: TextStyle(fontSize: 15, color: Colors.black87),
+                  style: TextStyle(
+                    fontSize: 15,
+                    color: VeridiaColors.onSurface,
+                  ),
                 ),
                 const SizedBox(height: 20),
                 Expanded(
@@ -1217,14 +1198,14 @@ class PublicationsScreen extends StatelessWidget {
                               Icon(
                                 Icons.photo_library_outlined,
                                 size: 72,
-                                color: Color(0xFF1E5631),
+                                color: VeridiaColors.primary,
                               ),
                               SizedBox(height: 24),
                               Text(
                                 'Aún no tienes publicaciones cargadas.',
                                 style: TextStyle(
                                   fontSize: 16,
-                                  color: Colors.black54,
+                                  color: VeridiaColors.onSurfaceVariant,
                                 ),
                               ),
                               SizedBox(height: 8),
@@ -1232,7 +1213,7 @@ class PublicationsScreen extends StatelessWidget {
                                 'Sube tu primera foto para empezar a construir tu colección natural.',
                                 style: TextStyle(
                                   fontSize: 14,
-                                  color: Colors.black45,
+                                  color: VeridiaColors.onSurfaceVariant,
                                 ),
                                 textAlign: TextAlign.center,
                               ),
@@ -1261,10 +1242,10 @@ class PublicationsScreen extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: VeridiaColors.surfaceContainer,
         borderRadius: BorderRadius.circular(18),
         boxShadow: const [
-          BoxShadow(color: Color.fromRGBO(0, 0, 0, 0.05), blurRadius: 10),
+          BoxShadow(color: Color.fromRGBO(0, 0, 0, 0.35), blurRadius: 10),
         ],
       ),
       child: Column(
@@ -1272,7 +1253,7 @@ class PublicationsScreen extends StatelessWidget {
         children: [
           Row(
             children: [
-              const Icon(Icons.nature, color: Color(0xFF1E5631), size: 22),
+              const Icon(Icons.nature, color: VeridiaColors.primary, size: 22),
               const SizedBox(width: 10),
               Expanded(
                 child: Text(
@@ -1288,17 +1269,27 @@ class PublicationsScreen extends StatelessWidget {
           const SizedBox(height: 6),
           Text(
             observation.scientificName,
-            style: const TextStyle(fontSize: 13, color: Colors.black54),
+            style: const TextStyle(
+              fontSize: 13,
+              color: VeridiaColors.onSurfaceVariant,
+            ),
           ),
           const SizedBox(height: 10),
           Row(
             children: [
-              const Icon(Icons.location_on, size: 16, color: Colors.grey),
+              const Icon(
+                Icons.location_on,
+                size: 16,
+                color: VeridiaColors.onSurfaceVariant,
+              ),
               const SizedBox(width: 6),
               Expanded(
                 child: Text(
                   observation.location,
-                  style: const TextStyle(fontSize: 13, color: Colors.black54),
+                  style: const TextStyle(
+                    fontSize: 13,
+                    color: VeridiaColors.onSurfaceVariant,
+                  ),
                 ),
               ),
             ],
@@ -1306,7 +1297,10 @@ class PublicationsScreen extends StatelessWidget {
           const SizedBox(height: 10),
           Text(
             observation.notes,
-            style: const TextStyle(fontSize: 14, color: Colors.black87),
+            style: const TextStyle(
+              fontSize: 14,
+              color: VeridiaColors.onSurface,
+            ),
           ),
           const SizedBox(height: 12),
           Row(
@@ -1314,9 +1308,16 @@ class PublicationsScreen extends StatelessWidget {
             children: [
               Text(
                 'Fecha: ${observation.dateTime.day}/${observation.dateTime.month}/${observation.dateTime.year}',
-                style: const TextStyle(fontSize: 12, color: Colors.black45),
+                style: const TextStyle(
+                  fontSize: 12,
+                  color: VeridiaColors.onSurfaceVariant,
+                ),
               ),
-              const Icon(Icons.arrow_forward_ios, size: 14, color: Colors.grey),
+              const Icon(
+                Icons.arrow_forward_ios,
+                size: 14,
+                color: VeridiaColors.onSurfaceVariant,
+              ),
             ],
           ),
         ],
@@ -1333,92 +1334,21 @@ class SettingsScreen extends StatefulWidget {
 }
 
 class _SettingsScreenState extends State<SettingsScreen> {
-  String _selectedLanguage = 'Español';
-
-  @override
-  void initState() {
-    super.initState();
-    _loadLanguage();
-  }
-
-  Future<void> _loadLanguage() async {
-    final prefs = await SharedPreferences.getInstance();
-    setState(() {
-      _selectedLanguage = prefs.getString('preferred_language') ?? 'Español';
-    });
-  }
-
-  Future<void> _saveLanguage(String language) async {
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.setString('preferred_language', language);
-    setState(() {
-      _selectedLanguage = language;
-    });
-    if (mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Idioma establecido a $language.')),
-      );
-    }
-  }
-
-  Future<void> _showLanguageDialog() async {
-    await showModalBottomSheet<void>(
-      context: context,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
-      ),
-      builder: (context) {
-        return Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            const ListTile(
-              title: Text(
-                'Selecciona un idioma',
-                style: TextStyle(fontWeight: FontWeight.bold),
-              ),
-            ),
-            ListTile(
-              title: const Text('Español'),
-              trailing: _selectedLanguage == 'Español'
-                  ? const Icon(Icons.check, color: Color(0xFF1E5631))
-                  : null,
-              onTap: () {
-                _saveLanguage('Español');
-                Navigator.pop(context);
-              },
-            ),
-            ListTile(
-              title: const Text('English'),
-              trailing: _selectedLanguage == 'English'
-                  ? const Icon(Icons.check, color: Color(0xFF1E5631))
-                  : null,
-              onTap: () {
-                _saveLanguage('English');
-                Navigator.pop(context);
-              },
-            ),
-            const SizedBox(height: 16),
-          ],
-        );
-      },
-    );
-  }
-
   void _openNotificationSettings() {
     AppSettings.openNotificationSettings();
   }
 
-  void _openPrivacySettings() {
-    AppSettings.openAppSettings();
+  void _abrirPrivacidadYSeguridad() {
+    Navigator.push(
+      context,
+      MaterialPageRoute(builder: (_) => const PrivacySecurityScreen()),
+    );
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('Configuración'),
-        backgroundColor: const Color(0xFF1E5631),
-      ),
+      appBar: AppBar(title: const Text('Configuración')),
       body: Padding(
         padding: const EdgeInsets.all(24),
         child: ValueListenableBuilder<UserProfile?>(
@@ -1432,9 +1362,9 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold),
                 ),
                 const SizedBox(height: 16),
-                const Text(
-                  'Personaliza tu experiencia y revisa los datos de tu cuenta en Verídia.',
-                  style: TextStyle(fontSize: 15, color: Colors.black87),
+                Text(
+                  'Revisa los datos de tu cuenta y los permisos de la app.',
+                  style: Theme.of(context).textTheme.bodySmall,
                 ),
                 const SizedBox(height: 24),
                 _infoTile(
@@ -1461,15 +1391,9 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 ),
                 _settingTile(
                   icon: Icons.lock_outline,
-                  title: 'Privacidad',
-                  subtitle: 'Abrir configuración de permisos de la aplicación.',
-                  onTap: _openPrivacySettings,
-                ),
-                _settingTile(
-                  icon: Icons.language,
-                  title: 'Idioma',
-                  subtitle: 'Idioma actual: $_selectedLanguage',
-                  onTap: _showLanguageDialog,
+                  title: 'Privacidad y seguridad',
+                  subtitle: 'Cambiar contraseña y ver qué datos usamos.',
+                  onTap: _abrirPrivacidadYSeguridad,
                 ),
               ],
             );
@@ -1488,15 +1412,15 @@ class _SettingsScreenState extends State<SettingsScreen> {
       margin: const EdgeInsets.only(bottom: 14),
       padding: const EdgeInsets.all(18),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: VeridiaColors.surfaceContainer,
         borderRadius: BorderRadius.circular(18),
         boxShadow: const [
-          BoxShadow(color: Color.fromRGBO(0, 0, 0, 0.05), blurRadius: 10),
+          BoxShadow(color: Color.fromRGBO(0, 0, 0, 0.35), blurRadius: 10),
         ],
       ),
       child: Row(
         children: [
-          Icon(icon, color: const Color(0xFF1E5631), size: 26),
+          Icon(icon, color: VeridiaColors.primary, size: 26),
           const SizedBox(width: 14),
           Expanded(
             child: Column(
@@ -1512,7 +1436,10 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 const SizedBox(height: 6),
                 Text(
                   subtitle,
-                  style: const TextStyle(fontSize: 14, color: Colors.black87),
+                  style: const TextStyle(
+                    fontSize: 14,
+                    color: VeridiaColors.onSurface,
+                  ),
                 ),
               ],
             ),
@@ -1535,15 +1462,15 @@ class _SettingsScreenState extends State<SettingsScreen> {
         margin: const EdgeInsets.only(bottom: 16),
         padding: const EdgeInsets.all(18),
         decoration: BoxDecoration(
-          color: Colors.white,
+          color: VeridiaColors.surfaceContainer,
           borderRadius: BorderRadius.circular(18),
           boxShadow: const [
-            BoxShadow(color: Color.fromRGBO(0, 0, 0, 0.05), blurRadius: 10),
+            BoxShadow(color: Color.fromRGBO(0, 0, 0, 0.35), blurRadius: 10),
           ],
         ),
         child: Row(
           children: [
-            Icon(icon, color: const Color(0xFF1E5631), size: 24),
+            Icon(icon, color: VeridiaColors.primary, size: 24),
             const SizedBox(width: 14),
             Expanded(
               child: Column(
@@ -1559,12 +1486,18 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   const SizedBox(height: 8),
                   Text(
                     subtitle,
-                    style: const TextStyle(fontSize: 14, color: Colors.black87),
+                    style: const TextStyle(
+                      fontSize: 14,
+                      color: VeridiaColors.onSurface,
+                    ),
                   ),
                 ],
               ),
             ),
-            const Icon(Icons.chevron_right, color: Colors.grey),
+            const Icon(
+              Icons.chevron_right,
+              color: VeridiaColors.onSurfaceVariant,
+            ),
           ],
         ),
       ),
@@ -1578,10 +1511,7 @@ class AboutVeridiaScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('Acerca de Veridia'),
-        backgroundColor: const Color(0xFF1E5631),
-      ),
+      appBar: AppBar(title: const Text('Acerca de Veridia')),
       body: StreamBuilder<List<Observation>>(
         stream: ObservationRepository.instance.streamForUser(
           UserRepository.instance.currentUser.value?.userId ?? '',
@@ -1608,7 +1538,7 @@ class AboutVeridiaScreen extends StatelessWidget {
                   'Verídia es una app pensada para gamificar de forma intuitiva y divertida el aprendizaje sobre ambientes naturales, fauna y flora. Aquí puedes explorar ecosistemas, descubrir especies y ganar recompensas mientras te conviertes en un guardián activo de la naturaleza.',
                   style: TextStyle(
                     fontSize: 16,
-                    color: Colors.black87,
+                    color: VeridiaColors.onSurface,
                     height: 1.5,
                   ),
                 ),
@@ -1646,7 +1576,10 @@ class AboutVeridiaScreen extends StatelessWidget {
                 const SizedBox(height: 24),
                 const Text(
                   'Únete a una comunidad que valora la curiosidad, el respeto por el medio ambiente y la diversión mientras aprendes.',
-                  style: TextStyle(fontSize: 15, color: Colors.black87),
+                  style: TextStyle(
+                    fontSize: 15,
+                    color: VeridiaColors.onSurface,
+                  ),
                 ),
               ],
             ),
@@ -1665,16 +1598,16 @@ class AboutVeridiaScreen extends StatelessWidget {
       child: Container(
         padding: const EdgeInsets.all(16),
         decoration: BoxDecoration(
-          color: Colors.white,
+          color: VeridiaColors.surfaceContainer,
           borderRadius: BorderRadius.circular(18),
           boxShadow: const [
-            BoxShadow(color: Color.fromRGBO(0, 0, 0, 0.05), blurRadius: 10),
+            BoxShadow(color: Color.fromRGBO(0, 0, 0, 0.35), blurRadius: 10),
           ],
         ),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Icon(icon, color: const Color(0xFF1E5631), size: 28),
+            Icon(icon, color: VeridiaColors.primary, size: 28),
             const SizedBox(height: 12),
             Text(
               value,
@@ -1683,7 +1616,10 @@ class AboutVeridiaScreen extends StatelessWidget {
             const SizedBox(height: 8),
             Text(
               label,
-              style: const TextStyle(fontSize: 13, color: Colors.black54),
+              style: const TextStyle(
+                fontSize: 13,
+                color: VeridiaColors.onSurfaceVariant,
+              ),
             ),
           ],
         ),

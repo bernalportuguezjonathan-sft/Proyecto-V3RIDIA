@@ -4,17 +4,16 @@ import 'package:image_picker/image_picker.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'dart:io';
-import 'login.dart';
-import 'home.dart';
-import 'mapa.dart';
 import 'historial.dart';
-import 'perfil.dart';
 import 'models/observation.dart';
 import 'services/especie_ia_service.dart';
 import 'services/foto_service.dart';
 import 'services/repositorio_d.dart';
 import 'services/repositorio_o.dart';
 import 'services/repositorio_u.dart';
+import 'theme/veridia_theme.dart';
+import 'navegacion.dart';
+import 'widgets/veridia_ui.dart';
 
 class IdentifySpeciesScreen extends StatefulWidget {
   const IdentifySpeciesScreen({super.key});
@@ -39,46 +38,6 @@ class _IdentifySpeciesScreenState extends State<IdentifySpeciesScreen> {
   bool _isSaving = false;
   SpeciesIdentification? _aiResult;
   String? _aiError;
-
-  final List<_BirdSpeciesGuide> _speciesGuides = [
-    _BirdSpeciesGuide(
-      name: 'Garza blanca',
-      scientificName: 'Egretta thula',
-      location: 'Humedal de Mosquera, sector este',
-      description: 'Ave frecuente en humedales y zonas de agua quieta.',
-      imageUrl:
-          'https://images.unsplash.com/photo-1517849845537-4d257902454a?auto=format&fit=crop&w=800&q=80',
-      region: 'Humedal',
-    ),
-    _BirdSpeciesGuide(
-      name: 'Tórtola',
-      scientificName: 'Columbina talpacoti',
-      location: 'Bosque del Cerro El Chical',
-      description: 'Se observa en zonas abiertas y bordes de bosque.',
-      imageUrl:
-          'https://images.unsplash.com/photo-1500534623283-312aade485b7?auto=format&fit=crop&w=800&q=80',
-      region: 'Bosque',
-    ),
-    _BirdSpeciesGuide(
-      name: 'Cotorra',
-      scientificName: 'Amazona autumnalis',
-      location: 'Laguna de la Vereda Norte',
-      description:
-          'Ave llamativa de áreas con árboles grandes y vegetación densa.',
-      imageUrl:
-          'https://images.unsplash.com/photo-1444464666168-49d633b86797?auto=format&fit=crop&w=800&q=80',
-      region: 'Laguna',
-    ),
-    _BirdSpeciesGuide(
-      name: 'Cucarachero',
-      scientificName: 'Troglodytes aedon',
-      location: 'Sendero El Jardín',
-      description: 'Pequeña ave de sotobosque y jardines con vegetación alta.',
-      imageUrl:
-          'https://images.unsplash.com/photo-1470115636492-6d2b56f9596d?auto=format&fit=crop&w=800&q=80',
-      region: 'Sendero',
-    ),
-  ];
 
   @override
   void initState() {
@@ -373,48 +332,18 @@ class _IdentifySpeciesScreenState extends State<IdentifySpeciesScreen> {
   void _mostrarError(String mensaje) {
     if (!mounted) return;
     ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text(mensaje), backgroundColor: Colors.red.shade700),
+      SnackBar(content: Text(mensaje), backgroundColor: VeridiaColors.error),
     );
   }
 
   void _cerrarSesion() {
-    showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('¿Cerrar sesión?'),
-        content: const Text('¿Estás seguro?'),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('Cancelar'),
-          ),
-          TextButton(
-            onPressed: () async {
-              final navigator = Navigator.of(context);
-              await UserRepository.instance.signOut();
-              if (!mounted) return;
-              if (navigator.canPop()) {
-                navigator.pop();
-              }
-              navigator.pushAndRemoveUntil(
-                MaterialPageRoute(builder: (context) => const LoginScreen()),
-                (route) => false,
-              );
-            },
-            child: const Text('Cerrar'),
-          ),
-        ],
-      ),
-    );
+    VeridiaNav.cerrarSesion(context);
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFFF5F9F7),
       appBar: AppBar(
-        backgroundColor: const Color(0xFF1E5631),
-        elevation: 0,
         leading: IconButton(
           icon: const Icon(Icons.arrow_back),
           onPressed: () => Navigator.pop(context),
@@ -424,20 +353,22 @@ class _IdentifySpeciesScreenState extends State<IdentifySpeciesScreen> {
           style: TextStyle(
             fontWeight: FontWeight.bold,
             fontSize: 18,
-            color: Colors.white,
+            color: VeridiaColors.onSurface,
           ),
         ),
         centerTitle: true,
         actions: [
-          IconButton(
+          VeridiaAppBarAction(
+            icon: Icons.logout_rounded,
+            tooltip: 'Cerrar sesión',
             onPressed: _cerrarSesion,
-            icon: const Icon(Icons.logout, color: Colors.white, size: 20),
           ),
+          const SizedBox(width: 12),
         ],
       ),
       body: Stack(
         children: [
-          Container(color: const Color(0xFFF5F9F7)),
+          Container(color: VeridiaColors.background),
           SafeArea(
             child: SingleChildScrollView(
               padding: const EdgeInsets.only(bottom: 90),
@@ -446,44 +377,35 @@ class _IdentifySpeciesScreenState extends State<IdentifySpeciesScreen> {
                 children: [
                   Padding(
                     padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
-                    child: Container(
-                      padding: const EdgeInsets.all(12),
-                      decoration: BoxDecoration(
-                        color: Colors.white,
-                        borderRadius: BorderRadius.circular(14),
-                        boxShadow: [
-                          BoxShadow(
-                            color: Colors.black.withValues(alpha: 0.05),
-                            blurRadius: 8,
-                            offset: const Offset(0, 2),
-                          ),
-                        ],
-                      ),
+                    child: VeridiaCard(
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          const Text(
-                            'Guía de observación en Mosquera',
-                            style: TextStyle(
-                              fontSize: 15,
-                              fontWeight: FontWeight.bold,
-                            ),
-                          ),
-                          const SizedBox(height: 6),
-                          Text(
-                            'Tu ubicación actual: $_currentLocation',
-                            style: TextStyle(
-                              fontSize: 12,
-                              color: Colors.grey.shade700,
-                            ),
+                          Row(
+                            children: [
+                              const Icon(
+                                Icons.my_location,
+                                size: 18,
+                                color: VeridiaColors.primary,
+                              ),
+                              const SizedBox(width: 8),
+                              Text(
+                                'Tu ubicación',
+                                style: Theme.of(context).textTheme.titleSmall,
+                              ),
+                            ],
                           ),
                           const SizedBox(height: 8),
                           Text(
-                            'Recomendación: dirige tu recorrido hacia humedales o zonas de bosque temprano en la mañana.',
-                            style: TextStyle(
-                              fontSize: 12,
-                              color: Colors.grey.shade700,
-                            ),
+                            _currentLocation,
+                            style: Theme.of(context).textTheme.bodySmall,
+                          ),
+                          const SizedBox(height: 10),
+                          Text(
+                            'Enfoca una planta o un animal y la IA te dirá '
+                            'qué especie es. Cada identificación queda en tu '
+                            'diario y suma para tus desafíos.',
+                            style: Theme.of(context).textTheme.bodySmall,
                           ),
                         ],
                       ),
@@ -492,94 +414,17 @@ class _IdentifySpeciesScreenState extends State<IdentifySpeciesScreen> {
                   const SizedBox(height: 8),
                   Padding(
                     padding: const EdgeInsets.symmetric(horizontal: 16),
-                    child: Text(
-                      'Especies reales para identificar',
-                      style: TextStyle(
-                        fontSize: 14,
-                        fontWeight: FontWeight.bold,
-                        color: Colors.grey.shade800,
-                      ),
+                    child: VeridiaSectionTitle(
+                      title: 'Tus identificaciones',
+                      subtitle: 'Especies que ya registraste con la IA',
+                      actionLabel: 'Ver diario',
+                      onAction: () =>
+                          VeridiaNav.abrir(context, const HistoryScreen()),
                     ),
                   ),
-                  const SizedBox(height: 10),
-                  SizedBox(
-                    height: 220,
-                    child: ListView.separated(
-                      padding: const EdgeInsets.symmetric(horizontal: 16),
-                      scrollDirection: Axis.horizontal,
-                      itemCount: _speciesGuides.length,
-                      separatorBuilder: (_, _) => const SizedBox(width: 10),
-                      itemBuilder: (context, index) {
-                        final guide = _speciesGuides[index];
-                        return GestureDetector(
-                          onTap: () =>
-                              setState(() => _selectedSpecies = guide.name),
-                          child: Container(
-                            width: 180,
-                            decoration: BoxDecoration(
-                              color: Colors.white,
-                              borderRadius: BorderRadius.circular(16),
-                              boxShadow: [
-                                BoxShadow(
-                                  color: Colors.black.withValues(alpha: 0.06),
-                                  blurRadius: 8,
-                                  offset: const Offset(0, 2),
-                                ),
-                              ],
-                            ),
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                ClipRRect(
-                                  borderRadius: const BorderRadius.vertical(
-                                    top: Radius.circular(16),
-                                  ),
-                                  child: Image.network(
-                                    guide.imageUrl,
-                                    height: 110,
-                                    width: double.infinity,
-                                    fit: BoxFit.cover,
-                                  ),
-                                ),
-                                Padding(
-                                  padding: const EdgeInsets.all(10),
-                                  child: Column(
-                                    crossAxisAlignment:
-                                        CrossAxisAlignment.start,
-                                    children: [
-                                      Text(
-                                        guide.name,
-                                        style: const TextStyle(
-                                          fontSize: 13,
-                                          fontWeight: FontWeight.bold,
-                                        ),
-                                      ),
-                                      const SizedBox(height: 4),
-                                      Text(
-                                        guide.scientificName,
-                                        style: TextStyle(
-                                          fontSize: 11,
-                                          color: Colors.grey.shade600,
-                                        ),
-                                      ),
-                                      const SizedBox(height: 6),
-                                      Text(
-                                        guide.region,
-                                        style: const TextStyle(
-                                          fontSize: 11,
-                                          fontWeight: FontWeight.w600,
-                                          color: Color(0xFF1E5631),
-                                        ),
-                                      ),
-                                    ],
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-                        );
-                      },
-                    ),
+                  _MisIdentificaciones(
+                    onSeleccionar: (nombre) =>
+                        setState(() => _selectedSpecies = nombre),
                   ),
                   const SizedBox(height: 20),
                   Padding(
@@ -592,16 +437,16 @@ class _IdentifySpeciesScreenState extends State<IdentifySpeciesScreen> {
                             width: double.infinity,
                             padding: const EdgeInsets.all(12),
                             decoration: BoxDecoration(
-                              color: const Color(
-                                0xFF1E5631,
-                              ).withValues(alpha: 0.08),
+                              color: VeridiaColors.primary.withValues(
+                                alpha: 0.10,
+                              ),
                               borderRadius: BorderRadius.circular(12),
                             ),
                             child: Text(
                               'Seleccionada: $_selectedSpecies',
                               style: const TextStyle(
                                 fontWeight: FontWeight.bold,
-                                color: Color(0xFF1E5631),
+                                color: VeridiaColors.primary,
                               ),
                             ),
                           ),
@@ -636,7 +481,7 @@ class _IdentifySpeciesScreenState extends State<IdentifySpeciesScreen> {
                         width: double.infinity,
                         padding: const EdgeInsets.all(16),
                         decoration: BoxDecoration(
-                          color: Colors.white,
+                          color: VeridiaColors.surfaceContainer,
                           borderRadius: BorderRadius.circular(14),
                         ),
                         child: Column(
@@ -654,7 +499,7 @@ class _IdentifySpeciesScreenState extends State<IdentifySpeciesScreen> {
                               'Ve hacia el humedal en la mañana si buscas garzas y patos. Para otras aves, recorre el bosque y el sendero ecológico.',
                               style: TextStyle(
                                 fontSize: 12,
-                                color: Colors.grey.shade700,
+                                color: VeridiaColors.onSurfaceVariant,
                               ),
                             ),
                           ],
@@ -670,7 +515,7 @@ class _IdentifySpeciesScreenState extends State<IdentifySpeciesScreen> {
                             width: double.infinity,
                             height: 220,
                             decoration: BoxDecoration(
-                              color: Colors.grey.shade300,
+                              color: VeridiaColors.outlineVariant,
                               borderRadius: BorderRadius.circular(20),
                             ),
                             child: _selectedImageBytes != null
@@ -697,7 +542,7 @@ class _IdentifySpeciesScreenState extends State<IdentifySpeciesScreen> {
                                     child: Icon(
                                       Icons.image,
                                       size: 64,
-                                      color: Colors.grey,
+                                      color: VeridiaColors.onSurfaceVariant,
                                     ),
                                   ),
                           ),
@@ -712,12 +557,12 @@ class _IdentifySpeciesScreenState extends State<IdentifySpeciesScreen> {
                                       height: 16,
                                       child: CircularProgressIndicator(
                                         strokeWidth: 2,
-                                        color: Color(0xFF1E5631),
+                                        color: VeridiaColors.primary,
                                       ),
                                     )
                                   : const Icon(
                                       Icons.auto_awesome,
-                                      color: Color(0xFF1E5631),
+                                      color: VeridiaColors.primary,
                                     ),
                               label: Text(
                                 _isAnalyzing
@@ -727,9 +572,9 @@ class _IdentifySpeciesScreenState extends State<IdentifySpeciesScreen> {
                                     : 'Analizar de nuevo',
                               ),
                               style: OutlinedButton.styleFrom(
-                                foregroundColor: const Color(0xFF1E5631),
+                                foregroundColor: VeridiaColors.primary,
                                 side: const BorderSide(
-                                  color: Color(0xFF1E5631),
+                                  color: VeridiaColors.primary,
                                 ),
                                 padding: const EdgeInsets.symmetric(
                                   vertical: 12,
@@ -746,14 +591,14 @@ class _IdentifySpeciesScreenState extends State<IdentifySpeciesScreen> {
                               width: double.infinity,
                               padding: const EdgeInsets.all(12),
                               decoration: BoxDecoration(
-                                color: Colors.red.shade50,
+                                color: VeridiaColors.errorContainer,
                                 borderRadius: BorderRadius.circular(12),
-                                border: Border.all(color: Colors.red.shade200),
+                                border: Border.all(color: VeridiaColors.error),
                               ),
                               child: Text(
                                 _aiError!,
                                 style: TextStyle(
-                                  color: Colors.red.shade700,
+                                  color: VeridiaColors.error,
                                   fontSize: 12,
                                 ),
                               ),
@@ -765,9 +610,9 @@ class _IdentifySpeciesScreenState extends State<IdentifySpeciesScreen> {
                               width: double.infinity,
                               padding: const EdgeInsets.all(14),
                               decoration: BoxDecoration(
-                                color: const Color(
-                                  0xFF1E5631,
-                                ).withValues(alpha: 0.08),
+                                color: VeridiaColors.primary.withValues(
+                                  alpha: 0.10,
+                                ),
                                 borderRadius: BorderRadius.circular(14),
                               ),
                               child: _aiResult!.identified
@@ -780,7 +625,7 @@ class _IdentifySpeciesScreenState extends State<IdentifySpeciesScreen> {
                                             const Icon(
                                               Icons.auto_awesome,
                                               size: 18,
-                                              color: Color(0xFF1E5631),
+                                              color: VeridiaColors.primary,
                                             ),
                                             const SizedBox(width: 6),
                                             Expanded(
@@ -789,7 +634,7 @@ class _IdentifySpeciesScreenState extends State<IdentifySpeciesScreen> {
                                                     'Especie identificada',
                                                 style: const TextStyle(
                                                   fontWeight: FontWeight.bold,
-                                                  color: Color(0xFF1E5631),
+                                                  color: VeridiaColors.primary,
                                                 ),
                                               ),
                                             ),
@@ -797,7 +642,8 @@ class _IdentifySpeciesScreenState extends State<IdentifySpeciesScreen> {
                                               'Confianza: ${_aiResult!.confidence}',
                                               style: TextStyle(
                                                 fontSize: 11,
-                                                color: Colors.grey.shade600,
+                                                color: VeridiaColors
+                                                    .onSurfaceVariant,
                                               ),
                                             ),
                                           ],
@@ -812,7 +658,8 @@ class _IdentifySpeciesScreenState extends State<IdentifySpeciesScreen> {
                                               style: TextStyle(
                                                 fontStyle: FontStyle.italic,
                                                 fontSize: 12,
-                                                color: Colors.grey.shade700,
+                                                color: VeridiaColors
+                                                    .onSurfaceVariant,
                                               ),
                                             ),
                                           ),
@@ -835,7 +682,7 @@ class _IdentifySpeciesScreenState extends State<IdentifySpeciesScreen> {
                                           'La IA no pudo identificar una especie en esta foto.',
                                       style: TextStyle(
                                         fontSize: 12,
-                                        color: Colors.grey.shade700,
+                                        color: VeridiaColors.onSurfaceVariant,
                                       ),
                                     ),
                             ),
@@ -844,11 +691,8 @@ class _IdentifySpeciesScreenState extends State<IdentifySpeciesScreen> {
                           SizedBox(
                             width: double.infinity,
                             child: ElevatedButton(
-                              onPressed: _isSaving
-                                  ? null
-                                  : _guardarObservacion,
+                              onPressed: _isSaving ? null : _guardarObservacion,
                               style: ElevatedButton.styleFrom(
-                                backgroundColor: const Color(0xFF1E5631),
                                 padding: const EdgeInsets.symmetric(
                                   vertical: 14,
                                 ),
@@ -862,13 +706,13 @@ class _IdentifySpeciesScreenState extends State<IdentifySpeciesScreen> {
                                       height: 20,
                                       child: CircularProgressIndicator(
                                         strokeWidth: 2,
-                                        color: Colors.white,
+                                        color: VeridiaColors.onSurface,
                                       ),
                                     )
                                   : const Text(
                                       'Guardar observación',
                                       style: TextStyle(
-                                        color: Colors.white,
+                                        color: VeridiaColors.onSurface,
                                         fontWeight: FontWeight.w600,
                                       ),
                                     ),
@@ -883,55 +727,9 @@ class _IdentifySpeciesScreenState extends State<IdentifySpeciesScreen> {
           ),
         ],
       ),
-      bottomNavigationBar: BottomNavigationBar(
-        backgroundColor: Colors.white,
-        selectedItemColor: const Color(0xFF1E5631),
-        unselectedItemColor: Colors.grey,
-        type: BottomNavigationBarType.fixed,
+      bottomNavigationBar: VeridiaBottomNav(
         currentIndex: 1,
-        items: const [
-          BottomNavigationBarItem(icon: Icon(Icons.home), label: 'Inicio'),
-          BottomNavigationBarItem(
-            icon: Icon(Icons.camera_alt),
-            label: 'Cámara',
-          ),
-          BottomNavigationBarItem(icon: Icon(Icons.map), label: 'Mapa'),
-          BottomNavigationBarItem(
-            icon: Icon(Icons.history),
-            label: 'Historial',
-          ),
-          BottomNavigationBarItem(icon: Icon(Icons.person), label: 'Perfil'),
-        ],
-        onTap: (index) {
-          switch (index) {
-            case 0:
-              Navigator.pushReplacement(
-                context,
-                MaterialPageRoute(builder: (context) => const HomeScreen()),
-              );
-              break;
-            case 1:
-              break; // Ya estamos aquí
-            case 2:
-              Navigator.pushReplacement(
-                context,
-                MaterialPageRoute(builder: (context) => const MapScreen()),
-              );
-              break;
-            case 3:
-              Navigator.pushReplacement(
-                context,
-                MaterialPageRoute(builder: (context) => const HistoryScreen()),
-              );
-              break;
-            case 4:
-              Navigator.pushReplacement(
-                context,
-                MaterialPageRoute(builder: (context) => const ProfileScreen()),
-              );
-              break;
-          }
-        },
+        onTap: (i) => VeridiaNav.ir(context, VeridiaSeccion.values[i], 1),
       ),
     );
   }
@@ -946,7 +744,7 @@ class _IdentifySpeciesScreenState extends State<IdentifySpeciesScreen> {
       child: Container(
         padding: const EdgeInsets.symmetric(vertical: 12),
         decoration: BoxDecoration(
-          color: Colors.white,
+          color: VeridiaColors.surfaceContainer,
           borderRadius: BorderRadius.circular(12),
           boxShadow: [
             BoxShadow(
@@ -958,14 +756,14 @@ class _IdentifySpeciesScreenState extends State<IdentifySpeciesScreen> {
         ),
         child: Column(
           children: [
-            Icon(icon, size: 24, color: const Color(0xFF1E5631)),
+            Icon(icon, size: 24, color: VeridiaColors.primary),
             const SizedBox(height: 6),
             Text(
               label,
               style: const TextStyle(
                 fontSize: 12,
                 fontWeight: FontWeight.w600,
-                color: Color(0xFF1E5631),
+                color: VeridiaColors.primary,
               ),
             ),
           ],
@@ -975,20 +773,139 @@ class _IdentifySpeciesScreenState extends State<IdentifySpeciesScreen> {
   }
 }
 
-class _BirdSpeciesGuide {
-  const _BirdSpeciesGuide({
-    required this.name,
-    required this.scientificName,
-    required this.location,
-    required this.description,
-    required this.imageUrl,
-    required this.region,
-  });
+/// Carrusel con las especies que el propio explorador ya identificó.
+/// Sustituye a la antigua lista de ejemplo: aquí todo lo que se ve es real.
+class _MisIdentificaciones extends StatelessWidget {
+  const _MisIdentificaciones({required this.onSeleccionar});
 
-  final String name;
-  final String scientificName;
-  final String location;
-  final String description;
-  final String imageUrl;
-  final String region;
+  final ValueChanged<String> onSeleccionar;
+
+  @override
+  Widget build(BuildContext context) {
+    final uid = UserRepository.instance.currentUser.value?.userId;
+    if (uid == null) return const SizedBox.shrink();
+
+    return SizedBox(
+      height: 190,
+      child: StreamBuilder<List<Observation>>(
+        stream: ObservationRepository.instance.streamForUser(uid),
+        builder: (context, snapshot) {
+          if (snapshot.connectionState == ConnectionState.waiting) {
+            return const VeridiaLoader();
+          }
+
+          final observaciones = snapshot.data ?? const <Observation>[];
+          if (observaciones.isEmpty) {
+            return Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 16),
+              child: VeridiaCard(
+                child: Row(
+                  children: [
+                    Container(
+                      width: 46,
+                      height: 46,
+                      decoration: BoxDecoration(
+                        color: VeridiaColors.secondary.withValues(alpha: 0.14),
+                        borderRadius: BorderRadius.circular(VeridiaRadii.md),
+                      ),
+                      child: const Icon(
+                        Icons.auto_awesome_outlined,
+                        color: VeridiaColors.secondary,
+                      ),
+                    ),
+                    const SizedBox(width: 14),
+                    Expanded(
+                      child: Text(
+                        'Todavía no identificaste ninguna especie. '
+                        'Toma o sube una foto para empezar.',
+                        style: Theme.of(context).textTheme.bodySmall,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            );
+          }
+
+          final visibles = observaciones.take(10).toList();
+          return ListView.separated(
+            padding: const EdgeInsets.symmetric(horizontal: 16),
+            scrollDirection: Axis.horizontal,
+            itemCount: visibles.length,
+            separatorBuilder: (_, _) => const SizedBox(width: 12),
+            itemBuilder: (context, index) {
+              final obs = visibles[index];
+              return SizedBox(
+                width: 170,
+                child: VeridiaCard(
+                  padding: EdgeInsets.zero,
+                  onTap: () => onSeleccionar(obs.commonName),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      ClipRRect(
+                        borderRadius: const BorderRadius.vertical(
+                          top: Radius.circular(VeridiaRadii.lg),
+                        ),
+                        child: SizedBox(
+                          height: 104,
+                          width: double.infinity,
+                          child: obs.hasPhoto
+                              ? Image.network(
+                                  obs.imagePath!,
+                                  fit: BoxFit.cover,
+                                  errorBuilder: (_, _, _) => const _SinFoto(),
+                                )
+                              : const _SinFoto(),
+                        ),
+                      ),
+                      Padding(
+                        padding: const EdgeInsets.fromLTRB(10, 8, 10, 10),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              obs.commonName,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: Theme.of(context).textTheme.labelLarge,
+                            ),
+                            const SizedBox(height: 2),
+                            Text(
+                              obs.scientificName,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: Theme.of(context).textTheme.labelSmall
+                                  ?.copyWith(fontStyle: FontStyle.italic),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              );
+            },
+          );
+        },
+      ),
+    );
+  }
+}
+
+class _SinFoto extends StatelessWidget {
+  const _SinFoto();
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      color: VeridiaColors.surfaceContainerHigh,
+      alignment: Alignment.center,
+      child: const Icon(
+        Icons.eco_outlined,
+        color: VeridiaColors.primary,
+        size: 24,
+      ),
+    );
+  }
 }

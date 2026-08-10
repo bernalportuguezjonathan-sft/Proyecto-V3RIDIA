@@ -8,7 +8,9 @@ import 'package:firebase_storage/firebase_storage.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'services/repositorio_u.dart';
-import 'login.dart';
+import 'theme/veridia_theme.dart';
+import 'navegacion.dart';
+import 'widgets/veridia_ui.dart';
 
 class AdminProfileScreen extends StatefulWidget {
   const AdminProfileScreen({super.key});
@@ -137,7 +139,7 @@ class _AdminProfileScreenState extends State<AdminProfileScreen> {
   void _showPhotoSourceOptions() {
     showModalBottomSheet(
       context: context,
-      backgroundColor: Colors.white,
+      backgroundColor: VeridiaColors.surfaceContainer,
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
       ),
@@ -152,7 +154,7 @@ class _AdminProfileScreenState extends State<AdminProfileScreen> {
                 style: TextStyle(
                   fontSize: 16,
                   fontWeight: FontWeight.bold,
-                  color: Color(0xFF1E5631),
+                  color: VeridiaColors.primary,
                 ),
               ),
             ),
@@ -160,7 +162,7 @@ class _AdminProfileScreenState extends State<AdminProfileScreen> {
             ListTile(
               leading: const Icon(
                 Icons.photo_library,
-                color: Color(0xFF1E5631),
+                color: VeridiaColors.primary,
               ),
               title: const Text('Galería'),
               onTap: () {
@@ -170,7 +172,10 @@ class _AdminProfileScreenState extends State<AdminProfileScreen> {
             ),
             if (!kIsWeb)
               ListTile(
-                leading: const Icon(Icons.camera_alt, color: Color(0xFF1E5631)),
+                leading: const Icon(
+                  Icons.camera_alt,
+                  color: VeridiaColors.primary,
+                ),
                 title: const Text('Cámara'),
                 onTap: () {
                   Navigator.pop(context);
@@ -178,7 +183,7 @@ class _AdminProfileScreenState extends State<AdminProfileScreen> {
                 },
               ),
             ListTile(
-              leading: const Icon(Icons.close, color: Colors.redAccent),
+              leading: const Icon(Icons.close, color: VeridiaColors.error),
               title: const Text('Cancelar'),
               onTap: () => Navigator.pop(context),
             ),
@@ -308,38 +313,8 @@ class _AdminProfileScreenState extends State<AdminProfileScreen> {
     }
   }
 
-  void _cerrarSesion() async {
-    final confirmed = await showDialog<bool>(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text(
-          'Cerrar sesión',
-          style: TextStyle(fontWeight: FontWeight.bold),
-        ),
-        content: const Text('¿Estás seguro de que quieres salir?'),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context, false),
-            child: const Text('Cancelar'),
-          ),
-          TextButton(
-            onPressed: () => Navigator.pop(context, true),
-            child: const Text('Salir', style: TextStyle(color: Colors.red)),
-          ),
-        ],
-      ),
-    );
-
-    if (confirmed == true) {
-      await UserRepository.instance.signOut();
-      if (mounted) {
-        Navigator.pushAndRemoveUntil(
-          context,
-          MaterialPageRoute(builder: (context) => const LoginScreen()),
-          (route) => false,
-        );
-      }
-    }
+  void _cerrarSesion() {
+    VeridiaNav.cerrarSesion(context);
   }
 
   @override
@@ -347,24 +322,26 @@ class _AdminProfileScreenState extends State<AdminProfileScreen> {
     final profile = UserRepository.instance.currentUser.value;
 
     return Scaffold(
-      backgroundColor: const Color(0xFFF5F9F7),
       appBar: AppBar(
-        backgroundColor: const Color(0xFF1E5631),
-        elevation: 0,
         leading: IconButton(
-          icon: const Icon(Icons.arrow_back, color: Colors.white),
+          icon: const Icon(Icons.arrow_back, color: VeridiaColors.onSurface),
           onPressed: () => Navigator.pop(context),
         ),
         title: const Text(
           'Mi Perfil',
-          style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+          style: TextStyle(
+            color: VeridiaColors.onSurface,
+            fontWeight: FontWeight.bold,
+          ),
         ),
         centerTitle: true,
         actions: [
-          IconButton(
-            icon: const Icon(Icons.logout, color: Colors.white),
+          VeridiaAppBarAction(
+            icon: Icons.logout_rounded,
+            tooltip: 'Cerrar sesión',
             onPressed: _cerrarSesion,
           ),
+          const SizedBox(width: 12),
         ],
       ),
       body: SingleChildScrollView(
@@ -375,7 +352,10 @@ class _AdminProfileScreenState extends State<AdminProfileScreen> {
               padding: const EdgeInsets.all(24),
               decoration: const BoxDecoration(
                 gradient: LinearGradient(
-                  colors: [Color(0xFF1E5631), Color(0xFF2D7A3F)],
+                  colors: [
+                    VeridiaColors.primary,
+                    VeridiaColors.primaryContainer,
+                  ],
                   begin: Alignment.topCenter,
                   end: Alignment.bottomCenter,
                 ),
@@ -389,11 +369,11 @@ class _AdminProfileScreenState extends State<AdminProfileScreen> {
                         width: 100,
                         height: 100,
                         decoration: BoxDecoration(
-                          color: Colors.white,
+                          color: VeridiaColors.surfaceContainer,
                           shape: BoxShape.circle,
                           boxShadow: [
                             BoxShadow(
-                              color: const Color(0xFF1E5631).withAlpha(77),
+                              color: VeridiaColors.primary.withAlpha(77),
                               blurRadius: 15,
                               offset: const Offset(0, 5),
                             ),
@@ -418,13 +398,13 @@ class _AdminProfileScreenState extends State<AdminProfileScreen> {
                                       const Icon(
                                         Icons.person,
                                         size: 50,
-                                        color: Color(0xFF1E5631),
+                                        color: VeridiaColors.primary,
                                       ),
                                 )
                               : const Icon(
                                   Icons.person,
                                   size: 50,
-                                  color: Color(0xFF1E5631),
+                                  color: VeridiaColors.primary,
                                 ),
                         ),
                       ),
@@ -437,18 +417,18 @@ class _AdminProfileScreenState extends State<AdminProfileScreen> {
                           height: 36,
                           decoration: BoxDecoration(
                             color: _isEditingProfile
-                                ? Colors.white
-                                : Colors.white54,
+                                ? VeridiaColors.onSurface
+                                : VeridiaColors.onSurfaceVariant,
                             shape: BoxShape.circle,
                             border: Border.all(
-                              color: const Color(0xFF1E5631),
+                              color: VeridiaColors.primary,
                               width: 2,
                             ),
                           ),
                           child: const Icon(
                             Icons.camera_alt,
                             size: 20,
-                            color: Color(0xFF1E5631),
+                            color: VeridiaColors.primary,
                           ),
                         ),
                       ),
@@ -460,13 +440,16 @@ class _AdminProfileScreenState extends State<AdminProfileScreen> {
                     style: const TextStyle(
                       fontSize: 22,
                       fontWeight: FontWeight.bold,
-                      color: Colors.white,
+                      color: VeridiaColors.onSurface,
                     ),
                   ),
                   const SizedBox(height: 4),
                   Text(
                     profile?.email ?? '',
-                    style: const TextStyle(color: Colors.white70, fontSize: 14),
+                    style: const TextStyle(
+                      color: VeridiaColors.onSurfaceVariant,
+                      fontSize: 14,
+                    ),
                   ),
                   const SizedBox(height: 12),
                   Container(
@@ -475,7 +458,7 @@ class _AdminProfileScreenState extends State<AdminProfileScreen> {
                       vertical: 6,
                     ),
                     decoration: BoxDecoration(
-                      color: Colors.white24,
+                      color: VeridiaColors.surfaceContainerHighest,
                       borderRadius: BorderRadius.circular(20),
                     ),
                     child: Row(
@@ -483,14 +466,14 @@ class _AdminProfileScreenState extends State<AdminProfileScreen> {
                       children: [
                         const Icon(
                           Icons.admin_panel_settings,
-                          color: Colors.white,
+                          color: VeridiaColors.onSurface,
                           size: 18,
                         ),
                         const SizedBox(width: 6),
                         Text(
                           'Administrador',
                           style: const TextStyle(
-                            color: Colors.white,
+                            color: VeridiaColors.onSurface,
                             fontSize: 13,
                           ),
                         ),
@@ -511,26 +494,26 @@ class _AdminProfileScreenState extends State<AdminProfileScreen> {
                           decoration: InputDecoration(
                             labelText: 'Nombre',
                             labelStyle: const TextStyle(
-                              color: Color(0xFF1E5631),
+                              color: VeridiaColors.primary,
                             ),
                             filled: true,
-                            fillColor: Colors.white,
+                            fillColor: VeridiaColors.surfaceContainerHigh,
                             border: OutlineInputBorder(
                               borderRadius: BorderRadius.circular(12),
                               borderSide: const BorderSide(
-                                color: Color(0xFFCAD2C5),
+                                color: VeridiaColors.outlineVariant,
                               ),
                             ),
                             enabledBorder: OutlineInputBorder(
                               borderRadius: BorderRadius.circular(12),
                               borderSide: const BorderSide(
-                                color: Color(0xFFCAD2C5),
+                                color: VeridiaColors.outlineVariant,
                               ),
                             ),
                             focusedBorder: OutlineInputBorder(
                               borderRadius: BorderRadius.circular(12),
                               borderSide: const BorderSide(
-                                color: Color(0xFF1E5631),
+                                color: VeridiaColors.primary,
                               ),
                             ),
                           ),
@@ -539,11 +522,11 @@ class _AdminProfileScreenState extends State<AdminProfileScreen> {
                           width: double.infinity,
                           padding: const EdgeInsets.all(16),
                           decoration: BoxDecoration(
-                            color: Colors.white,
+                            color: VeridiaColors.surfaceContainer,
                             borderRadius: BorderRadius.circular(12),
                             boxShadow: const [
                               BoxShadow(
-                                color: Color.fromRGBO(0, 0, 0, 0.05),
+                                color: Color.fromRGBO(0, 0, 0, 0.35),
                                 blurRadius: 8,
                               ),
                             ],
@@ -556,7 +539,7 @@ class _AdminProfileScreenState extends State<AdminProfileScreen> {
                                 style: TextStyle(
                                   fontSize: 14,
                                   fontWeight: FontWeight.bold,
-                                  color: Colors.grey,
+                                  color: VeridiaColors.onSurfaceVariant,
                                 ),
                               ),
                               const SizedBox(height: 8),
@@ -580,7 +563,6 @@ class _AdminProfileScreenState extends State<AdminProfileScreen> {
                           child: ElevatedButton(
                             onPressed: _isSaving ? null : _saveProfileChanges,
                             style: ElevatedButton.styleFrom(
-                              backgroundColor: const Color(0xFF1E5631),
                               shape: RoundedRectangleBorder(
                                 borderRadius: BorderRadius.circular(12),
                               ),
@@ -590,7 +572,7 @@ class _AdminProfileScreenState extends State<AdminProfileScreen> {
                                     width: 18,
                                     height: 18,
                                     child: CircularProgressIndicator(
-                                      color: Colors.white,
+                                      color: VeridiaColors.onSurface,
                                       strokeWidth: 2,
                                     ),
                                   )
@@ -613,7 +595,9 @@ class _AdminProfileScreenState extends State<AdminProfileScreen> {
                               });
                             },
                             style: OutlinedButton.styleFrom(
-                              side: const BorderSide(color: Color(0xFF1E5631)),
+                              side: const BorderSide(
+                                color: VeridiaColors.primary,
+                              ),
                               shape: RoundedRectangleBorder(
                                 borderRadius: BorderRadius.circular(12),
                               ),
@@ -629,16 +613,18 @@ class _AdminProfileScreenState extends State<AdminProfileScreen> {
                       child: ElevatedButton.icon(
                         onPressed: () =>
                             setState(() => _isEditingProfile = true),
-                        icon: const Icon(Icons.edit, color: Colors.white),
+                        icon: const Icon(
+                          Icons.edit,
+                          color: VeridiaColors.onSurface,
+                        ),
                         label: const Text(
                           'Editar Perfil',
                           style: TextStyle(
                             fontWeight: FontWeight.bold,
-                            color: Colors.white,
+                            color: VeridiaColors.onSurface,
                           ),
                         ),
                         style: ElevatedButton.styleFrom(
-                          backgroundColor: const Color(0xFF1E5631),
                           padding: const EdgeInsets.symmetric(vertical: 14),
                           shape: RoundedRectangleBorder(
                             borderRadius: BorderRadius.circular(12),
@@ -652,7 +638,7 @@ class _AdminProfileScreenState extends State<AdminProfileScreen> {
                     style: TextStyle(
                       fontSize: 16,
                       fontWeight: FontWeight.bold,
-                      color: Colors.black87,
+                      color: VeridiaColors.onSurface,
                     ),
                   ),
                   const SizedBox(height: 12),
@@ -683,10 +669,10 @@ class _AdminProfileScreenState extends State<AdminProfileScreen> {
     return Container(
       margin: const EdgeInsets.only(bottom: 12),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: VeridiaColors.surfaceContainer,
         borderRadius: BorderRadius.circular(12),
         boxShadow: const [
-          BoxShadow(color: Color.fromRGBO(0, 0, 0, 0.05), blurRadius: 8),
+          BoxShadow(color: Color.fromRGBO(0, 0, 0, 0.35), blurRadius: 8),
         ],
       ),
       child: Material(
@@ -698,7 +684,7 @@ class _AdminProfileScreenState extends State<AdminProfileScreen> {
             padding: const EdgeInsets.all(16),
             child: Row(
               children: [
-                Icon(icon, color: const Color(0xFF1E5631)),
+                Icon(icon, color: VeridiaColors.primary),
                 const SizedBox(width: 16),
                 Text(
                   label,
@@ -708,7 +694,7 @@ class _AdminProfileScreenState extends State<AdminProfileScreen> {
                 const Icon(
                   Icons.arrow_forward_ios,
                   size: 16,
-                  color: Colors.grey,
+                  color: VeridiaColors.onSurfaceVariant,
                 ),
               ],
             ),

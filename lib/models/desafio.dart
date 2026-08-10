@@ -108,8 +108,7 @@ class Challenge {
       targetSpecies: map['targetSpecies'] as String? ?? '',
       targetGoal: (map['targetGoal'] as num?)?.toInt() ?? 1,
       dueDate:
-          DateTime.tryParse(map['dueDate'] as String? ?? '') ??
-          DateTime.now(),
+          DateTime.tryParse(map['dueDate'] as String? ?? '') ?? DateTime.now(),
       createdDate:
           DateTime.tryParse(map['createdDate'] as String? ?? '') ??
           DateTime.now(),

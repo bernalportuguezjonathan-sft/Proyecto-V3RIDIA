@@ -1,17 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
-import 'login.dart';
-import 'home.dart';
-import 'identify_species.dart';
-import 'mapa.dart';
-import 'historial.dart';
-import 'perfil.dart';
 import 'models/desafio.dart';
 import 'models/user.dart';
 import 'services/especie_ia_service.dart';
 import 'services/repositorio_d.dart';
 import 'services/repositorio_u.dart';
-import 'widgets/token_icon.dart';
+import 'theme/veridia_theme.dart';
+import 'navegacion.dart';
+import 'widgets/veridia_ui.dart';
 
 class ChallengesScreen extends StatefulWidget {
   const ChallengesScreen({super.key});
@@ -24,31 +20,7 @@ class _ChallengesScreenState extends State<ChallengesScreen> {
   final EspecieIAService _especieIAService = EspecieIAService();
   final Set<String> _analizando = {};
   void _cerrarSesion() {
-    showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('¿Cerrar sesión?'),
-        content: const Text('¿Estás seguro?'),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('Cancelar'),
-          ),
-          TextButton(
-            onPressed: () async {
-              final navigator = Navigator.of(context);
-              await UserRepository.instance.signOut();
-              if (!mounted) return;
-              navigator.pushAndRemoveUntil(
-                MaterialPageRoute(builder: (context) => const LoginScreen()),
-                (route) => false,
-              );
-            },
-            child: const Text('Cerrar'),
-          ),
-        ],
-      ),
-    );
+    VeridiaNav.cerrarSesion(context);
   }
 
   void _showChallengeForm({Challenge? challenge}) {
@@ -190,8 +162,6 @@ class _ChallengesScreenState extends State<ChallengesScreen> {
               }
             },
             style: ElevatedButton.styleFrom(
-              backgroundColor: const Color(0xFF1E5631),
-              foregroundColor: Colors.white,
               shape: RoundedRectangleBorder(
                 borderRadius: BorderRadius.circular(16),
               ),
@@ -228,7 +198,7 @@ class _ChallengesScreenState extends State<ChallengesScreen> {
         messenger.showSnackBar(
           SnackBar(
             content: Text(e.message),
-            backgroundColor: Colors.red.shade700,
+            backgroundColor: VeridiaColors.error,
           ),
         );
         return;
@@ -236,7 +206,7 @@ class _ChallengesScreenState extends State<ChallengesScreen> {
         messenger.showSnackBar(
           SnackBar(
             content: const Text('No se pudo analizar la foto con IA.'),
-            backgroundColor: Colors.red.shade700,
+            backgroundColor: VeridiaColors.error,
           ),
         );
         return;
@@ -254,7 +224,7 @@ class _ChallengesScreenState extends State<ChallengesScreen> {
                   ? 'La IA detectó "${resultado.commonName}", no "${challenge.targetSpecies}". No cuenta para este desafío.'
                   : 'La IA no identificó ninguna especie en esta foto.',
             ),
-            backgroundColor: Colors.red.shade700,
+            backgroundColor: VeridiaColors.error,
           ),
         );
         return;
@@ -279,12 +249,7 @@ class _ChallengesScreenState extends State<ChallengesScreen> {
       final message = newProgress >= challenge.targetGoal
           ? '¡Desafío completado! Bono entregado.'
           : 'IA confirmó "${resultado.commonName}". Progreso: $newProgress/${challenge.targetGoal}';
-      messenger.showSnackBar(
-        SnackBar(
-          content: Text(message),
-          backgroundColor: const Color(0xFF1E5631),
-        ),
-      );
+      messenger.showSnackBar(SnackBar(content: Text(message)));
     } finally {
       if (mounted) setState(() => _analizando.remove(challenge.id));
     }
@@ -315,7 +280,10 @@ class _ChallengesScreenState extends State<ChallengesScreen> {
               }
               navigator.pop();
             },
-            child: const Text('Eliminar', style: TextStyle(color: Colors.red)),
+            child: const Text(
+              'Eliminar',
+              style: TextStyle(color: VeridiaColors.error),
+            ),
           ),
         ],
       ),
@@ -325,10 +293,7 @@ class _ChallengesScreenState extends State<ChallengesScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFFF5F9F7),
       appBar: AppBar(
-        backgroundColor: const Color(0xFF1E5631),
-        elevation: 0,
         leading: IconButton(
           icon: const Icon(Icons.arrow_back),
           onPressed: () => Navigator.pop(context),
@@ -338,39 +303,23 @@ class _ChallengesScreenState extends State<ChallengesScreen> {
           style: TextStyle(
             fontWeight: FontWeight.bold,
             fontSize: 18,
-            color: Colors.white,
+            color: VeridiaColors.onSurface,
           ),
         ),
         centerTitle: true,
         actions: [
           ValueListenableBuilder<UserProfile?>(
             valueListenable: UserRepository.instance.currentUser,
-            builder: (context, userProfile, child) {
-              return Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 12),
-                child: Center(
-                  child: Row(
-                    children: [
-                      TokenIcon(size: 24),
-                      const SizedBox(width: 6),
-                      Text(
-                        '${userProfile?.tokens ?? 0}',
-                        style: const TextStyle(
-                          fontWeight: FontWeight.bold,
-                          fontSize: 14,
-                          color: Colors.white,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              );
-            },
+            builder: (context, userProfile, child) =>
+                VeridiaTokenBadge(tokens: userProfile?.tokens ?? 0),
           ),
-          IconButton(
+          const SizedBox(width: 10),
+          VeridiaAppBarAction(
+            icon: Icons.logout_rounded,
+            tooltip: 'Cerrar sesión',
             onPressed: _cerrarSesion,
-            icon: const Icon(Icons.logout, color: Colors.white, size: 20),
           ),
+          const SizedBox(width: 12),
         ],
       ),
       body: ValueListenableBuilder<List<Challenge>>(
@@ -383,7 +332,7 @@ class _ChallengesScreenState extends State<ChallengesScreen> {
               : ChallengeRepository.instance.challengesForUser(profile?.userId);
           return Stack(
             children: [
-              Container(color: const Color(0xFFF5F9F7)),
+              Container(color: VeridiaColors.background),
               SafeArea(
                 child: challenges.isEmpty
                     ? Center(
@@ -393,7 +342,7 @@ class _ChallengesScreenState extends State<ChallengesScreen> {
                             Icon(
                               Icons.emoji_events_outlined,
                               size: 64,
-                              color: Colors.grey.shade400,
+                              color: VeridiaColors.outline,
                             ),
                             const SizedBox(height: 16),
                             Text(
@@ -401,13 +350,13 @@ class _ChallengesScreenState extends State<ChallengesScreen> {
                               style: TextStyle(
                                 fontSize: 16,
                                 fontWeight: FontWeight.bold,
-                                color: Colors.grey.shade700,
+                                color: VeridiaColors.onSurfaceVariant,
                               ),
                             ),
                             const SizedBox(height: 8),
                             Text(
                               'Crea tu primer desafío mensual',
-                              style: TextStyle(color: Colors.grey.shade500),
+                              style: TextStyle(color: VeridiaColors.outline),
                             ),
                           ],
                         ),
@@ -421,11 +370,11 @@ class _ChallengesScreenState extends State<ChallengesScreen> {
                           return Container(
                             margin: const EdgeInsets.only(bottom: 12),
                             decoration: BoxDecoration(
-                              color: Colors.white,
+                              color: VeridiaColors.surfaceContainer,
                               borderRadius: BorderRadius.circular(18),
                               boxShadow: [
                                 const BoxShadow(
-                                  color: Color.fromRGBO(0, 0, 0, 0.05),
+                                  color: Color.fromRGBO(0, 0, 0, 0.35),
                                   blurRadius: 8,
                                   offset: Offset(0, 2),
                                 ),
@@ -448,7 +397,7 @@ class _ChallengesScreenState extends State<ChallengesScreen> {
                                               style: const TextStyle(
                                                 fontSize: 16,
                                                 fontWeight: FontWeight.bold,
-                                                color: Colors.black87,
+                                                color: VeridiaColors.onSurface,
                                               ),
                                             ),
                                             const SizedBox(height: 4),
@@ -456,7 +405,8 @@ class _ChallengesScreenState extends State<ChallengesScreen> {
                                               'Objetivo: ${challenge.targetSpecies}',
                                               style: TextStyle(
                                                 fontSize: 12,
-                                                color: Colors.grey.shade600,
+                                                color: VeridiaColors
+                                                    .onSurfaceVariant,
                                               ),
                                             ),
                                           ],
@@ -469,7 +419,8 @@ class _ChallengesScreenState extends State<ChallengesScreen> {
                                             vertical: 4,
                                           ),
                                           decoration: BoxDecoration(
-                                            color: Colors.green.shade100,
+                                            color:
+                                                VeridiaColors.primaryContainer,
                                             borderRadius: BorderRadius.circular(
                                               8,
                                             ),
@@ -479,14 +430,15 @@ class _ChallengesScreenState extends State<ChallengesScreen> {
                                               const Icon(
                                                 Icons.emoji_events,
                                                 size: 12,
-                                                color: Colors.green,
+                                                color: VeridiaColors.secondary,
                                               ),
                                               const SizedBox(width: 4),
                                               Text(
                                                 '+${challenge.tokensReward}',
-                                                style: TextStyle(
+                                                style: const TextStyle(
                                                   fontSize: 11,
-                                                  color: Colors.green.shade700,
+                                                  color: VeridiaColors
+                                                      .onPrimaryContainer,
                                                   fontWeight: FontWeight.bold,
                                                 ),
                                               ),
@@ -500,7 +452,7 @@ class _ChallengesScreenState extends State<ChallengesScreen> {
                                     challenge.description,
                                     style: TextStyle(
                                       fontSize: 12,
-                                      color: Colors.grey.shade700,
+                                      color: VeridiaColors.onSurfaceVariant,
                                     ),
                                   ),
                                   const SizedBox(height: 12),
@@ -518,7 +470,7 @@ class _ChallengesScreenState extends State<ChallengesScreen> {
                                         'Vence: ${challenge.dueDate.day}/${challenge.dueDate.month}/${challenge.dueDate.year}',
                                         style: TextStyle(
                                           fontSize: 11,
-                                          color: Colors.grey.shade600,
+                                          color: VeridiaColors.onSurfaceVariant,
                                         ),
                                       ),
                                     ],
@@ -527,15 +479,18 @@ class _ChallengesScreenState extends State<ChallengesScreen> {
                                   ClipRRect(
                                     borderRadius: BorderRadius.circular(8),
                                     child: LinearProgressIndicator(
-                                      value:
-                                          challenge.currentProgress /
-                                          challenge.targetGoal,
+                                      value: challenge.targetGoal <= 0
+                                          ? 0
+                                          : (challenge.currentProgress /
+                                                    challenge.targetGoal)
+                                                .clamp(0.0, 1.0),
                                       minHeight: 6,
-                                      backgroundColor: Colors.grey.shade200,
+                                      backgroundColor:
+                                          VeridiaColors.surfaceContainerHighest,
                                       valueColor: AlwaysStoppedAnimation<Color>(
                                         challenge.isCompleted
-                                            ? Colors.green
-                                            : const Color(0xFF1E5631),
+                                            ? VeridiaColors.secondary
+                                            : VeridiaColors.primary,
                                       ),
                                     ),
                                   ),
@@ -547,24 +502,22 @@ class _ChallengesScreenState extends State<ChallengesScreen> {
                                       Expanded(
                                         child: ElevatedButton.icon(
                                           onPressed:
-                                              _analizando.contains(
-                                                challenge.id,
-                                              )
+                                              _analizando.contains(challenge.id)
                                               ? null
                                               : () => _pickImageFromGallery(
                                                   challenge,
                                                 ),
                                           icon:
-                                              _analizando.contains(
-                                                challenge.id,
-                                              )
+                                              _analizando.contains(challenge.id)
                                               ? const SizedBox(
                                                   width: 16,
                                                   height: 16,
-                                                  child: CircularProgressIndicator(
-                                                    strokeWidth: 2,
-                                                    color: Colors.white,
-                                                  ),
+                                                  child:
+                                                      CircularProgressIndicator(
+                                                        strokeWidth: 2,
+                                                        color: VeridiaColors
+                                                            .onSurface,
+                                                      ),
                                                 )
                                               : const Icon(
                                                   Icons.photo_library,
@@ -576,10 +529,10 @@ class _ChallengesScreenState extends State<ChallengesScreen> {
                                                 : 'Subir foto',
                                           ),
                                           style: ElevatedButton.styleFrom(
-                                            backgroundColor: const Color(
-                                              0xFF1E5631,
-                                            ),
-                                            foregroundColor: Colors.white,
+                                            backgroundColor:
+                                                VeridiaColors.primary,
+                                            foregroundColor:
+                                                VeridiaColors.onPrimary,
                                             shape: RoundedRectangleBorder(
                                               borderRadius:
                                                   BorderRadius.circular(16),
@@ -607,7 +560,7 @@ class _ChallengesScreenState extends State<ChallengesScreen> {
                                                 Icons.edit,
                                                 size: 18,
                                               ),
-                                              color: const Color(0xFF1E5631),
+                                              color: VeridiaColors.primary,
                                               visualDensity:
                                                   VisualDensity.compact,
                                             ),
@@ -620,7 +573,7 @@ class _ChallengesScreenState extends State<ChallengesScreen> {
                                                 Icons.delete,
                                                 size: 18,
                                               ),
-                                              color: Colors.red,
+                                              color: VeridiaColors.error,
                                               visualDensity:
                                                   VisualDensity.compact,
                                             ),
@@ -639,61 +592,9 @@ class _ChallengesScreenState extends State<ChallengesScreen> {
           );
         },
       ),
-      bottomNavigationBar: BottomNavigationBar(
-        backgroundColor: Colors.white,
-        selectedItemColor: const Color(0xFF1E5631),
-        unselectedItemColor: Colors.grey,
-        type: BottomNavigationBarType.fixed,
+      bottomNavigationBar: VeridiaBottomNav(
         currentIndex: 0,
-        items: const [
-          BottomNavigationBarItem(icon: Icon(Icons.home), label: 'Inicio'),
-          BottomNavigationBarItem(
-            icon: Icon(Icons.camera_alt),
-            label: 'Cámara',
-          ),
-          BottomNavigationBarItem(icon: Icon(Icons.map), label: 'Mapa'),
-          BottomNavigationBarItem(
-            icon: Icon(Icons.history),
-            label: 'Historial',
-          ),
-          BottomNavigationBarItem(icon: Icon(Icons.person), label: 'Perfil'),
-        ],
-        onTap: (index) {
-          switch (index) {
-            case 0:
-              Navigator.pushReplacement(
-                context,
-                MaterialPageRoute(builder: (context) => const HomeScreen()),
-              );
-              break;
-            case 1:
-              Navigator.pushReplacement(
-                context,
-                MaterialPageRoute(
-                  builder: (context) => const IdentifySpeciesScreen(),
-                ),
-              );
-              break;
-            case 2:
-              Navigator.pushReplacement(
-                context,
-                MaterialPageRoute(builder: (context) => const MapScreen()),
-              );
-              break;
-            case 3:
-              Navigator.pushReplacement(
-                context,
-                MaterialPageRoute(builder: (context) => const HistoryScreen()),
-              );
-              break;
-            case 4:
-              Navigator.pushReplacement(
-                context,
-                MaterialPageRoute(builder: (context) => const ProfileScreen()),
-              );
-              break;
-          }
-        },
+        onTap: (i) => VeridiaNav.ir(context, VeridiaSeccion.values[i], 0),
       ),
     );
   }

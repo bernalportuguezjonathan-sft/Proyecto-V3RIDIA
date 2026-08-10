@@ -54,8 +54,7 @@ class AssignmentRecord {
       eventType: map['eventType'] as String? ?? '',
       note: map['note'] as String? ?? '',
       dateTime:
-          DateTime.tryParse(map['dateTime'] as String? ?? '') ??
-          DateTime.now(),
+          DateTime.tryParse(map['dateTime'] as String? ?? '') ?? DateTime.now(),
       targetUserId: map['targetUserId'] as String?,
       targetUserDisplayName: map['targetUserDisplayName'] as String?,
       targetUserEmail: map['targetUserEmail'] as String?,

@@ -1,13 +1,18 @@
 import 'package:flutter/material.dart';
-import 'login.dart'; // Para redirigir al login
+import 'package:firebase_auth/firebase_auth.dart';
+
+import 'desafios.dart';
+import 'historial.dart';
 import 'identify_species.dart';
 import 'mapa.dart';
-import 'historial.dart';
-import 'perfil.dart';
-import 'desafios.dart';
+import 'models/observation.dart';
 import 'models/user.dart';
+import 'navegacion.dart';
+import 'services/repositorio_o.dart';
 import 'services/repositorio_u.dart';
-import 'widgets/token_icon.dart';
+import 'theme/veridia_theme.dart';
+import 'widgets/veridia_logo.dart';
+import 'widgets/veridia_ui.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -17,446 +22,358 @@ class HomeScreen extends StatefulWidget {
 }
 
 class _HomeScreenState extends State<HomeScreen> {
-  // The user name is read from UserRepository.currentUser so UI updates automatically
+  final _buscarController = TextEditingController();
+
+  @override
+  void dispose() {
+    _buscarController.dispose();
+    super.dispose();
+  }
+
+  void _buscar(String query) {
+    final texto = query.trim();
+    if (texto.isEmpty) return;
+    VeridiaNav.abrir(context, MapScreen(initialQuery: texto));
+  }
 
   @override
   Widget build(BuildContext context) {
+    final text = Theme.of(context).textTheme;
+    final uid = FirebaseAuth.instance.currentUser?.uid;
+
     return Scaffold(
-      backgroundColor: const Color(0xFFF5F9F7),
       appBar: AppBar(
-        backgroundColor: const Color(0xFF1E5631),
-        elevation: 0,
-        title: const Text(
-          'Inicio',
-          style: TextStyle(
-            fontWeight: FontWeight.bold,
-            fontSize: 18,
-            color: Colors.white,
-          ),
+        titleSpacing: 16,
+        centerTitle: false,
+        title: Row(
+          children: [
+            const VeridiaSymbol(size: 32, glow: false),
+            const SizedBox(width: 10),
+            Text('Veridia', style: text.titleLarge),
+          ],
         ),
-        centerTitle: true,
         actions: [
           ValueListenableBuilder<UserProfile?>(
             valueListenable: UserRepository.instance.currentUser,
-            builder: (context, userProfile, child) {
-              return Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 12),
-                child: Center(
-                  child: Row(
+            builder: (context, perfil, _) =>
+                VeridiaTokenBadge(tokens: perfil?.tokens ?? 0),
+          ),
+          const SizedBox(width: 10),
+          VeridiaAppBarAction(
+            icon: Icons.logout_rounded,
+            tooltip: 'Cerrar sesión',
+            onPressed: () => VeridiaNav.cerrarSesion(context),
+          ),
+          const SizedBox(width: 12),
+        ],
+      ),
+      body: VeridiaBackground(
+        child: SafeArea(
+          top: false,
+          child: ListView(
+            padding: const EdgeInsets.fromLTRB(16, 16, 16, 24),
+            children: [
+              ValueListenableBuilder<UserProfile?>(
+                valueListenable: UserRepository.instance.currentUser,
+                builder: (context, perfil, _) {
+                  final nombre = perfil == null
+                      ? 'Explorador'
+                      : (perfil.displayName.isNotEmpty
+                            ? perfil.displayName
+                            : perfil.email.split('@').first);
+                  return Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      TokenIcon(size: 24),
-                      const SizedBox(width: 6),
+                      Text('Hola, $nombre', style: text.headlineSmall),
+                      const SizedBox(height: 4),
                       Text(
-                        '${userProfile?.tokens ?? 0}',
-                        style: const TextStyle(
-                          fontWeight: FontWeight.bold,
-                          fontSize: 14,
-                          color: Colors.white,
-                        ),
+                        '¿Qué especie vas a descubrir hoy?',
+                        style: text.bodySmall,
                       ),
                     ],
+                  );
+                },
+              ),
+              const SizedBox(height: 18),
+              TextField(
+                controller: _buscarController,
+                textInputAction: TextInputAction.search,
+                onSubmitted: _buscar,
+                style: text.bodyMedium,
+                decoration: InputDecoration(
+                  hintText: 'Buscar especies, rutas, lugares...',
+                  prefixIcon: const Icon(Icons.search, size: 20),
+                  suffixIcon: IconButton(
+                    icon: const Icon(Icons.arrow_forward, size: 18),
+                    tooltip: 'Buscar en el mapa',
+                    onPressed: () => _buscar(_buscarController.text),
                   ),
                 ),
-              );
-            },
+              ),
+              const SizedBox(height: 24),
+              const VeridiaSectionTitle(
+                title: 'Accesos rápidos',
+                subtitle: 'Lo esencial para tu expedición',
+              ),
+              GridView.count(
+                crossAxisCount: 2,
+                mainAxisSpacing: 12,
+                crossAxisSpacing: 12,
+                shrinkWrap: true,
+                physics: const NeverScrollableScrollPhysics(),
+                childAspectRatio: 1.35,
+                children: [
+                  _AccesoRapido(
+                    icon: Icons.camera_alt_rounded,
+                    titulo: 'Cámara IA',
+                    descripcion: 'Identifica especies',
+                    destacado: true,
+                    onTap: () => VeridiaNav.abrir(
+                      context,
+                      const IdentifySpeciesScreen(),
+                    ),
+                  ),
+                  _AccesoRapido(
+                    icon: Icons.map_rounded,
+                    titulo: 'Mapa',
+                    descripcion: 'Explora la zona',
+                    onTap: () => VeridiaNav.abrir(context, const MapScreen()),
+                  ),
+                  _AccesoRapido(
+                    icon: Icons.menu_book_rounded,
+                    titulo: 'Diario',
+                    descripcion: 'Tus avistamientos',
+                    onTap: () =>
+                        VeridiaNav.abrir(context, const HistoryScreen()),
+                  ),
+                  _AccesoRapido(
+                    icon: Icons.emoji_events_rounded,
+                    titulo: 'Desafíos',
+                    descripcion: 'Gana Veridiums',
+                    onTap: () =>
+                        VeridiaNav.abrir(context, const ChallengesScreen()),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 26),
+              VeridiaSectionTitle(
+                title: 'Últimas capturas',
+                subtitle: 'Tus avistamientos más recientes',
+                actionLabel: 'Ver todas',
+                onAction: () =>
+                    VeridiaNav.abrir(context, const HistoryScreen()),
+              ),
+              SizedBox(
+                height: 172,
+                child: uid == null
+                    ? const _CapturasVacias()
+                    : StreamBuilder<List<Observation>>(
+                        stream: ObservationRepository.instance.streamForUser(
+                          uid,
+                        ),
+                        builder: (context, snapshot) {
+                          if (snapshot.connectionState ==
+                              ConnectionState.waiting) {
+                            return const VeridiaLoader();
+                          }
+                          final capturas = snapshot.data ?? const [];
+                          if (capturas.isEmpty) return const _CapturasVacias();
+
+                          final visibles = capturas.take(8).toList();
+                          return ListView.separated(
+                            scrollDirection: Axis.horizontal,
+                            itemCount: visibles.length,
+                            separatorBuilder: (_, _) =>
+                                const SizedBox(width: 12),
+                            itemBuilder: (context, i) =>
+                                _TarjetaCaptura(observacion: visibles[i]),
+                          );
+                        },
+                      ),
+              ),
+            ],
           ),
-          IconButton(
-            onPressed: () {
-              showDialog(
-                context: context,
-                builder: (dialogContext) => AlertDialog(
-                  title: const Text('¿Cerrar sesión?'),
-                  content: const Text('¿Estás seguro?'),
-                  actions: [
-                    TextButton(
-                      onPressed: () => Navigator.pop(dialogContext),
-                      child: const Text('Cancelar'),
-                    ),
-                    TextButton(
-                      onPressed: () async {
-                        final navigator = Navigator.of(dialogContext);
-                        await UserRepository.instance.signOut();
-                        if (!mounted) return;
-                        navigator.pushAndRemoveUntil(
-                          MaterialPageRoute(
-                            builder: (_) => const LoginScreen(),
-                          ),
-                          (route) => false,
-                        );
-                      },
-                      child: const Text('Cerrar'),
-                    ),
-                  ],
-                ),
-              );
-            },
-            icon: const Icon(Icons.logout, color: Colors.white, size: 20),
+        ),
+      ),
+      bottomNavigationBar: VeridiaBottomNav(
+        currentIndex: 0,
+        onTap: (i) => VeridiaNav.ir(context, VeridiaSeccion.values[i], 0),
+      ),
+    );
+  }
+}
+
+class _AccesoRapido extends StatelessWidget {
+  const _AccesoRapido({
+    required this.icon,
+    required this.titulo,
+    required this.descripcion,
+    required this.onTap,
+    this.destacado = false,
+  });
+
+  final IconData icon;
+  final String titulo;
+  final String descripcion;
+  final VoidCallback onTap;
+  final bool destacado;
+
+  @override
+  Widget build(BuildContext context) {
+    final text = Theme.of(context).textTheme;
+    final accent = destacado ? VeridiaColors.secondary : VeridiaColors.primary;
+
+    return VeridiaCard(
+      onTap: onTap,
+      glow: destacado,
+      borderColor: destacado
+          ? VeridiaColors.secondary.withValues(alpha: 0.45)
+          : null,
+      padding: const EdgeInsets.all(14),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          Container(
+            padding: const EdgeInsets.all(9),
+            decoration: BoxDecoration(
+              color: accent.withValues(alpha: 0.16),
+              borderRadius: BorderRadius.circular(VeridiaRadii.md),
+            ),
+            child: Icon(icon, size: 20, color: accent),
+          ),
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(titulo, style: text.titleSmall),
+              const SizedBox(height: 2),
+              Text(
+                descripcion,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: text.labelSmall,
+              ),
+            ],
           ),
         ],
       ),
-      body: Stack(
-        children: [
-          // Fondo
-          Container(color: const Color(0xFFF5F9F7)),
-          // Contenido principal
-          SafeArea(
-            child: SingleChildScrollView(
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+    );
+  }
+}
+
+class _TarjetaCaptura extends StatelessWidget {
+  const _TarjetaCaptura({required this.observacion});
+
+  final Observation observacion;
+
+  @override
+  Widget build(BuildContext context) {
+    final text = Theme.of(context).textTheme;
+
+    return SizedBox(
+      width: 136,
+      child: VeridiaCard(
+        padding: EdgeInsets.zero,
+        onTap: () => VeridiaNav.abrir(context, const HistoryScreen()),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            ClipRRect(
+              borderRadius: const BorderRadius.vertical(
+                top: Radius.circular(VeridiaRadii.lg),
+              ),
+              child: SizedBox(
+                height: 96,
+                width: double.infinity,
+                child: observacion.hasPhoto
+                    ? Image.network(
+                        observacion.imagePath!,
+                        fit: BoxFit.cover,
+                        errorBuilder: (_, _, _) => const _FotoPlaceholder(),
+                      )
+                    : const _FotoPlaceholder(),
+              ),
+            ),
+            Padding(
+              padding: const EdgeInsets.fromLTRB(10, 8, 10, 10),
               child: Column(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
+                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  // Saludo (se actualiza cuando cambia UserRepository.currentUser)
-                  ValueListenableBuilder<UserProfile?>(
-                    valueListenable: UserRepository.instance.currentUser,
-                    builder: (context, userProfile, child) {
-                      String display;
-                      if (userProfile != null) {
-                        display = userProfile.displayName.isNotEmpty
-                            ? userProfile.displayName
-                            : (userProfile.email.split('@').first);
-                      } else {
-                        display = 'Explorador';
-                      }
-
-                      return Text(
-                        '¡Bienvenido, $display!',
-                        style: const TextStyle(
-                          fontSize: 20,
-                          fontWeight: FontWeight.bold,
-                          color: Color(0xFF1E5631),
-                        ),
-                      );
-                    },
+                  Text(
+                    observacion.commonName,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: text.labelLarge,
                   ),
-                  const SizedBox(height: 4),
-                  const Text(
-                    'Buscar especies, rutas, etc.',
-                    style: TextStyle(fontSize: 12, color: Colors.grey),
-                  ),
-                  const SizedBox(height: 16),
-
-                  // Barra de búsqueda
-                  Container(
-                    decoration: BoxDecoration(
-                      color: Colors.white,
-                      borderRadius: BorderRadius.circular(16),
-                      boxShadow: const [
-                        BoxShadow(
-                          color: Color.fromRGBO(0, 0, 0, 0.05),
-                          blurRadius: 8,
-                          offset: Offset(0, 2),
-                        ),
-                      ],
-                    ),
-                    child: TextField(
-                      textInputAction: TextInputAction.search,
-                      onSubmitted: (query) {
-                        final texto = query.trim();
-                        if (texto.isEmpty) return;
-                        Navigator.push(
-                          context,
-                          MaterialPageRoute(
-                            builder: (context) =>
-                                MapScreen(initialQuery: texto),
-                          ),
-                        );
-                      },
-                      decoration: InputDecoration(
-                        hintText: 'Buscar especies, rutas, etc.',
-                        hintStyle: TextStyle(color: Colors.grey.shade400),
-                        prefixIcon: const Icon(
-                          Icons.search,
-                          color: Color(0xFF1E5631),
-                        ),
-                        border: InputBorder.none,
-                        contentPadding: const EdgeInsets.symmetric(
-                          vertical: 12,
-                        ),
-                      ),
+                  const SizedBox(height: 2),
+                  Text(
+                    observacion.scientificName,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: text.labelSmall?.copyWith(
+                      fontStyle: FontStyle.italic,
                     ),
                   ),
-                  const SizedBox(height: 12),
-
-                  // Título "Accesos rápidos"
-                  const Text(
-                    'Accesos rápidos',
-                    style: TextStyle(
-                      fontSize: 13,
-                      fontWeight: FontWeight.bold,
-                      color: Colors.black87,
-                    ),
-                  ),
-                  const SizedBox(height: 12),
-
-                  // Grid de accesos rápidos (2x2)
-                  GridView.count(
-                    crossAxisCount: 2,
-                    mainAxisSpacing: 10,
-                    crossAxisSpacing: 10,
-                    shrinkWrap: true,
-                    physics: const NeverScrollableScrollPhysics(),
-                    childAspectRatio: 1.15,
-                    children: [
-                      _crearAccesoRapido(
-                        icon: Icons.camera_alt,
-                        titulo: 'Cámara IA',
-                        onTap: () {
-                          Navigator.push(
-                            context,
-                            MaterialPageRoute(
-                              builder: (context) =>
-                                  const IdentifySpeciesScreen(),
-                            ),
-                          );
-                        },
-                      ),
-                      _crearAccesoRapido(
-                        icon: Icons.map,
-                        titulo: 'Mapa',
-                        onTap: () {
-                          Navigator.push(
-                            context,
-                            MaterialPageRoute(
-                              builder: (context) => const MapScreen(),
-                            ),
-                          );
-                        },
-                      ),
-                      _crearAccesoRapido(
-                        icon: Icons.history,
-                        titulo: 'Historial',
-                        onTap: () {
-                          Navigator.push(
-                            context,
-                            MaterialPageRoute(
-                              builder: (context) => const HistoryScreen(),
-                            ),
-                          );
-                        },
-                      ),
-                      _crearAccesoRapido(
-                        icon: Icons.emoji_events,
-                        titulo: 'Desafíos',
-                        onTap: () {
-                          Navigator.push(
-                            context,
-                            MaterialPageRoute(
-                              builder: (context) => const ChallengesScreen(),
-                            ),
-                          );
-                        },
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 16),
-
-                  // Últimas capturas
-                  const Text(
-                    'Últimas capturas',
-                    style: TextStyle(
-                      fontSize: 13,
-                      fontWeight: FontWeight.bold,
-                      color: Colors.black87,
-                    ),
-                  ),
-                  const SizedBox(height: 8),
-
-                  SingleChildScrollView(
-                    scrollDirection: Axis.horizontal,
-                    child: Row(
-                      children: [
-                        _crearTarjetaCaptura(
-                          'Nombre común',
-                          'Nombre científico',
-                        ),
-                        const SizedBox(width: 12),
-                        _crearTarjetaCaptura(
-                          'Nombre común',
-                          'Nombre científico',
-                        ),
-                        const SizedBox(width: 12),
-                        _crearTarjetaCaptura(
-                          'Nombre común',
-                          'Nombre científico',
-                        ),
-                      ],
-                    ),
-                  ),
-                  const SizedBox(height: 8),
-                  Align(
-                    alignment: Alignment.centerRight,
-                    child: TextButton(
-                      onPressed: () {
-                        Navigator.push(
-                          context,
-                          MaterialPageRoute(
-                            builder: (context) => const HistoryScreen(),
-                          ),
-                        );
-                      },
-                      child: const Text(
-                        'Ver todas',
-                        style: TextStyle(fontSize: 12),
-                      ),
-                    ),
-                  ),
-                  const SizedBox(height: 12),
-
-                  // Botón de cerrar sesión (ahora en AppBar superior)
                 ],
               ),
             ),
-          ),
-        ],
-      ),
-      bottomNavigationBar: BottomNavigationBar(
-        backgroundColor: Colors.white,
-        selectedItemColor: const Color(0xFF1E5631),
-        unselectedItemColor: Colors.grey,
-        type: BottomNavigationBarType.fixed,
-        currentIndex: 0,
-        onTap: (index) {
-          switch (index) {
-            case 0:
-              break; // Ya estamos en home
-            case 1:
-              Navigator.push(
-                context,
-                MaterialPageRoute(
-                  builder: (context) => const IdentifySpeciesScreen(),
-                ),
-              );
-              break;
-            case 2:
-              Navigator.push(
-                context,
-                MaterialPageRoute(builder: (context) => const MapScreen()),
-              );
-              break;
-            case 3:
-              Navigator.push(
-                context,
-                MaterialPageRoute(builder: (context) => const HistoryScreen()),
-              );
-              break;
-            case 4:
-              Navigator.push(
-                context,
-                MaterialPageRoute(builder: (context) => const ProfileScreen()),
-              );
-              break;
-          }
-        },
-        items: const [
-          BottomNavigationBarItem(icon: Icon(Icons.home), label: 'Inicio'),
-          BottomNavigationBarItem(
-            icon: Icon(Icons.camera_alt),
-            label: 'Cámara',
-          ),
-          BottomNavigationBarItem(icon: Icon(Icons.map), label: 'Mapa'),
-          BottomNavigationBarItem(
-            icon: Icon(Icons.history),
-            label: 'Historial',
-          ),
-          BottomNavigationBarItem(icon: Icon(Icons.person), label: 'Perfil'),
-        ],
-      ),
-    );
-  }
-
-  // Widget para accesos rápidos
-  Widget _crearAccesoRapido({
-    required IconData icon,
-    required String titulo,
-    required VoidCallback onTap,
-  }) {
-    return GestureDetector(
-      onTap: onTap,
-      child: Container(
-        decoration: BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.circular(16),
-          boxShadow: const [
-            BoxShadow(
-              color: Color.fromRGBO(0, 0, 0, 0.05),
-              blurRadius: 8,
-              offset: Offset(0, 2),
-            ),
-          ],
-        ),
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Container(
-              padding: const EdgeInsets.all(12),
-              decoration: BoxDecoration(
-                color: const Color(0xFFE8F5E9),
-                borderRadius: BorderRadius.circular(10),
-              ),
-              child: Icon(icon, size: 28, color: const Color(0xFF1E5631)),
-            ),
-            const SizedBox(height: 8),
-            Text(
-              titulo,
-              style: const TextStyle(
-                fontSize: 12,
-                fontWeight: FontWeight.w600,
-                color: Color(0xFF1E5631),
-              ),
-              textAlign: TextAlign.center,
-            ),
           ],
         ),
       ),
     );
   }
+}
 
-  // Widget para tarjeta de captura
-  Widget _crearTarjetaCaptura(String nombreComun, String nombreCientifico) {
+class _FotoPlaceholder extends StatelessWidget {
+  const _FotoPlaceholder();
+
+  @override
+  Widget build(BuildContext context) {
     return Container(
-      width: 100,
-      height: 120,
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(16),
-        boxShadow: const [
-          BoxShadow(
-            color: Color.fromRGBO(0, 0, 0, 0.05),
-            blurRadius: 8,
-            offset: Offset(0, 2),
-          ),
-        ],
+      color: VeridiaColors.surfaceContainerHigh,
+      alignment: Alignment.center,
+      child: const Icon(
+        Icons.eco_outlined,
+        color: VeridiaColors.primary,
+        size: 26,
       ),
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.end,
+    );
+  }
+}
+
+class _CapturasVacias extends StatelessWidget {
+  const _CapturasVacias();
+
+  @override
+  Widget build(BuildContext context) {
+    final text = Theme.of(context).textTheme;
+
+    return VeridiaCard(
+      child: Row(
         children: [
           Container(
-            padding: const EdgeInsets.all(8),
+            width: 48,
+            height: 48,
             decoration: BoxDecoration(
-              color: Colors.white,
-              borderRadius: const BorderRadius.only(
-                bottomLeft: Radius.circular(10),
-                bottomRight: Radius.circular(10),
-              ),
+              color: VeridiaColors.primary.withValues(alpha: 0.14),
+              borderRadius: BorderRadius.circular(VeridiaRadii.md),
             ),
+            child: const Icon(
+              Icons.photo_camera_outlined,
+              color: VeridiaColors.primary,
+            ),
+          ),
+          const SizedBox(width: 14),
+          Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisAlignment: MainAxisAlignment.center,
               children: [
+                Text('Aún no tienes capturas', style: text.titleSmall),
+                const SizedBox(height: 4),
                 Text(
-                  nombreComun,
-                  style: const TextStyle(
-                    fontSize: 11,
-                    fontWeight: FontWeight.bold,
-                    color: Colors.black87,
-                  ),
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                ),
-                Text(
-                  nombreCientifico,
-                  style: TextStyle(fontSize: 9, color: Colors.grey.shade600),
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
+                  'Usa la Cámara IA para registrar tu primera especie.',
+                  style: text.bodySmall,
                 ),
               ],
             ),

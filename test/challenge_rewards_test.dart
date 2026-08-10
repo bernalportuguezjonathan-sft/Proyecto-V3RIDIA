@@ -70,4 +70,71 @@ void main() {
       expect(Challenge.fromMap('c1', map).tokensReward, 4);
     });
   });
+
+  group('Veridiums entregados al avanzar', () {
+    /// Réplica de la fórmula de ChallengeRepository.updateProgress: no se puede
+    /// llamar al repositorio en tests porque necesita Firebase.
+    int veridiumsPorAvance({
+      required int meta,
+      required int progresoPrevio,
+      required int progresoNuevo,
+      required bool bonoYaEntregado,
+    }) {
+      final normalizado = progresoNuevo.clamp(0, meta);
+      final delta = normalizado - progresoPrevio;
+      if (delta <= 0) return 0;
+      final completa = normalizado >= meta;
+      final entregarBono = completa && !bonoYaEntregado;
+      return delta + (entregarBono ? calcularBonoCompletar(meta) : 0);
+    }
+
+    test('una foto normal da exactamente 1 Veridium', () {
+      expect(
+        veridiumsPorAvance(
+          meta: 5,
+          progresoPrevio: 1,
+          progresoNuevo: 2,
+          bonoYaEntregado: false,
+        ),
+        1,
+      );
+    });
+
+    test('la foto que completa da 1 por la foto MÁS el bono', () {
+      // Meta 20 -> bono 2, así que la última foto entrega 1 + 2 = 3.
+      expect(
+        veridiumsPorAvance(
+          meta: 20,
+          progresoPrevio: 19,
+          progresoNuevo: 20,
+          bonoYaEntregado: false,
+        ),
+        3,
+      );
+    });
+
+    test('el bono no se entrega dos veces', () {
+      expect(
+        veridiumsPorAvance(
+          meta: 20,
+          progresoPrevio: 19,
+          progresoNuevo: 20,
+          bonoYaEntregado: true,
+        ),
+        1,
+      );
+    });
+
+    test('no avanzar no da Veridiums', () {
+      expect(
+        veridiumsPorAvance(
+          meta: 5,
+          progresoPrevio: 3,
+          progresoNuevo: 3,
+          bonoYaEntregado: false,
+        ),
+        0,
+      );
+    });
+  });
 }

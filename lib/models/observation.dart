@@ -56,8 +56,7 @@ class Observation {
       location: map['location'] as String? ?? '',
       notes: map['notes'] as String? ?? '',
       dateTime:
-          DateTime.tryParse(map['dateTime'] as String? ?? '') ??
-          DateTime.now(),
+          DateTime.tryParse(map['dateTime'] as String? ?? '') ?? DateTime.now(),
       imagePath: map['imagePath'] as String?,
       latitude: (map['latitude'] as num?)?.toDouble(),
       longitude: (map['longitude'] as num?)?.toDouble(),

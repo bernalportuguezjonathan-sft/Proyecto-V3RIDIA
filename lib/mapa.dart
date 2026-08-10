@@ -4,16 +4,14 @@ import 'package:flutter/material.dart';
 import 'package:flutter_map/flutter_map.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:latlong2/latlong.dart';
-import 'login.dart';
-import 'home.dart';
-import 'identify_species.dart';
-import 'historial.dart';
-import 'perfil.dart';
 import 'detallemapa.dart';
 import 'models/bird_zone.dart';
 import 'models/observation.dart';
 import 'services/repositorio_o.dart';
-import 'services/repositorio_u.dart';
+import 'theme/veridia_theme.dart';
+import 'identify_species.dart';
+import 'navegacion.dart';
+import 'widgets/veridia_ui.dart';
 
 class MapScreen extends StatefulWidget {
   const MapScreen({super.key, this.initialQuery});
@@ -66,7 +64,9 @@ class _MapScreenState extends State<MapScreen> {
     try {
       if (!await Geolocator.isLocationServiceEnabled()) {
         if (mounted) {
-          setState(() => _locationMessage = 'Activa el GPS para ver zonas cercanas');
+          setState(
+            () => _locationMessage = 'Activa el GPS para ver zonas cercanas',
+          );
         }
         return;
       }
@@ -107,7 +107,8 @@ class _MapScreenState extends State<MapScreen> {
   double? _distanciaKm(double lat, double lng) {
     final user = _userLocation;
     if (user == null) return null;
-    return _distance.as(LengthUnit.Kilometer, user, LatLng(lat, lng))
+    return _distance
+        .as(LengthUnit.Kilometer, user, LatLng(lat, lng))
         .toDouble();
   }
 
@@ -142,7 +143,10 @@ class _MapScreenState extends State<MapScreen> {
     if (zones.isNotEmpty) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
         if (!mounted) return;
-        _mapController.move(LatLng(zones.first.latitude, zones.first.longitude), 13.0);
+        _mapController.move(
+          LatLng(zones.first.latitude, zones.first.longitude),
+          13.0,
+        );
       });
     }
   }
@@ -171,7 +175,11 @@ class _MapScreenState extends State<MapScreen> {
               children: [
                 const CircleAvatar(
                   backgroundColor: Color(0xFFB45309),
-                  child: Icon(Icons.camera_alt, color: Colors.white, size: 18),
+                  child: Icon(
+                    Icons.camera_alt,
+                    color: VeridiaColors.onSurface,
+                    size: 18,
+                  ),
                 ),
                 const SizedBox(width: 12),
                 Expanded(
@@ -190,7 +198,7 @@ class _MapScreenState extends State<MapScreen> {
                         style: TextStyle(
                           fontSize: 12,
                           fontStyle: FontStyle.italic,
-                          color: Colors.grey.shade600,
+                          color: VeridiaColors.onSurfaceVariant,
                         ),
                       ),
                     ],
@@ -215,7 +223,10 @@ class _MapScreenState extends State<MapScreen> {
             if (sighting.notes.isNotEmpty)
               Text(
                 sighting.notes,
-                style: TextStyle(fontSize: 13, color: Colors.grey.shade700),
+                style: TextStyle(
+                  fontSize: 13,
+                  color: VeridiaColors.onSurfaceVariant,
+                ),
               ),
             const SizedBox(height: 8),
             Text(
@@ -224,7 +235,10 @@ class _MapScreenState extends State<MapScreen> {
             ),
             Text(
               '${sighting.dateTime.day}/${sighting.dateTime.month}/${sighting.dateTime.year}',
-              style: TextStyle(fontSize: 11, color: Colors.grey.shade600),
+              style: TextStyle(
+                fontSize: 11,
+                color: VeridiaColors.onSurfaceVariant,
+              ),
             ),
           ],
         ),
@@ -233,31 +247,7 @@ class _MapScreenState extends State<MapScreen> {
   }
 
   void _cerrarSesion() {
-    showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('¿Cerrar sesión?'),
-        content: const Text('¿Estás seguro?'),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('Cancelar'),
-          ),
-          TextButton(
-            onPressed: () async {
-              final navigator = Navigator.of(context);
-              await UserRepository.instance.signOut();
-              if (!mounted) return;
-              navigator.pushAndRemoveUntil(
-                MaterialPageRoute(builder: (context) => const LoginScreen()),
-                (route) => false,
-              );
-            },
-            child: const Text('Cerrar'),
-          ),
-        ],
-      ),
-    );
+    VeridiaNav.cerrarSesion(context);
   }
 
   void _applyFilters() {
@@ -310,7 +300,10 @@ class _MapScreenState extends State<MapScreen> {
                       color: zone.color,
                       shape: BoxShape.circle,
                     ),
-                    child: const Icon(Icons.nature, color: Colors.white),
+                    child: const Icon(
+                      Icons.nature,
+                      color: VeridiaColors.onSurface,
+                    ),
                   ),
                   const SizedBox(width: 12),
                   Expanded(
@@ -319,12 +312,18 @@ class _MapScreenState extends State<MapScreen> {
                       children: [
                         Text(
                           zone.name,
-                          style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                          style: const TextStyle(
+                            fontSize: 16,
+                            fontWeight: FontWeight.bold,
+                          ),
                         ),
                         const SizedBox(height: 4),
                         Text(
                           zone.location,
-                          style: TextStyle(fontSize: 12, color: Colors.grey.shade700),
+                          style: TextStyle(
+                            fontSize: 12,
+                            color: VeridiaColors.onSurfaceVariant,
+                          ),
                         ),
                       ],
                     ),
@@ -334,12 +333,18 @@ class _MapScreenState extends State<MapScreen> {
               const SizedBox(height: 12),
               Text(
                 zone.description,
-                style: TextStyle(fontSize: 13, color: Colors.grey.shade700),
+                style: TextStyle(
+                  fontSize: 13,
+                  color: VeridiaColors.onSurfaceVariant,
+                ),
               ),
               const SizedBox(height: 12),
               Text(
                 'Especies destacadas',
-                style: const TextStyle(fontSize: 14, fontWeight: FontWeight.bold),
+                style: const TextStyle(
+                  fontSize: 14,
+                  fontWeight: FontWeight.bold,
+                ),
               ),
               const SizedBox(height: 8),
               Wrap(
@@ -361,13 +366,14 @@ class _MapScreenState extends State<MapScreen> {
                     Navigator.pop(sheetContext);
                     Navigator.push(
                       context,
-                      MaterialPageRoute(builder: (context) => MapDetailScreen(zone: zone)),
+                      MaterialPageRoute(
+                        builder: (context) => MapDetailScreen(zone: zone),
+                      ),
                     );
                   },
                   icon: const Icon(Icons.camera_alt),
                   label: const Text('Ver misión y especies'),
                   style: ElevatedButton.styleFrom(
-                    backgroundColor: const Color(0xFF1E5631),
                     padding: const EdgeInsets.symmetric(vertical: 14),
                   ),
                 ),
@@ -407,7 +413,7 @@ class _MapScreenState extends State<MapScreen> {
               decoration: BoxDecoration(
                 color: const Color(0xFF1D4ED8),
                 shape: BoxShape.circle,
-                border: Border.all(color: Colors.white, width: 3),
+                border: Border.all(color: VeridiaColors.onSurface, width: 3),
                 boxShadow: [
                   BoxShadow(
                     color: Colors.black.withValues(alpha: 0.25),
@@ -420,7 +426,7 @@ class _MapScreenState extends State<MapScreen> {
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
               decoration: BoxDecoration(
-                color: Colors.white,
+                color: VeridiaColors.surfaceContainer,
                 borderRadius: BorderRadius.circular(999),
               ),
               child: const Text(
@@ -447,7 +453,7 @@ class _MapScreenState extends State<MapScreen> {
             decoration: BoxDecoration(
               color: const Color(0xFFB45309),
               shape: BoxShape.circle,
-              border: Border.all(color: Colors.white, width: 2),
+              border: Border.all(color: VeridiaColors.onSurface, width: 2),
               boxShadow: [
                 BoxShadow(
                   color: Colors.black.withValues(alpha: 0.2),
@@ -455,7 +461,11 @@ class _MapScreenState extends State<MapScreen> {
                 ),
               ],
             ),
-            child: const Icon(Icons.camera_alt, color: Colors.white, size: 18),
+            child: const Icon(
+              Icons.camera_alt,
+              color: VeridiaColors.onSurface,
+              size: 18,
+            ),
           ),
         ),
       );
@@ -478,27 +488,40 @@ class _MapScreenState extends State<MapScreen> {
                 decoration: BoxDecoration(
                   color: zone.color,
                   shape: BoxShape.circle,
-                  border: Border.all(color: Colors.white, width: 3),
+                  border: Border.all(color: VeridiaColors.onSurface, width: 3),
                   boxShadow: [
-                    BoxShadow(color: Colors.black.withValues(alpha: 0.16), blurRadius: 6),
+                    BoxShadow(
+                      color: Colors.black.withValues(alpha: 0.16),
+                      blurRadius: 6,
+                    ),
                   ],
                 ),
-                child: const Icon(Icons.location_on, color: Colors.white, size: 20),
+                child: const Icon(
+                  Icons.location_on,
+                  color: VeridiaColors.onSurface,
+                  size: 20,
+                ),
               ),
               const SizedBox(height: 2),
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 3),
                 constraints: const BoxConstraints(maxWidth: 110),
                 decoration: BoxDecoration(
-                  color: Colors.white,
+                  color: VeridiaColors.surfaceContainer,
                   borderRadius: BorderRadius.circular(999),
                   boxShadow: [
-                    BoxShadow(color: Colors.black.withValues(alpha: 0.08), blurRadius: 4),
+                    BoxShadow(
+                      color: Colors.black.withValues(alpha: 0.08),
+                      blurRadius: 4,
+                    ),
                   ],
                 ),
                 child: Text(
                   zone.name,
-                  style: const TextStyle(fontSize: 9, fontWeight: FontWeight.w700),
+                  style: const TextStyle(
+                    fontSize: 9,
+                    fontWeight: FontWeight.w700,
+                  ),
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
                   textAlign: TextAlign.center,
@@ -517,9 +540,7 @@ class _MapScreenState extends State<MapScreen> {
 
     if (_isLoadingZones) {
       return Scaffold(
-        backgroundColor: const Color(0xFFF5F9F7),
         appBar: AppBar(
-          backgroundColor: const Color(0xFF1E5631),
           title: const Text('Mapa de especies - Cundinamarca'),
           centerTitle: true,
           leading: IconButton(
@@ -532,10 +553,7 @@ class _MapScreenState extends State<MapScreen> {
     }
 
     return Scaffold(
-      backgroundColor: const Color(0xFFF5F9F7),
       appBar: AppBar(
-        backgroundColor: const Color(0xFF1E5631),
-        elevation: 0,
         leading: IconButton(
           icon: const Icon(Icons.arrow_back),
           onPressed: () => Navigator.pop(context),
@@ -545,15 +563,17 @@ class _MapScreenState extends State<MapScreen> {
           style: TextStyle(
             fontWeight: FontWeight.bold,
             fontSize: 18,
-            color: Colors.white,
+            color: VeridiaColors.onSurface,
           ),
         ),
         centerTitle: true,
         actions: [
-          IconButton(
+          VeridiaAppBarAction(
+            icon: Icons.logout_rounded,
+            tooltip: 'Cerrar sesión',
             onPressed: _cerrarSesion,
-            icon: const Icon(Icons.logout, color: Colors.white, size: 20),
           ),
+          const SizedBox(width: 12),
         ],
       ),
       body: Column(
@@ -561,22 +581,26 @@ class _MapScreenState extends State<MapScreen> {
           Container(
             width: double.infinity,
             padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
-            color: Colors.white,
+            color: VeridiaColors.surfaceContainerLow,
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 const Text(
                   'Explora zonas de avistamiento',
                   style: TextStyle(
-                    fontSize: 16,
-                    fontWeight: FontWeight.bold,
-                    color: Color(0xFF1E5631),
+                    fontFamily: VeridiaFonts.headline,
+                    fontSize: 17,
+                    fontWeight: FontWeight.w700,
+                    color: VeridiaColors.secondary,
                   ),
                 ),
                 const SizedBox(height: 8),
                 Text(
                   'Recoge fotos de especies en la región y completa tus misiones.',
-                  style: TextStyle(fontSize: 13, color: Colors.grey.shade700),
+                  style: TextStyle(
+                    fontSize: 13,
+                    color: VeridiaColors.onSurfaceVariant,
+                  ),
                 ),
                 const SizedBox(height: 10),
                 TextField(
@@ -584,9 +608,12 @@ class _MapScreenState extends State<MapScreen> {
                   onChanged: (_) => _applyFilters(),
                   decoration: InputDecoration(
                     hintText: 'Buscar zonas o especies',
-                    prefixIcon: const Icon(Icons.search, color: Color(0xFF1E5631)),
+                    prefixIcon: const Icon(
+                      Icons.search,
+                      color: VeridiaColors.primary,
+                    ),
                     filled: true,
-                    fillColor: Colors.grey.shade100,
+                    fillColor: VeridiaColors.surfaceContainerHigh,
                     border: OutlineInputBorder(
                       borderRadius: BorderRadius.circular(12),
                       borderSide: BorderSide.none,
@@ -603,11 +630,15 @@ class _MapScreenState extends State<MapScreen> {
                     separatorBuilder: (_, _) => const SizedBox(width: 8),
                     itemBuilder: (context, index) {
                       if (index == 0) {
-                        final isSelected = _selectedSpecies == null || _selectedSpecies!.isEmpty;
+                        final isSelected =
+                            _selectedSpecies == null ||
+                            _selectedSpecies!.isEmpty;
                         return ChoiceChip(
                           label: const Text('Todas'),
                           selected: isSelected,
-                          selectedColor: const Color(0xFF1E5631).withValues(alpha: 0.15),
+                          selectedColor: VeridiaColors.primary.withValues(
+                            alpha: 0.15,
+                          ),
                           onSelected: (_) {
                             setState(() {
                               _selectedSpecies = null;
@@ -621,7 +652,9 @@ class _MapScreenState extends State<MapScreen> {
                       return ChoiceChip(
                         label: Text(species),
                         selected: isSelected,
-                        selectedColor: const Color(0xFF1E5631).withValues(alpha: 0.15),
+                        selectedColor: VeridiaColors.primary.withValues(
+                          alpha: 0.15,
+                        ),
                         onSelected: (_) {
                           setState(() {
                             _selectedSpecies = isSelected ? null : species;
@@ -646,15 +679,10 @@ class _MapScreenState extends State<MapScreen> {
                   ),
                   children: [
                     TileLayer(
-                      urlTemplate: 'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',
+                      urlTemplate:
+                          'https://basemaps.cartocdn.com/dark_all/{z}/{x}/{y}@2x.png',
                       userAgentPackageName: 'com.example.veridia_app',
-                    ),
-                    TileLayer(
-                      urlTemplate: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
-                      userAgentPackageName: 'com.example.veridia_app',
-                      tileBuilder: (context, tileWidget, tile) {
-                        return Opacity(opacity: 0.65, child: tileWidget);
-                      },
+                      retinaMode: true,
                     ),
                     PolygonLayer(polygons: _buildPolygons()),
                     MarkerLayer(markers: _buildMarkers()),
@@ -666,31 +694,50 @@ class _MapScreenState extends State<MapScreen> {
                   top: 12,
                   left: 12,
                   child: Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 12,
+                      vertical: 10,
+                    ),
                     decoration: BoxDecoration(
-                      color: Colors.white.withValues(alpha: 0.95),
+                      color: VeridiaColors.surfaceContainer.withValues(
+                        alpha: 0.95,
+                      ),
                       borderRadius: BorderRadius.circular(14),
                       boxShadow: [
-                        BoxShadow(color: Colors.black.withValues(alpha: 0.08), blurRadius: 6),
+                        BoxShadow(
+                          color: Colors.black.withValues(alpha: 0.08),
+                          blurRadius: 6,
+                        ),
                       ],
                     ),
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         const Text(
-                          'Mapa híbrido de la Sabana de Bogotá',
-                          style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold),
+                          'Sabana de Bogotá',
+                          style: TextStyle(
+                            fontSize: 13,
+                            fontWeight: FontWeight.bold,
+                            color: VeridiaColors.onSurface,
+                          ),
                         ),
                         Text(
                           _filteredZones.isEmpty
                               ? 'Sin zonas visibles'
                               : '${_filteredZones.length} zonas activas',
-                          style: TextStyle(fontSize: 11, color: Colors.grey.shade700),
+                          style: TextStyle(
+                            fontSize: 11,
+                            color: VeridiaColors.onSurfaceVariant,
+                          ),
                         ),
                         const SizedBox(height: 4),
                         Text(
                           'Humedales, lagunas y parques urbanos',
-                          style: TextStyle(fontSize: 10, color: Color(0xFF1E5631), fontWeight: FontWeight.w600),
+                          style: TextStyle(
+                            fontSize: 10,
+                            color: VeridiaColors.secondary,
+                            fontWeight: FontWeight.w600,
+                          ),
                         ),
                       ],
                     ),
@@ -703,14 +750,16 @@ class _MapScreenState extends State<MapScreen> {
                     children: [
                       FloatingActionButton.small(
                         heroTag: 'reset-map',
-                        backgroundColor: Colors.white,
+                        backgroundColor: VeridiaColors.surfaceContainer,
                         onPressed: _resetView,
-                        child: const Icon(Icons.refresh, color: Color(0xFF1E5631)),
+                        child: const Icon(
+                          Icons.refresh,
+                          color: VeridiaColors.primary,
+                        ),
                       ),
                       const SizedBox(height: 8),
                       FloatingActionButton.small(
                         heroTag: 'center-map',
-                        backgroundColor: const Color(0xFF1E5631),
                         tooltip: 'Ir a mi ubicación',
                         onPressed: () {
                           final user = _userLocation;
@@ -720,21 +769,29 @@ class _MapScreenState extends State<MapScreen> {
                             _locateUser(moveCamera: true);
                           }
                         },
-                        child: const Icon(Icons.my_location, color: Colors.white),
+                        child: const Icon(
+                          Icons.my_location,
+                          color: VeridiaColors.onSurface,
+                        ),
                       ),
                       const SizedBox(height: 8),
                       FloatingActionButton.small(
                         heroTag: 'toggle-sightings',
+                        tooltip: _showSightings
+                            ? 'Ocultar avistamientos'
+                            : 'Mostrar avistamientos',
                         backgroundColor: _showSightings
-                            ? const Color(0xFFB45309)
-                            : Colors.white,
+                            ? VeridiaColors.secondaryContainer
+                            : VeridiaColors.surfaceContainer,
                         onPressed: () =>
                             setState(() => _showSightings = !_showSightings),
                         child: Icon(
-                          Icons.camera_alt,
+                          _showSightings
+                              ? Icons.visibility
+                              : Icons.visibility_off,
                           color: _showSightings
-                              ? Colors.white
-                              : const Color(0xFFB45309),
+                              ? VeridiaColors.onSecondaryContainer
+                              : VeridiaColors.onSurfaceVariant,
                         ),
                       ),
                     ],
@@ -747,10 +804,13 @@ class _MapScreenState extends State<MapScreen> {
                   child: Container(
                     padding: const EdgeInsets.all(12),
                     decoration: BoxDecoration(
-                      color: Colors.white,
+                      color: VeridiaColors.surfaceContainer,
                       borderRadius: BorderRadius.circular(16),
                       boxShadow: [
-                        BoxShadow(color: Colors.black.withValues(alpha: 0.08), blurRadius: 10),
+                        BoxShadow(
+                          color: Colors.black.withValues(alpha: 0.08),
+                          blurRadius: 10,
+                        ),
                       ],
                     ),
                     child: Column(
@@ -775,7 +835,7 @@ class _MapScreenState extends State<MapScreen> {
                                   textAlign: TextAlign.end,
                                   style: TextStyle(
                                     fontSize: 10,
-                                    color: Colors.grey.shade600,
+                                    color: VeridiaColors.onSurfaceVariant,
                                   ),
                                   maxLines: 1,
                                   overflow: TextOverflow.ellipsis,
@@ -792,7 +852,8 @@ class _MapScreenState extends State<MapScreen> {
                             child: ListView.separated(
                               scrollDirection: Axis.horizontal,
                               itemCount: _zonasOrdenadas.length,
-                              separatorBuilder: (_, _) => const SizedBox(width: 8),
+                              separatorBuilder: (_, _) =>
+                                  const SizedBox(width: 8),
                               itemBuilder: (context, index) {
                                 final zone = _zonasOrdenadas[index];
                                 final km = _distanciaKm(
@@ -805,12 +866,17 @@ class _MapScreenState extends State<MapScreen> {
                                     width: 150,
                                     padding: const EdgeInsets.all(10),
                                     decoration: BoxDecoration(
-                                      color: const Color(0xFFF7FBF7),
+                                      color: VeridiaColors.background,
                                       borderRadius: BorderRadius.circular(12),
-                                      border: Border.all(color: zone.color.withValues(alpha: 0.25)),
+                                      border: Border.all(
+                                        color: zone.color.withValues(
+                                          alpha: 0.25,
+                                        ),
+                                      ),
                                     ),
                                     child: Column(
-                                      crossAxisAlignment: CrossAxisAlignment.start,
+                                      crossAxisAlignment:
+                                          CrossAxisAlignment.start,
                                       children: [
                                         Row(
                                           children: [
@@ -839,7 +905,11 @@ class _MapScreenState extends State<MapScreen> {
                                         const SizedBox(height: 6),
                                         Text(
                                           zone.location,
-                                          style: TextStyle(fontSize: 10, color: Colors.grey.shade700),
+                                          style: TextStyle(
+                                            fontSize: 10,
+                                            color:
+                                                VeridiaColors.onSurfaceVariant,
+                                          ),
                                           maxLines: 1,
                                           overflow: TextOverflow.ellipsis,
                                         ),
@@ -880,49 +950,16 @@ class _MapScreenState extends State<MapScreen> {
           ),
         ],
       ),
-      bottomNavigationBar: BottomNavigationBar(
-        backgroundColor: Colors.white,
-        selectedItemColor: const Color(0xFF1E5631),
-        unselectedItemColor: Colors.grey,
-        type: BottomNavigationBarType.fixed,
+      floatingActionButton: FloatingActionButton.extended(
+        heroTag: 'registrar-avistamiento',
+        onPressed: () =>
+            VeridiaNav.abrir(context, const IdentifySpeciesScreen()),
+        icon: const Icon(Icons.add_a_photo_outlined, size: 20),
+        label: const Text('Registrar especie'),
+      ),
+      bottomNavigationBar: VeridiaBottomNav(
         currentIndex: 2,
-        items: const [
-          BottomNavigationBarItem(icon: Icon(Icons.home), label: 'Inicio'),
-          BottomNavigationBarItem(icon: Icon(Icons.camera_alt), label: 'Cámara'),
-          BottomNavigationBarItem(icon: Icon(Icons.map), label: 'Mapa'),
-          BottomNavigationBarItem(icon: Icon(Icons.history), label: 'Historial'),
-          BottomNavigationBarItem(icon: Icon(Icons.person), label: 'Perfil'),
-        ],
-        onTap: (index) {
-          switch (index) {
-            case 0:
-              Navigator.pushReplacement(
-                context,
-                MaterialPageRoute(builder: (context) => const HomeScreen()),
-              );
-              break;
-            case 1:
-              Navigator.pushReplacement(
-                context,
-                MaterialPageRoute(builder: (context) => const IdentifySpeciesScreen()),
-              );
-              break;
-            case 2:
-              break;
-            case 3:
-              Navigator.pushReplacement(
-                context,
-                MaterialPageRoute(builder: (context) => const HistoryScreen()),
-              );
-              break;
-            case 4:
-              Navigator.pushReplacement(
-                context,
-                MaterialPageRoute(builder: (context) => const ProfileScreen()),
-              );
-              break;
-          }
-        },
+        onTap: (i) => VeridiaNav.ir(context, VeridiaSeccion.values[i], 2),
       ),
     );
   }

@@ -34,16 +34,13 @@ class ChallengeRepository {
       return;
     }
 
-    _sub = _collection.snapshots().listen(
-      (snapshot) {
-        final list = snapshot.docs
-            .map((doc) => Challenge.fromMap(doc.id, doc.data()))
-            .toList();
-        list.sort((a, b) => b.createdDate.compareTo(a.createdDate));
-        challenges.value = list;
-      },
-      onError: (e) => debugPrint('ChallengeRepository stream error: $e'),
-    );
+    _sub = _collection.snapshots().listen((snapshot) {
+      final list = snapshot.docs
+          .map((doc) => Challenge.fromMap(doc.id, doc.data()))
+          .toList();
+      list.sort((a, b) => b.createdDate.compareTo(a.createdDate));
+      challenges.value = list;
+    }, onError: (e) => debugPrint('ChallengeRepository stream error: $e'));
   }
 
   /// Desafíos que le corresponden a un usuario: los globales más los que un
@@ -68,8 +65,9 @@ class ChallengeRepository {
 
   /// Sube el progreso de un desafío y entrega Veridiums.
   ///
-  /// Cada avance da 1 Veridium; al completarlo se entrega el premio total
-  /// (`tokensReward`) una sola vez, marcando `tokensAwarded` para no repetirlo.
+  /// Cada foto verificada da 1 Veridium. Al completar el desafío se suma
+  /// ADEMÁS el bono (`tokensReward`), una sola vez: `tokensAwarded` evita
+  /// repetirlo si el progreso se vuelve a tocar.
   Future<void> updateProgress(String id, int newProgress) async {
     final matches = challenges.value.where((c) => c.id == id);
     if (matches.isEmpty) return;
@@ -89,7 +87,7 @@ class ChallengeRepository {
     });
 
     await UserRepository.instance.addTokens(
-      entregarPremio ? challenge.tokensReward : progressDelta,
+      progressDelta + (entregarPremio ? challenge.tokensReward : 0),
     );
   }
 }

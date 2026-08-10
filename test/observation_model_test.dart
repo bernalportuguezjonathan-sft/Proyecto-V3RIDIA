@@ -4,11 +4,7 @@ import 'package:veridia_app/models/observation.dart';
 /// Guarda el contrato con Firestore: si estos campos cambian de nombre, el
 /// historial y los puntos del mapa dejan de cargar.
 void main() {
-  Observation crear({
-    String? foto,
-    double? lat,
-    double? lng,
-  }) => Observation(
+  Observation crear({String? foto, double? lat, double? lng}) => Observation(
     id: 'obs-1',
     commonName: 'Garza Real',
     scientificName: 'Ardea alba',

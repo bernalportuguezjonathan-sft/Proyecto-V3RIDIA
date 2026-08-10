@@ -1,12 +1,10 @@
 import 'package:flutter/material.dart';
-import 'login.dart';
-import 'home.dart';
-import 'identify_species.dart';
-import 'mapa.dart';
-import 'perfil.dart';
 import 'models/observation.dart';
 import 'services/repositorio_o.dart';
 import 'services/repositorio_u.dart';
+import 'theme/veridia_theme.dart';
+import 'navegacion.dart';
+import 'widgets/veridia_ui.dart';
 
 class HistoryScreen extends StatefulWidget {
   const HistoryScreen({super.key});
@@ -36,31 +34,7 @@ class _HistoryScreenState extends State<HistoryScreen>
   }
 
   void _cerrarSesion() {
-    showDialog(
-      context: context,
-      builder: (dialogContext) => AlertDialog(
-        title: const Text('¿Cerrar sesión?'),
-        content: const Text('¿Estás seguro?'),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(dialogContext),
-            child: const Text('Cancelar'),
-          ),
-          TextButton(
-            onPressed: () async {
-              await UserRepository.instance.signOut();
-              if (!mounted) return;
-              Navigator.pushAndRemoveUntil(
-                context,
-                MaterialPageRoute(builder: (_) => const LoginScreen()),
-                (route) => false,
-              );
-            },
-            child: const Text('Cerrar'),
-          ),
-        ],
-      ),
-    );
+    VeridiaNav.cerrarSesion(context);
   }
 
   @override
@@ -154,9 +128,7 @@ class _HistoryScreenState extends State<HistoryScreen>
                 navigator.pop();
               }
             },
-            style: ElevatedButton.styleFrom(
-              backgroundColor: const Color(0xFF1E5631),
-            ),
+            style: ElevatedButton.styleFrom(),
             child: const Text('Guardar'),
           ),
         ],
@@ -181,7 +153,10 @@ class _HistoryScreenState extends State<HistoryScreen>
               await ObservationRepository.instance.deleteObservation(id);
               navigator.pop();
             },
-            child: const Text('Eliminar', style: TextStyle(color: Colors.red)),
+            child: const Text(
+              'Eliminar',
+              style: TextStyle(color: VeridiaColors.error),
+            ),
           ),
         ],
       ),
@@ -191,12 +166,9 @@ class _HistoryScreenState extends State<HistoryScreen>
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFFF5F9F7),
       appBar: AppBar(
-        backgroundColor: const Color(0xFF1E5631),
-        elevation: 0,
         leading: IconButton(
-          icon: const Icon(Icons.arrow_back, color: Colors.white),
+          icon: const Icon(Icons.arrow_back, color: VeridiaColors.onSurface),
           onPressed: () => Navigator.pop(context),
         ),
         title: const Text(
@@ -204,21 +176,23 @@ class _HistoryScreenState extends State<HistoryScreen>
           style: TextStyle(
             fontWeight: FontWeight.bold,
             fontSize: 18,
-            color: Colors.white,
+            color: VeridiaColors.onSurface,
           ),
         ),
         centerTitle: true,
         actions: [
-          IconButton(
+          VeridiaAppBarAction(
+            icon: Icons.logout_rounded,
+            tooltip: 'Cerrar sesión',
             onPressed: _cerrarSesion,
-            icon: const Icon(Icons.logout, color: Colors.white, size: 20),
           ),
+          const SizedBox(width: 12),
         ],
         bottom: TabBar(
           controller: _tabController,
-          labelColor: Colors.white,
-          unselectedLabelColor: Colors.white70,
-          indicatorColor: Colors.white,
+          labelColor: VeridiaColors.onSurface,
+          unselectedLabelColor: VeridiaColors.onSurfaceVariant,
+          indicatorColor: VeridiaColors.onSurface,
           tabs: const [
             Tab(text: 'Todas'),
             Tab(text: 'Almacenamientos'),
@@ -228,7 +202,7 @@ class _HistoryScreenState extends State<HistoryScreen>
       ),
       body: Stack(
         children: [
-          Container(color: const Color(0xFFF5F9F7)),
+          Container(color: VeridiaColors.background),
           SafeArea(
             child: TabBarView(
               controller: _tabController,
@@ -286,7 +260,7 @@ class _HistoryScreenState extends State<HistoryScreen>
                   hintText: 'Buscar por especie, lugar o nota',
                   prefixIcon: const Icon(
                     Icons.search,
-                    color: Color(0xFF1E5631),
+                    color: VeridiaColors.primary,
                   ),
                   suffixIcon: _searchQuery.isEmpty
                       ? null
@@ -299,11 +273,15 @@ class _HistoryScreenState extends State<HistoryScreen>
                         ),
                   border: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(10),
-                    borderSide: const BorderSide(color: Color(0xFFD3D3D3)),
+                    borderSide: const BorderSide(
+                      color: VeridiaColors.outlineVariant,
+                    ),
                   ),
                   enabledBorder: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(10),
-                    borderSide: const BorderSide(color: Color(0xFFD3D3D3)),
+                    borderSide: const BorderSide(
+                      color: VeridiaColors.outlineVariant,
+                    ),
                   ),
                 ),
               ),
@@ -319,7 +297,9 @@ class _HistoryScreenState extends State<HistoryScreen>
                 const Center(
                   child: Padding(
                     padding: EdgeInsets.only(top: 24),
-                    child: Text('Ninguna observación coincide con tu búsqueda.'),
+                    child: Text(
+                      'Ninguna observación coincide con tu búsqueda.',
+                    ),
                   ),
                 )
               else
@@ -358,12 +338,13 @@ class _HistoryScreenState extends State<HistoryScreen>
             children: [
               Row(
                 children: [
-                  Expanded(
-                    child: _resumenCard('Observaciones', '$total'),
-                  ),
+                  Expanded(child: _resumenCard('Observaciones', '$total')),
                   const SizedBox(width: 12),
                   Expanded(
-                    child: _resumenCard('Especies distintas', '$especiesUnicas'),
+                    child: _resumenCard(
+                      'Especies distintas',
+                      '$especiesUnicas',
+                    ),
                   ),
                 ],
               ),
@@ -373,7 +354,7 @@ class _HistoryScreenState extends State<HistoryScreen>
                 style: TextStyle(
                   fontSize: 14,
                   fontWeight: FontWeight.bold,
-                  color: Colors.black87,
+                  color: VeridiaColors.onSurface,
                 ),
               ),
               const SizedBox(height: 12),
@@ -409,10 +390,10 @@ class _HistoryScreenState extends State<HistoryScreen>
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: VeridiaColors.surfaceContainer,
         borderRadius: BorderRadius.circular(12),
         boxShadow: const [
-          BoxShadow(color: Color.fromRGBO(0, 0, 0, 0.05), blurRadius: 8),
+          BoxShadow(color: Color.fromRGBO(0, 0, 0, 0.35), blurRadius: 8),
         ],
       ),
       child: Column(
@@ -422,14 +403,17 @@ class _HistoryScreenState extends State<HistoryScreen>
             style: const TextStyle(
               fontSize: 24,
               fontWeight: FontWeight.bold,
-              color: Color(0xFF1E5631),
+              color: VeridiaColors.primary,
             ),
           ),
           const SizedBox(height: 4),
           Text(
             titulo,
             textAlign: TextAlign.center,
-            style: TextStyle(fontSize: 11, color: Colors.grey.shade700),
+            style: TextStyle(
+              fontSize: 11,
+              color: VeridiaColors.onSurfaceVariant,
+            ),
           ),
         ],
       ),
@@ -439,9 +423,7 @@ class _HistoryScreenState extends State<HistoryScreen>
   Widget _buildLugaresTab() {
     final userId = UserRepository.instance.currentUser.value?.userId;
     if (userId == null) {
-      return const Center(
-        child: Text('Inicia sesión para ver tus lugares.'),
-      );
+      return const Center(child: Text('Inicia sesión para ver tus lugares.'));
     }
     return StreamBuilder<List<Observation>>(
       stream: ObservationRepository.instance.streamForUser(userId),
@@ -472,11 +454,11 @@ class _HistoryScreenState extends State<HistoryScreen>
     return Container(
       margin: const EdgeInsets.only(bottom: 12),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: VeridiaColors.surfaceContainer,
         borderRadius: BorderRadius.circular(12),
         boxShadow: const [
           BoxShadow(
-            color: Color.fromRGBO(0, 0, 0, 0.05),
+            color: Color.fromRGBO(0, 0, 0, 0.35),
             blurRadius: 8,
             offset: Offset(0, 2),
           ),
@@ -491,14 +473,14 @@ class _HistoryScreenState extends State<HistoryScreen>
               child: Container(
                 width: 80,
                 height: 80,
-                color: Colors.grey.shade200,
+                color: VeridiaColors.surfaceContainerHighest,
                 child: captura.hasPhoto
                     ? Image.network(
                         captura.imagePath!,
                         fit: BoxFit.cover,
                         errorBuilder: (_, _, _) => const Icon(
                           Icons.broken_image,
-                          color: Colors.grey,
+                          color: VeridiaColors.onSurfaceVariant,
                           size: 36,
                         ),
                         loadingBuilder: (context, child, progress) =>
@@ -514,7 +496,11 @@ class _HistoryScreenState extends State<HistoryScreen>
                                 ),
                               ),
                       )
-                    : const Icon(Icons.image, color: Colors.grey, size: 40),
+                    : const Icon(
+                        Icons.image,
+                        color: VeridiaColors.onSurfaceVariant,
+                        size: 40,
+                      ),
               ),
             ),
             const SizedBox(width: 12),
@@ -527,27 +513,39 @@ class _HistoryScreenState extends State<HistoryScreen>
                     style: const TextStyle(
                       fontSize: 14,
                       fontWeight: FontWeight.bold,
-                      color: Colors.black87,
+                      color: VeridiaColors.onSurface,
                     ),
                   ),
                   Text(
                     captura.scientificName,
-                    style: TextStyle(fontSize: 12, color: Colors.grey.shade600),
+                    style: TextStyle(
+                      fontSize: 12,
+                      color: VeridiaColors.onSurfaceVariant,
+                    ),
                   ),
                   const SizedBox(height: 4),
                   Text(
                     '${captura.dateTime}',
-                    style: TextStyle(fontSize: 11, color: Colors.grey),
+                    style: TextStyle(
+                      fontSize: 11,
+                      color: VeridiaColors.onSurfaceVariant,
+                    ),
                   ),
                   const SizedBox(height: 8),
                   Text(
                     captura.location,
-                    style: TextStyle(fontSize: 11, color: Colors.grey.shade700),
+                    style: TextStyle(
+                      fontSize: 11,
+                      color: VeridiaColors.onSurfaceVariant,
+                    ),
                   ),
                   const SizedBox(height: 4),
                   Text(
                     captura.notes,
-                    style: TextStyle(fontSize: 11, color: Colors.grey.shade700),
+                    style: TextStyle(
+                      fontSize: 11,
+                      color: VeridiaColors.onSurfaceVariant,
+                    ),
                   ),
                 ],
               ),
@@ -555,11 +553,11 @@ class _HistoryScreenState extends State<HistoryScreen>
             Column(
               children: [
                 IconButton(
-                  icon: const Icon(Icons.edit, color: Color(0xFF1E5631)),
+                  icon: const Icon(Icons.edit, color: VeridiaColors.primary),
                   onPressed: () => _showEditDialog(captura),
                 ),
                 IconButton(
-                  icon: const Icon(Icons.delete, color: Colors.red),
+                  icon: const Icon(Icons.delete, color: VeridiaColors.error),
                   onPressed: () => _showDeleteDialog(captura.id),
                 ),
               ],
@@ -573,10 +571,10 @@ class _HistoryScreenState extends State<HistoryScreen>
   Widget _crearInsignia(String titulo, IconData icon, bool desbloqueada) {
     return Container(
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: VeridiaColors.surfaceContainer,
         borderRadius: BorderRadius.circular(12),
         boxShadow: const [
-          BoxShadow(color: Color.fromRGBO(0, 0, 0, 0.05), blurRadius: 8),
+          BoxShadow(color: Color.fromRGBO(0, 0, 0, 0.35), blurRadius: 8),
         ],
       ),
       child: Opacity(
@@ -587,7 +585,7 @@ class _HistoryScreenState extends State<HistoryScreen>
             Icon(
               desbloqueada ? icon : Icons.lock_outline,
               size: 32,
-              color: const Color(0xFF1E5631),
+              color: VeridiaColors.primary,
             ),
             const SizedBox(height: 8),
             Padding(
@@ -597,7 +595,7 @@ class _HistoryScreenState extends State<HistoryScreen>
                 style: const TextStyle(
                   fontSize: 10,
                   fontWeight: FontWeight.w600,
-                  color: Colors.black87,
+                  color: VeridiaColors.onSurface,
                 ),
                 textAlign: TextAlign.center,
                 maxLines: 2,
@@ -611,51 +609,9 @@ class _HistoryScreenState extends State<HistoryScreen>
   }
 
   Widget _buildBottomNavBar(int currentIndex) {
-    return BottomNavigationBar(
-      backgroundColor: Colors.white,
-      selectedItemColor: const Color(0xFF1E5631),
-      unselectedItemColor: Colors.grey,
-      type: BottomNavigationBarType.fixed,
-      currentIndex: currentIndex,
-      onTap: (index) {
-        switch (index) {
-          case 0:
-            Navigator.pushReplacement(
-              context,
-              MaterialPageRoute(builder: (context) => const HomeScreen()),
-            );
-            break;
-          case 1:
-            Navigator.pushReplacement(
-              context,
-              MaterialPageRoute(
-                builder: (context) => const IdentifySpeciesScreen(),
-              ),
-            );
-            break;
-          case 2:
-            Navigator.pushReplacement(
-              context,
-              MaterialPageRoute(builder: (context) => const MapScreen()),
-            );
-            break;
-          case 3:
-            break; // Ya estamos en historial
-          case 4:
-            Navigator.pushReplacement(
-              context,
-              MaterialPageRoute(builder: (context) => const ProfileScreen()),
-            );
-            break;
-        }
-      },
-      items: const [
-        BottomNavigationBarItem(icon: Icon(Icons.home), label: 'Inicio'),
-        BottomNavigationBarItem(icon: Icon(Icons.camera_alt), label: 'Cámara'),
-        BottomNavigationBarItem(icon: Icon(Icons.map), label: 'Mapa'),
-        BottomNavigationBarItem(icon: Icon(Icons.history), label: 'Historial'),
-        BottomNavigationBarItem(icon: Icon(Icons.person), label: 'Perfil'),
-      ],
+    return VeridiaBottomNav(
+      currentIndex: 3,
+      onTap: (i) => VeridiaNav.ir(context, VeridiaSeccion.values[i], 3),
     );
   }
 }

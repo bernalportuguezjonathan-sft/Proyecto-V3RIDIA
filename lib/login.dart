@@ -9,9 +9,13 @@ import 'models/user.dart';
 import 'admin_home.dart';
 import 'home.dart';
 import 'register.dart';
+import 'theme/veridia_theme.dart';
 import 'widgets/animated_visibility.dart';
 import 'widgets/google_logo_icon.dart';
 import 'widgets/google_web_button.dart';
+import 'widgets/veridia_logo.dart';
+import 'widgets/veridia_montanas.dart';
+import 'widgets/veridia_ui.dart';
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
@@ -67,33 +71,7 @@ class _LoginScreenState extends State<LoginScreen>
   }
 
   void _mostrarAlerta(String mensaje) {
-    ScaffoldMessenger.of(context).clearSnackBars();
-
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Row(
-          children: [
-            const Icon(Icons.info_outline, color: Colors.white),
-            const SizedBox(width: 12),
-            Expanded(
-              child: Text(
-                mensaje,
-                style: const TextStyle(
-                  color: Colors.white,
-                  fontSize: 14,
-                  fontWeight: FontWeight.w500,
-                ),
-              ),
-            ),
-          ],
-        ),
-        backgroundColor: const Color(0xFF1E5631),
-        behavior: SnackBarBehavior.floating,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-        margin: const EdgeInsets.symmetric(horizontal: 20, vertical: 15),
-        duration: const Duration(seconds: 2),
-      ),
-    );
+    mostrarMensajeVeridia(context, mensaje, esError: true);
   }
 
   Future<void> _iniciarSesion() async {
@@ -116,9 +94,7 @@ class _LoginScreenState extends State<LoginScreen>
     showDialog(
       context: context,
       barrierDismissible: false,
-      builder: (context) => const Center(
-        child: CircularProgressIndicator(color: Color(0xFF1E5631)),
-      ),
+      builder: (context) => const Center(child: VeridiaLoader()),
     );
 
     try {
@@ -216,27 +192,23 @@ class _LoginScreenState extends State<LoginScreen>
         await showDialog(
           context: context,
           builder: (context) => AlertDialog(
-            backgroundColor: Colors.white,
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(18),
+            icon: const Icon(
+              Icons.gpp_bad_outlined,
+              color: VeridiaColors.error,
+              size: 28,
             ),
-            title: const Text(
-              'Cuenta Suspendida',
-              style: TextStyle(fontWeight: FontWeight.bold),
-            ),
+            title: const Text('Cuenta suspendida'),
             content: Column(
               mainAxisSize: MainAxisSize.min,
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(
-                  banLabel,
-                  style: const TextStyle(fontSize: 14, color: Colors.black87),
+                VeridiaTag(
+                  label: banLabel,
+                  icon: Icons.schedule,
+                  color: VeridiaColors.error,
                 ),
                 const SizedBox(height: 12),
-                Text(
-                  banReason,
-                  style: const TextStyle(fontSize: 14, color: Colors.black54),
-                ),
+                Text(banReason),
               ],
             ),
             actions: [
@@ -305,9 +277,7 @@ class _LoginScreenState extends State<LoginScreen>
     showDialog(
       context: context,
       barrierDismissible: false,
-      builder: (context) => const Center(
-        child: CircularProgressIndicator(color: Color(0xFF1E5631)),
-      ),
+      builder: (context) => const Center(child: VeridiaLoader()),
     );
 
     try {
@@ -385,75 +355,19 @@ class _LoginScreenState extends State<LoginScreen>
     super.dispose();
   }
 
-  Widget _crearCampoTexto({
-    required TextEditingController controller,
-    required String hintText,
-    required IconData icon,
-    bool isPassword = false,
-  }) {
-    final theme = Theme.of(context);
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 16.0),
-      child: TextField(
-        controller: controller,
-        obscureText: isPassword,
-        cursorColor: theme.colorScheme.primary,
-        style: const TextStyle(color: Colors.black87, fontSize: 15),
-        decoration: InputDecoration(
-          prefixIcon: Icon(icon, color: theme.colorScheme.primary, size: 22),
-          hintText: hintText,
-          filled: true,
-          fillColor: theme.colorScheme.surface,
-          border: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(14),
-            borderSide: const BorderSide(color: Color(0xFFCAD2C5), width: 1),
-          ),
-          enabledBorder: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(14),
-            borderSide: const BorderSide(color: Color(0xFFCAD2C5), width: 1),
-          ),
-          focusedBorder: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(14),
-            borderSide: BorderSide(
-              color: theme.colorScheme.primary,
-              width: 1.5,
-            ),
-          ),
-          hintStyle: const TextStyle(color: Colors.grey, fontSize: 15),
-          contentPadding: const EdgeInsets.symmetric(
-            vertical: 18,
-            horizontal: 18,
-          ),
-        ),
-      ),
-    );
-  }
-
   @override
   Widget build(BuildContext context) {
+    final text = Theme.of(context).textTheme;
+
     return Scaffold(
-      backgroundColor: const Color(0xFFF4F6F8),
-      body: Stack(
-        children: [
-          Positioned.fill(
-            child: Image.asset(
-              'assets/images/background.jpg',
-              fit: BoxFit.cover,
-              filterQuality: FilterQuality.high,
-              semanticLabel: 'Fondo decorativo',
-            ),
-          ),
-          Positioned.fill(
-            child: Container(color: const Color.fromRGBO(0, 0, 0, 0.35)),
-          ),
-          SafeArea(
-            child: Center(
-              child: SingleChildScrollView(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 24.0,
-                  vertical: 32.0,
-                ),
-                physics: const BouncingScrollPhysics(),
+      body: VeridiaMontanas(
+        child: SafeArea(
+          child: Center(
+            child: SingleChildScrollView(
+              padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 32),
+              physics: const BouncingScrollPhysics(),
+              child: ConstrainedBox(
+                constraints: const BoxConstraints(maxWidth: 460),
                 child: FadeTransition(
                   opacity: _fade,
                   child: SlideTransition(
@@ -463,110 +377,44 @@ class _LoginScreenState extends State<LoginScreen>
                       children: [
                         ScaleTransition(
                           scale: _logoScale,
-                          child: Container(
-                            width: 118,
-                            height: 118,
-                            decoration: BoxDecoration(
-                              color: Colors.white,
-                              shape: BoxShape.circle,
-                              boxShadow: [
-                                const BoxShadow(
-                                  color: Color.fromRGBO(0, 0, 0, 0.10),
-                                  blurRadius: 16,
-                                  offset: Offset(0, 8),
-                                ),
-                              ],
-                            ),
-                            child: Padding(
-                              padding: const EdgeInsets.all(18.0),
-                              child: Image.asset(
-                                'assets/images/logo.png',
-                                fit: BoxFit.contain,
-                                semanticLabel: 'Logo Veridia',
-                              ),
-                            ),
-                          ),
+                          child: const VeridiaSymbol(size: 104),
                         ),
-                        const SizedBox(height: 18),
-                        const Text(
-                          'Iniciar Sesión',
-                          style: TextStyle(
-                            fontSize: 26,
-                            fontWeight: FontWeight.bold,
-                            color: Colors.white,
-                            letterSpacing: 0.2,
-                          ),
+                        const SizedBox(height: 20),
+                        Text('Bienvenido de vuelta', style: text.headlineSmall),
+                        const SizedBox(height: 6),
+                        Text(
+                          'Ingresa para seguir explorando la biodiversidad',
+                          textAlign: TextAlign.center,
+                          style: text.bodySmall,
                         ),
                         const SizedBox(height: 28),
-                        Container(
-                          width: double.infinity,
-                          padding: const EdgeInsets.all(24.0),
-                          decoration: BoxDecoration(
-                            color: const Color.fromRGBO(255, 255, 255, 0.97),
-                            borderRadius: BorderRadius.circular(24),
-                            boxShadow: [
-                              const BoxShadow(
-                                color: Color.fromRGBO(0, 0, 0, 0.08),
-                                blurRadius: 20,
-                                offset: Offset(0, 10),
-                              ),
-                            ],
-                          ),
+                        VeridiaCard(
+                          padding: const EdgeInsets.all(20),
+                          glow: true,
                           child: Column(
                             crossAxisAlignment: CrossAxisAlignment.stretch,
                             children: [
-                              _crearCampoTexto(
+                              _SelectorRol(
+                                valor: _selectedRole,
+                                onChanged: (rol) =>
+                                    setState(() => _selectedRole = rol),
+                              ),
+                              const SizedBox(height: 20),
+                              VeridiaTextField(
                                 controller: _emailController,
                                 hintText: 'Correo electrónico',
-                                icon: Icons.email_outlined,
+                                icon: Icons.mail_outline,
+                                keyboardType: TextInputType.emailAddress,
+                                textInputAction: TextInputAction.next,
                               ),
-                              _crearCampoTexto(
+                              const SizedBox(height: 14),
+                              VeridiaTextField(
                                 controller: _passwordController,
                                 hintText: 'Contraseña',
                                 icon: Icons.lock_outline,
                                 isPassword: true,
-                              ),
-                              const SizedBox(height: 12),
-                              DropdownButtonFormField<String>(
-                                initialValue: _selectedRole,
-                                decoration: InputDecoration(
-                                  labelText: 'Iniciar sesión como',
-                                  filled: true,
-                                  fillColor: Theme.of(
-                                    context,
-                                  ).colorScheme.surface,
-                                  border: OutlineInputBorder(
-                                    borderRadius: BorderRadius.circular(14),
-                                    borderSide: const BorderSide(
-                                      color: Color(0xFFCAD2C5),
-                                      width: 1,
-                                    ),
-                                  ),
-                                  enabledBorder: OutlineInputBorder(
-                                    borderRadius: BorderRadius.circular(14),
-                                    borderSide: const BorderSide(
-                                      color: Color(0xFFCAD2C5),
-                                      width: 1,
-                                    ),
-                                  ),
-                                ),
-                                items: const [
-                                  DropdownMenuItem(
-                                    value: 'Explorador',
-                                    child: Text('Explorador'),
-                                  ),
-                                  DropdownMenuItem(
-                                    value: 'Administrador',
-                                    child: Text('Administrador'),
-                                  ),
-                                ],
-                                onChanged: (value) {
-                                  if (value != null) {
-                                    setState(() {
-                                      _selectedRole = value;
-                                    });
-                                  }
-                                },
+                                textInputAction: TextInputAction.done,
+                                onSubmitted: (_) => _iniciarSesion(),
                               ),
                               AnimatedVisibility(
                                 visible: _selectedRole == 'Administrador',
@@ -574,47 +422,50 @@ class _LoginScreenState extends State<LoginScreen>
                                   crossAxisAlignment:
                                       CrossAxisAlignment.stretch,
                                   children: [
-                                    const SizedBox(height: 10),
-                                    const Text(
-                                      'El rol Administrador requiere el código privado.',
-                                      style: TextStyle(
-                                        fontSize: 13,
-                                        color: Color(0xFF4F4F4F),
-                                        height: 1.4,
-                                      ),
+                                    const SizedBox(height: 14),
+                                    Row(
+                                      children: [
+                                        const Icon(
+                                          Icons.shield_outlined,
+                                          size: 16,
+                                          color: VeridiaColors.secondary,
+                                        ),
+                                        const SizedBox(width: 8),
+                                        Expanded(
+                                          child: Text(
+                                            'El rol Administrador requiere el '
+                                            'código privado.',
+                                            style: text.bodySmall,
+                                          ),
+                                        ),
+                                      ],
                                     ),
                                     const SizedBox(height: 10),
-                                    _crearCampoTexto(
+                                    // Campo sensible: siempre oculto, sin ojo
+                                    // de mostrar/ocultar.
+                                    TextField(
                                       controller: _adminCodeController,
-                                      hintText: 'Código de administrador',
-                                      icon: Icons.vpn_key,
-                                      isPassword: true,
+                                      obscureText: true,
+                                      cursorColor: VeridiaColors.primary,
+                                      style: text.bodyLarge,
+                                      decoration: const InputDecoration(
+                                        hintText: 'Código de administrador',
+                                        prefixIcon: Icon(
+                                          Icons.vpn_key_outlined,
+                                          size: 20,
+                                        ),
+                                      ),
                                     ),
                                   ],
                                 ),
                               ),
-                              const SizedBox(height: 8),
-                              SizedBox(
-                                width: double.infinity,
-                                height: 52,
-                                child: ElevatedButton(
-                                  onPressed: _iniciarSesion,
-                                  style: ElevatedButton.styleFrom(
-                                    backgroundColor: const Color(0xFF1E5631),
-                                    shape: RoundedRectangleBorder(
-                                      borderRadius: BorderRadius.circular(14),
-                                    ),
-                                    elevation: 0,
-                                  ),
-                                  child: const Text(
-                                    'Entrar',
-                                    style: TextStyle(
-                                      color: Colors.white,
-                                      fontSize: 16,
-                                      fontWeight: FontWeight.w600,
-                                    ),
-                                  ),
+                              const SizedBox(height: 20),
+                              FilledButton(
+                                onPressed: _iniciarSesion,
+                                style: FilledButton.styleFrom(
+                                  minimumSize: const Size(double.infinity, 52),
                                 ),
+                                child: const Text('Entrar'),
                               ),
                               AnimatedVisibility(
                                 visible: _selectedRole != 'Administrador',
@@ -622,66 +473,39 @@ class _LoginScreenState extends State<LoginScreen>
                                   crossAxisAlignment:
                                       CrossAxisAlignment.stretch,
                                   children: [
-                                    const SizedBox(height: 12),
+                                    const SizedBox(height: 18),
+                                    Row(
+                                      children: [
+                                        const Expanded(child: Divider()),
+                                        Padding(
+                                          padding: const EdgeInsets.symmetric(
+                                            horizontal: 12,
+                                          ),
+                                          child: Text(
+                                            'o continúa con',
+                                            style: text.labelSmall,
+                                          ),
+                                        ),
+                                        const Expanded(child: Divider()),
+                                      ],
+                                    ),
+                                    const SizedBox(height: 16),
                                     if (kIsWeb)
                                       Center(child: buildGoogleWebButton())
                                     else
-                                      SizedBox(
-                                        width: double.infinity,
-                                        height: 52,
-                                        child: OutlinedButton(
-                                          onPressed: _signInWithGoogle,
-                                          style: OutlinedButton.styleFrom(
-                                            backgroundColor: Colors.white,
-                                            foregroundColor: Colors.black87,
-                                            side: const BorderSide(
-                                              color: Color(0xFFB0B0B0),
-                                            ),
-                                            shape: RoundedRectangleBorder(
-                                              borderRadius:
-                                                  BorderRadius.circular(14),
-                                            ),
-                                            padding: const EdgeInsets.symmetric(
-                                              vertical: 0,
-                                              horizontal: 0,
-                                            ),
+                                      OutlinedButton.icon(
+                                        onPressed: _signInWithGoogle,
+                                        icon: const GoogleLogoIcon(size: 20),
+                                        label: const Text(
+                                          'Iniciar sesión con Google',
+                                        ),
+                                        style: OutlinedButton.styleFrom(
+                                          minimumSize: const Size(
+                                            double.infinity,
+                                            52,
                                           ),
-                                          child: Row(
-                                            mainAxisAlignment:
-                                                MainAxisAlignment.center,
-                                            children: [
-                                              Container(
-                                                height: 36,
-                                                width: 36,
-                                                decoration: BoxDecoration(
-                                                  color: Colors.white,
-                                                  borderRadius:
-                                                      BorderRadius.circular(8),
-                                                  border: Border.all(
-                                                    color: const Color(
-                                                      0xFFDDDDDD,
-                                                    ),
-                                                    width: 1,
-                                                  ),
-                                                ),
-                                                child: const Padding(
-                                                  padding: EdgeInsets.all(6.0),
-                                                  child: GoogleLogoIcon(
-                                                    size: 24,
-                                                  ),
-                                                ),
-                                              ),
-                                              const SizedBox(width: 12),
-                                              const Text(
-                                                'Iniciar sesión con Google',
-                                                style: TextStyle(
-                                                  color: Colors.black87,
-                                                  fontSize: 16,
-                                                  fontWeight: FontWeight.w600,
-                                                ),
-                                              ),
-                                            ],
-                                          ),
+                                          foregroundColor:
+                                              VeridiaColors.onSurface,
                                         ),
                                       ),
                                   ],
@@ -700,17 +524,7 @@ class _LoginScreenState extends State<LoginScreen>
                               ),
                             );
                           },
-                          style: TextButton.styleFrom(
-                            foregroundColor: Colors.white,
-                          ),
-                          child: const Text(
-                            '¿No tienes cuenta? Regístrate aquí',
-                            style: TextStyle(
-                              decoration: TextDecoration.underline,
-                              fontSize: 14,
-                              fontWeight: FontWeight.w500,
-                            ),
-                          ),
+                          child: const Text('¿No tienes cuenta? Regístrate'),
                         ),
                       ],
                     ),
@@ -719,7 +533,106 @@ class _LoginScreenState extends State<LoginScreen>
               ),
             ),
           ),
+        ),
+      ),
+    );
+  }
+}
+
+/// Conmutador Explorador / Administrador.
+class _SelectorRol extends StatelessWidget {
+  const _SelectorRol({required this.valor, required this.onChanged});
+
+  final String valor;
+  final ValueChanged<String> onChanged;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.all(4),
+      decoration: BoxDecoration(
+        color: VeridiaColors.surfaceContainerLowest,
+        borderRadius: BorderRadius.circular(VeridiaRadii.pill),
+        border: Border.all(color: VeridiaColors.outlineVariant),
+      ),
+      child: Row(
+        children: [
+          Expanded(
+            child: _OpcionRol(
+              label: 'Explorador',
+              icon: Icons.travel_explore,
+              seleccionado: valor == 'Explorador',
+              onTap: () => onChanged('Explorador'),
+            ),
+          ),
+          Expanded(
+            child: _OpcionRol(
+              label: 'Administrador',
+              icon: Icons.admin_panel_settings_outlined,
+              seleccionado: valor == 'Administrador',
+              onTap: () => onChanged('Administrador'),
+            ),
+          ),
         ],
+      ),
+    );
+  }
+}
+
+class _OpcionRol extends StatelessWidget {
+  const _OpcionRol({
+    required this.label,
+    required this.icon,
+    required this.seleccionado,
+    required this.onTap,
+  });
+
+  final String label;
+  final IconData icon;
+  final bool seleccionado;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: onTap,
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 180),
+        padding: const EdgeInsets.symmetric(vertical: 10),
+        decoration: BoxDecoration(
+          color: seleccionado
+              ? VeridiaColors.primaryContainer
+              : Colors.transparent,
+          borderRadius: BorderRadius.circular(VeridiaRadii.pill),
+        ),
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(
+              icon,
+              size: 16,
+              color: seleccionado
+                  ? VeridiaColors.onPrimaryContainer
+                  : VeridiaColors.onSurfaceVariant,
+            ),
+            const SizedBox(width: 6),
+            Flexible(
+              child: Text(
+                label,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: TextStyle(
+                  fontFamily: VeridiaFonts.headline,
+                  fontSize: 13,
+                  fontWeight: FontWeight.w700,
+                  color: seleccionado
+                      ? VeridiaColors.onPrimaryContainer
+                      : VeridiaColors.onSurfaceVariant,
+                ),
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }

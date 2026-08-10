@@ -2,7 +2,6 @@ import 'package:firebase_core/firebase_core.dart' show FirebaseOptions;
 import 'package:flutter/foundation.dart'
     show defaultTargetPlatform, kIsWeb, TargetPlatform;
 
-
 class DefaultFirebaseOptions {
   static FirebaseOptions get currentPlatform {
     if (kIsWeb) {
@@ -53,7 +52,8 @@ class DefaultFirebaseOptions {
     messagingSenderId: '523510024166',
     projectId: 'v3ridia',
     storageBucket: 'v3ridia.firebasestorage.app',
-    iosClientId: '523510024166-8mr1e3kh7fnjqhi9ui4v24ln3t6o9n62.apps.googleusercontent.com',
+    iosClientId:
+        '523510024166-8mr1e3kh7fnjqhi9ui4v24ln3t6o9n62.apps.googleusercontent.com',
     iosBundleId: 'com.example.veridiaApp',
   );
 
@@ -63,7 +63,8 @@ class DefaultFirebaseOptions {
     messagingSenderId: '523510024166',
     projectId: 'v3ridia',
     storageBucket: 'v3ridia.firebasestorage.app',
-    iosClientId: '523510024166-8mr1e3kh7fnjqhi9ui4v24ln3t6o9n62.apps.googleusercontent.com',
+    iosClientId:
+        '523510024166-8mr1e3kh7fnjqhi9ui4v24ln3t6o9n62.apps.googleusercontent.com',
     iosBundleId: 'com.example.veridiaApp',
   );
 

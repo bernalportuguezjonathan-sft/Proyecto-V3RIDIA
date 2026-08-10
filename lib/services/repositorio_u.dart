@@ -19,36 +19,37 @@ class UserRepository {
     null,
   );
 
+  UserProfile _perfilDesdeDoc(String id, Map<String, dynamic> data) {
+    final createdDate = data['createdDate'] is String
+        ? DateTime.tryParse(data['createdDate'] as String)
+        : DateTime.now();
+    final banExpiresValue = data['banExpires'];
+    final banExpires = banExpiresValue is String
+        ? DateTime.tryParse(banExpiresValue)
+        : banExpiresValue is Timestamp
+        ? banExpiresValue.toDate()
+        : null;
+    return UserProfile(
+      userId: id,
+      email: data['email'] as String? ?? '',
+      displayName:
+          data['displayName'] as String? ??
+          (data['email'] as String? ?? '').split('@').first,
+      photoURL: data['photoURL'] as String?,
+      tokens: data['tokens'] as int? ?? 0,
+      role: data['role'] as String? ?? 'Explorador',
+      createdDate: createdDate ?? DateTime.now(),
+      isBanned: data['isBanned'] as bool? ?? false,
+      banExpires: banExpires,
+      banReason: data['banReason'] as String?,
+    );
+  }
+
   Future<List<UserProfile>> fetchAllUsers({String? role}) async {
     try {
       final query = await _firestore.collection('users').get();
       final users = query.docs
-          .map((doc) {
-            final data = doc.data();
-            final createdDate = data['createdDate'] is String
-                ? DateTime.tryParse(data['createdDate'] as String)
-                : DateTime.now();
-            final banExpiresValue = data['banExpires'];
-            final banExpires = banExpiresValue is String
-                ? DateTime.tryParse(banExpiresValue)
-                : banExpiresValue is Timestamp
-                ? banExpiresValue.toDate()
-                : null;
-            return UserProfile(
-              userId: doc.id,
-              email: data['email'] as String? ?? '',
-              displayName:
-                  data['displayName'] as String? ??
-                  (data['email'] as String? ?? '').split('@').first,
-              photoURL: data['photoURL'] as String?,
-              tokens: data['tokens'] as int? ?? 0,
-              role: data['role'] as String? ?? 'Explorador',
-              createdDate: createdDate ?? DateTime.now(),
-              isBanned: data['isBanned'] as bool? ?? false,
-              banExpires: banExpires,
-              banReason: data['banReason'] as String?,
-            );
-          })
+          .map((doc) => _perfilDesdeDoc(doc.id, doc.data()))
           .where((user) => role == null || user.role == role)
           .toList();
       users.sort((a, b) => a.displayName.compareTo(b.displayName));
@@ -57,6 +58,39 @@ class UserRepository {
       debugPrint('UserRepository.fetchAllUsers error: $e');
       return [];
     }
+  }
+
+  /// Usuarios en vivo. A diferencia de [fetchAllUsers] no se traga los
+  /// errores: el widget recibe el fallo y puede mostrarlo en pantalla.
+  ///
+  /// `porVeridiums` ordena de mayor a menor saldo (ranking); si no, alfabético.
+  Stream<List<UserProfile>> streamAllUsers({
+    String? role,
+    bool porVeridiums = false,
+  }) {
+    return _firestore.collection('users').snapshots().map((snapshot) {
+      final users = snapshot.docs
+          .map((doc) => _perfilDesdeDoc(doc.id, doc.data()))
+          .where((user) => role == null || user.role == role)
+          .toList();
+      if (porVeridiums) {
+        users.sort((a, b) {
+          final porTokens = b.tokens.compareTo(a.tokens);
+          return porTokens != 0
+              ? porTokens
+              : a.displayName.toLowerCase().compareTo(
+                  b.displayName.toLowerCase(),
+                );
+        });
+      } else {
+        users.sort(
+          (a, b) => a.displayName.toLowerCase().compareTo(
+            b.displayName.toLowerCase(),
+          ),
+        );
+      }
+      return users;
+    });
   }
 
   Future<void> signOut() async {
@@ -84,12 +118,14 @@ class UserRepository {
       final refreshedUser = FirebaseAuth.instance.currentUser;
       if (refreshedUser != null) {
         Map<String, dynamic>? data;
+        var lecturaOk = false;
         try {
           final userDoc = await _firestore
               .collection('users')
               .doc(refreshedUser.uid)
               .get();
           data = userDoc.data();
+          lecturaOk = true;
         } catch (e) {
           debugPrint('Firestore user read error for ${refreshedUser.uid}: $e');
         }
@@ -99,6 +135,47 @@ class UserRepository {
         final cachedDisplayName = await _getCachedDisplayName(
           refreshedUser.uid,
         );
+
+        // Autorreparación: el usuario ya existe en Firebase Auth (inició
+        // sesión bien) pero nunca quedó su documento en Firestore — por
+        // ejemplo, un fallo de red al registrarse. Sin ese documento el
+        // Panel Admin (Moderación, Ranking) nunca lo ve, aunque la persona
+        // siga usando la app con datos solo en caché local. Se crea aquí,
+        // siempre como Explorador: un rol en caché nunca es prueba
+        // suficiente para crear un Administrador (eso exige el código real,
+        // ver firestore.rules → isAdminCodeValid).
+        if (lecturaOk && data == null) {
+          final nombreParaCrear = cachedDisplayName.isNotEmpty
+              ? cachedDisplayName
+              : (refreshedUser.displayName ??
+                    refreshedUser.email?.split('@').first ??
+                    'Usuario');
+          try {
+            await createUserProfile(
+              userId: refreshedUser.uid,
+              email: refreshedUser.email ?? '',
+              displayName: nombreParaCrear,
+              role: 'Explorador',
+            );
+            if (cachedTokens > 0) {
+              await _firestore
+                  .collection('users')
+                  .doc(refreshedUser.uid)
+                  .update({'tokens': cachedTokens});
+            }
+            data = {
+              'email': refreshedUser.email ?? '',
+              'displayName': nombreParaCrear,
+              'role': 'Explorador',
+              'tokens': cachedTokens,
+              'isBanned': false,
+            };
+          } catch (e) {
+            debugPrint(
+              'No se pudo autorreparar el perfil de ${refreshedUser.uid}: $e',
+            );
+          }
+        }
 
         final currentTokens = data != null
             ? (data['tokens'] as int? ?? cachedTokens)
@@ -261,13 +338,11 @@ class UserRepository {
     );
   }
 
-  Future<void> addTokens(int amount) => _setTokens(
-    (currentUser.value?.tokens ?? 0) + amount,
-  );
+  Future<void> addTokens(int amount) =>
+      _setTokens((currentUser.value?.tokens ?? 0) + amount);
 
-  Future<void> removeTokens(int amount) => _setTokens(
-    (currentUser.value?.tokens ?? 0) - amount,
-  );
+  Future<void> removeTokens(int amount) =>
+      _setTokens((currentUser.value?.tokens ?? 0) - amount);
 
   Future<void> _setTokens(int rawTotal) async {
     final user = currentUser.value;

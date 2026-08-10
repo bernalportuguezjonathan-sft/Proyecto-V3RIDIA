@@ -3,6 +3,8 @@ import 'dart:convert';
 import 'package:flutter/services.dart';
 import 'package:latlong2/latlong.dart';
 
+import '../theme/veridia_theme.dart';
+
 class BirdSpecies {
   final String name;
   final String scientificName;
@@ -25,10 +27,14 @@ class BirdSpecies {
     return BirdSpecies(
       name: name,
       scientificName: json['nombre_cientifico'] as String,
-      descriptionHabitat: json['descripcion'] as String? ?? json['descripcion_habitat'] as String? ?? '',
+      descriptionHabitat:
+          json['descripcion'] as String? ??
+          json['descripcion_habitat'] as String? ??
+          '',
       emoji: _emojiForSpecies(name),
       color: _colorForSpecies(name),
-      imageUrl: json['url_imagen'] as String? ?? json['imagen_url'] as String? ?? '',
+      imageUrl:
+          json['url_imagen'] as String? ?? json['imagen_url'] as String? ?? '',
     );
   }
 }
@@ -63,17 +69,24 @@ class BirdZone {
     final coordinates = json['coordenadas'] as Map<String, dynamic>;
     final latitude = (coordinates['latitud'] as num).toDouble();
     final longitude = (coordinates['longitud'] as num).toDouble();
-    final speciesJson = (json['especies'] as List<dynamic>?
-            ?? json['especies_destacadas'] as List<dynamic>)
-        .map((item) => BirdSpecies.fromJson(item as Map<String, dynamic>))
-        .toList();
+    final speciesJson =
+        (json['especies'] as List<dynamic>? ??
+                json['especies_destacadas'] as List<dynamic>)
+            .map((item) => BirdSpecies.fromJson(item as Map<String, dynamic>))
+            .toList();
 
     return BirdZone(
       id: id,
       name: json['nombre_zona'] as String? ?? json['nombre'] as String,
       location: json['municipio'] as String? ?? 'Mosquera',
-      description: json['descripcion_zona'] as String? ?? json['descripcion'] as String? ?? '',
-      habitat: json['habitat'] as String? ?? json['descripcion_zona'] as String? ?? '',
+      description:
+          json['descripcion_zona'] as String? ??
+          json['descripcion'] as String? ??
+          '',
+      habitat:
+          json['habitat'] as String? ??
+          json['descripcion_zona'] as String? ??
+          '',
       latitude: latitude,
       longitude: longitude,
       color: _colorForZone(id),
@@ -85,8 +98,9 @@ class BirdZone {
 
 Future<List<BirdZone>> loadBirdZones() async {
   try {
-    final String jsonString =
-        await rootBundle.loadString('assets/data/mosquera_birds.json');
+    final String jsonString = await rootBundle.loadString(
+      'assets/data/mosquera_birds.json',
+    );
     final List<dynamic> zonesJson = jsonDecode(jsonString) as List<dynamic>;
     return zonesJson
         .map((item) => BirdZone.fromJson(item as Map<String, dynamic>))
@@ -99,7 +113,7 @@ Future<List<BirdZone>> loadBirdZones() async {
 Color _colorForZone(String id) {
   switch (id) {
     case 'humedal-guali':
-      return const Color(0xFF1E5631);
+      return VeridiaColors.primary;
     case 'laguna-la-herrera':
       return const Color(0xFF0F766E);
     case 'parque-principal-mosquera':
@@ -107,7 +121,7 @@ Color _colorForZone(String id) {
     case 'parque-de-la-sabana':
       return const Color(0xFF7C3AED);
     default:
-      return const Color(0xFF1E5631);
+      return VeridiaColors.primary;
   }
 }
 
@@ -117,10 +131,14 @@ Color _colorForSpecies(String name) {
   if (lower.contains('garza')) return const Color(0xFF8BC34A);
   if (lower.contains('pato')) return const Color(0xFF388E3C);
   if (lower.contains('monjita')) return const Color(0xFF66BB6A);
-  if (lower.contains('copetón') || lower.contains('copeton')) return const Color(0xFF3F51B5);
+  if (lower.contains('copetón') || lower.contains('copeton')) {
+    return const Color(0xFF3F51B5);
+  }
   if (lower.contains('mirla')) return const Color(0xFF009688);
-  if (lower.contains('colibrí') || lower.contains('colibri')) return const Color(0xFFFFA000);
-  return const Color(0xFF1E5631);
+  if (lower.contains('colibrí') || lower.contains('colibri')) {
+    return const Color(0xFFFFA000);
+  }
+  return VeridiaColors.primary;
 }
 
 String _emojiForSpecies(String name) {
@@ -182,7 +200,8 @@ List<BirdZone> filterBirdZones(
 }) {
   final normalizedQuery = query.trim().toLowerCase();
   return zones.where((zone) {
-    final matchesQuery = normalizedQuery.isEmpty ||
+    final matchesQuery =
+        normalizedQuery.isEmpty ||
         zone.name.toLowerCase().contains(normalizedQuery) ||
         zone.location.toLowerCase().contains(normalizedQuery) ||
         zone.description.toLowerCase().contains(normalizedQuery) ||
@@ -192,7 +211,8 @@ List<BirdZone> filterBirdZones(
               species.scientificName.toLowerCase().contains(normalizedQuery),
         );
 
-    final matchesSpecies = selectedSpecies == null ||
+    final matchesSpecies =
+        selectedSpecies == null ||
         selectedSpecies.isEmpty ||
         zone.species.any((species) => species.name == selectedSpecies);
 

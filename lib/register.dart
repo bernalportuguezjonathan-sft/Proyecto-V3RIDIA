@@ -8,9 +8,13 @@ import 'services/repositorio_u.dart';
 import 'models/user.dart';
 import 'home.dart';
 import 'admin_home.dart';
+import 'theme/veridia_theme.dart';
 import 'widgets/animated_visibility.dart';
 import 'widgets/google_logo_icon.dart';
 import 'widgets/google_web_button.dart';
+import 'widgets/veridia_logo.dart';
+import 'widgets/veridia_montanas.dart';
+import 'widgets/veridia_ui.dart';
 
 class RegisterScreen extends StatefulWidget {
   const RegisterScreen({super.key});
@@ -66,35 +70,8 @@ class _RegisterScreenState extends State<RegisterScreen>
     }
   }
 
-  // Función para las alertas modernas y flotantes
   void _mostrarAlerta(String mensaje) {
-    ScaffoldMessenger.of(context).clearSnackBars(); // Evita que se acumulen
-
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Row(
-          children: [
-            const Icon(Icons.info_outline, color: Colors.white),
-            const SizedBox(width: 12),
-            Expanded(
-              child: Text(
-                mensaje,
-                style: const TextStyle(
-                  color: Colors.white,
-                  fontSize: 14,
-                  fontWeight: FontWeight.w500,
-                ),
-              ),
-            ),
-          ],
-        ),
-        backgroundColor: const Color(0xFF1E5631), // Verde ambiental
-        behavior: SnackBarBehavior.floating,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-        margin: const EdgeInsets.symmetric(horizontal: 20, vertical: 15),
-        duration: const Duration(seconds: 2), // Desaparece rápido
-      ),
-    );
+    mostrarMensajeVeridia(context, mensaje, esError: true);
   }
 
   // Función principal de registro con tus validaciones
@@ -174,9 +151,7 @@ class _RegisterScreenState extends State<RegisterScreen>
     showDialog(
       context: context,
       barrierDismissible: false,
-      builder: (context) => const Center(
-        child: CircularProgressIndicator(color: Color(0xFF1E5631)),
-      ),
+      builder: (context) => const Center(child: VeridiaLoader()),
     );
 
     try {
@@ -210,7 +185,8 @@ class _RegisterScreenState extends State<RegisterScreen>
             adminCode: adminCode.isEmpty ? null : adminCode,
           );
         } on FirebaseException catch (e) {
-          if (_selectedRole == 'Administrador' && e.code == 'permission-denied') {
+          if (_selectedRole == 'Administrador' &&
+              e.code == 'permission-denied') {
             // Código de administrador incorrecto: no dejamos el perfil a
             // medias, deshacemos la cuenta recién creada.
             UserRepository.instance.currentUser.value = null;
@@ -232,6 +208,10 @@ class _RegisterScreenState extends State<RegisterScreen>
             _selectedRole!,
             name,
           );
+          // Reintenta ya mismo: si fue un fallo de red pasajero, esto evita
+          // que la cuenta quede "fantasma" (existe en Auth, invisible para
+          // el admin) hasta el próximo reinicio de sesión.
+          await UserRepository.instance.initializeUser();
         }
       }
 
@@ -330,6 +310,7 @@ class _RegisterScreenState extends State<RegisterScreen>
           return;
         }
         debugPrint('Could not persist Google profile to Firestore: $e');
+        await UserRepository.instance.initializeUser();
       }
     } else {
       UserRepository.instance.currentUser.value = userProfile;
@@ -389,9 +370,7 @@ class _RegisterScreenState extends State<RegisterScreen>
     showDialog(
       context: context,
       barrierDismissible: false,
-      builder: (context) => const Center(
-        child: CircularProgressIndicator(color: Color(0xFF1E5631)),
-      ),
+      builder: (context) => const Center(child: VeridiaLoader()),
     );
 
     try {
@@ -462,77 +441,38 @@ class _RegisterScreenState extends State<RegisterScreen>
     super.dispose();
   }
 
-  // Diseño de un campo de texto reutilizable para no repetir código
   Widget _crearCampoTexto({
     required TextEditingController controller,
     required String hintText,
     required IconData icon,
     bool isPassword = false,
+    TextInputType? keyboardType,
   }) {
-    final theme = Theme.of(context);
     return Padding(
-      padding: const EdgeInsets.only(bottom: 16.0),
-      child: TextField(
+      padding: const EdgeInsets.only(bottom: 14.0),
+      child: VeridiaTextField(
         controller: controller,
-        obscureText: isPassword,
-        cursorColor: theme.colorScheme.primary,
-        style: const TextStyle(color: Colors.black87, fontSize: 15),
-        decoration: InputDecoration(
-          prefixIcon: Icon(icon, color: theme.colorScheme.primary, size: 22),
-          hintText: hintText,
-          filled: true,
-          fillColor: theme.colorScheme.surface,
-          contentPadding: const EdgeInsets.symmetric(
-            vertical: 18,
-            horizontal: 18,
-          ),
-          border: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(14),
-            borderSide: const BorderSide(color: Color(0xFFCAD2C5), width: 1),
-          ),
-          enabledBorder: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(14),
-            borderSide: const BorderSide(color: Color(0xFFCAD2C5), width: 1),
-          ),
-          focusedBorder: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(14),
-            borderSide: BorderSide(
-              color: theme.colorScheme.primary,
-              width: 1.5,
-            ),
-          ),
-          hintStyle: const TextStyle(color: Colors.grey, fontSize: 15),
-        ),
+        hintText: hintText,
+        icon: icon,
+        isPassword: isPassword,
+        keyboardType: keyboardType,
       ),
     );
   }
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
+    final text = Theme.of(context).textTheme;
+
     return Scaffold(
-      backgroundColor: const Color(0xFFF4F6F8),
-      body: Stack(
-        children: [
-          Positioned.fill(
-            child: Image.asset(
-              'assets/images/background.jpg',
-              fit: BoxFit.cover,
-              filterQuality: FilterQuality.high,
-              semanticLabel: 'Fondo decorativo',
-            ),
-          ),
-          Positioned.fill(
-            child: Container(color: const Color.fromRGBO(0, 0, 0, 0.32)),
-          ),
-          SafeArea(
-            child: Center(
-              child: SingleChildScrollView(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 24.0,
-                  vertical: 28.0,
-                ),
-                physics: const BouncingScrollPhysics(),
+      body: VeridiaMontanas(
+        child: SafeArea(
+          child: Center(
+            child: SingleChildScrollView(
+              padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 28),
+              physics: const BouncingScrollPhysics(),
+              child: ConstrainedBox(
+                constraints: const BoxConstraints(maxWidth: 460),
                 child: FadeTransition(
                   opacity: _fade,
                   child: SlideTransition(
@@ -542,65 +482,21 @@ class _RegisterScreenState extends State<RegisterScreen>
                       children: [
                         ScaleTransition(
                           scale: _logoScale,
-                          child: Container(
-                            width: 112,
-                            height: 112,
-                            decoration: BoxDecoration(
-                              color: theme.colorScheme.surface,
-                              shape: BoxShape.circle,
-                              boxShadow: [
-                                const BoxShadow(
-                                  color: Color.fromRGBO(0, 0, 0, 0.10),
-                                  blurRadius: 16,
-                                  offset: Offset(0, 8),
-                                ),
-                              ],
-                            ),
-                            child: Padding(
-                              padding: const EdgeInsets.all(18.0),
-                              child: Image.asset(
-                                'assets/images/logo.png',
-                                fit: BoxFit.contain,
-                                semanticLabel: 'Logo Veridia',
-                              ),
-                            ),
-                          ),
+                          child: const VeridiaSymbol(size: 92),
                         ),
                         const SizedBox(height: 18),
-                        const Text(
-                          'Regístrate',
-                          style: TextStyle(
-                            fontSize: 26,
-                            fontWeight: FontWeight.bold,
-                            color: Colors.white,
-                            letterSpacing: 0.2,
-                          ),
-                        ),
-                        const SizedBox(height: 10),
-                        const Text(
-                          'Crea tu cuenta para explorar observaciones y proteger ecosistemas.',
+                        Text('Crea tu cuenta', style: text.headlineSmall),
+                        const SizedBox(height: 6),
+                        Text(
+                          'Únete a Veridia y empieza a registrar la '
+                          'biodiversidad que te rodea.',
                           textAlign: TextAlign.center,
-                          style: TextStyle(
-                            color: Colors.white70,
-                            fontSize: 14,
-                            height: 1.4,
-                          ),
+                          style: text.bodySmall,
                         ),
-                        const SizedBox(height: 28),
-                        Container(
-                          width: double.infinity,
-                          padding: const EdgeInsets.all(24.0),
-                          decoration: BoxDecoration(
-                            color: const Color.fromRGBO(255, 255, 255, 0.97),
-                            borderRadius: BorderRadius.circular(24),
-                            boxShadow: [
-                              const BoxShadow(
-                                color: Color.fromRGBO(0, 0, 0, 0.08),
-                                blurRadius: 20,
-                                offset: Offset(0, 10),
-                              ),
-                            ],
-                          ),
+                        const SizedBox(height: 26),
+                        VeridiaCard(
+                          padding: const EdgeInsets.all(20),
+                          glow: true,
                           child: Column(
                             crossAxisAlignment: CrossAxisAlignment.stretch,
                             children: [
@@ -612,7 +508,8 @@ class _RegisterScreenState extends State<RegisterScreen>
                               _crearCampoTexto(
                                 controller: _emailController,
                                 hintText: 'Correo electrónico',
-                                icon: Icons.email_outlined,
+                                icon: Icons.mail_outline,
+                                keyboardType: TextInputType.emailAddress,
                               ),
                               _crearCampoTexto(
                                 controller: _passwordController,
@@ -626,33 +523,22 @@ class _RegisterScreenState extends State<RegisterScreen>
                                 icon: Icons.lock_outline,
                                 isPassword: true,
                               ),
-                              const SizedBox(height: 16),
+                              const SizedBox(height: 6),
                               DropdownButtonFormField<String>(
                                 initialValue: _selectedRole,
                                 isExpanded: true,
-                                style: const TextStyle(color: Colors.black87),
-                                icon: Icon(
+                                style: text.bodyLarge,
+                                icon: const Icon(
                                   Icons.arrow_drop_down,
-                                  color: theme.colorScheme.primary,
+                                  color: VeridiaColors.primary,
                                 ),
-                                dropdownColor: theme.colorScheme.surface,
-                                decoration: InputDecoration(
+                                dropdownColor:
+                                    VeridiaColors.surfaceContainerHigh,
+                                decoration: const InputDecoration(
                                   hintText: 'Selecciona tipo de usuario',
-                                  filled: true,
-                                  fillColor: theme.colorScheme.surface,
-                                  border: OutlineInputBorder(
-                                    borderRadius: BorderRadius.circular(14),
-                                    borderSide: const BorderSide(
-                                      color: Color(0xFFCAD2C5),
-                                      width: 1,
-                                    ),
-                                  ),
-                                  enabledBorder: OutlineInputBorder(
-                                    borderRadius: BorderRadius.circular(14),
-                                    borderSide: const BorderSide(
-                                      color: Color(0xFFCAD2C5),
-                                      width: 1,
-                                    ),
+                                  prefixIcon: Icon(
+                                    Icons.badge_outlined,
+                                    size: 20,
                                   ),
                                 ),
                                 items: const [
@@ -667,9 +553,7 @@ class _RegisterScreenState extends State<RegisterScreen>
                                 ],
                                 onChanged: (value) {
                                   if (value != null) {
-                                    setState(() {
-                                      _selectedRole = value;
-                                    });
+                                    setState(() => _selectedRole = value);
                                   }
                                 },
                               ),
@@ -679,27 +563,51 @@ class _RegisterScreenState extends State<RegisterScreen>
                                   crossAxisAlignment:
                                       CrossAxisAlignment.stretch,
                                   children: [
-                                    const SizedBox(height: 16),
-                                    _crearCampoTexto(
+                                    const SizedBox(height: 14),
+                                    // Campo sensible: oculto siempre, sin ojo.
+                                    TextField(
                                       controller: _adminCodeController,
-                                      hintText:
-                                          'Código privado de administrador',
-                                      icon: Icons.vpn_key_outlined,
-                                    ),
-                                    const SizedBox(height: 8),
-                                    const Text(
-                                      'Solicita a tus superiores el código de administrador antes de continuar.',
-                                      style: TextStyle(
-                                        color: Colors.black54,
-                                        fontSize: 12,
+                                      obscureText: true,
+                                      cursorColor: VeridiaColors.primary,
+                                      style: text.bodyLarge,
+                                      decoration: const InputDecoration(
+                                        hintText:
+                                            'Código privado de administrador',
+                                        prefixIcon: Icon(
+                                          Icons.vpn_key_outlined,
+                                          size: 20,
+                                        ),
                                       ),
+                                    ),
+                                    const SizedBox(height: 10),
+                                    Row(
+                                      crossAxisAlignment:
+                                          CrossAxisAlignment.start,
+                                      children: [
+                                        const Icon(
+                                          Icons.info_outline,
+                                          size: 15,
+                                          color: VeridiaColors.secondary,
+                                        ),
+                                        const SizedBox(width: 8),
+                                        Expanded(
+                                          child: Text(
+                                            'Solicita el código de '
+                                            'administrador antes de continuar.',
+                                            style: text.bodySmall,
+                                          ),
+                                        ),
+                                      ],
                                     ),
                                   ],
                                 ),
                               ),
-                              const SizedBox(height: 24),
-                              ElevatedButton(
+                              const SizedBox(height: 22),
+                              FilledButton(
                                 onPressed: _registrarUsuario,
+                                style: FilledButton.styleFrom(
+                                  minimumSize: const Size(double.infinity, 52),
+                                ),
                                 child: const Text('Registrarse'),
                               ),
                               AnimatedVisibility(
@@ -708,66 +616,39 @@ class _RegisterScreenState extends State<RegisterScreen>
                                   crossAxisAlignment:
                                       CrossAxisAlignment.stretch,
                                   children: [
-                                    const SizedBox(height: 12),
+                                    const SizedBox(height: 18),
+                                    Row(
+                                      children: [
+                                        const Expanded(child: Divider()),
+                                        Padding(
+                                          padding: const EdgeInsets.symmetric(
+                                            horizontal: 12,
+                                          ),
+                                          child: Text(
+                                            'o continúa con',
+                                            style: text.labelSmall,
+                                          ),
+                                        ),
+                                        const Expanded(child: Divider()),
+                                      ],
+                                    ),
+                                    const SizedBox(height: 16),
                                     if (kIsWeb)
                                       Center(child: buildGoogleWebButton())
                                     else
-                                      SizedBox(
-                                        width: double.infinity,
-                                        height: 52,
-                                        child: OutlinedButton(
-                                          onPressed: _registrarseConGoogle,
-                                          style: OutlinedButton.styleFrom(
-                                            backgroundColor: Colors.white,
-                                            foregroundColor: Colors.black87,
-                                            side: const BorderSide(
-                                              color: Color(0xFFB0B0B0),
-                                            ),
-                                            shape: RoundedRectangleBorder(
-                                              borderRadius:
-                                                  BorderRadius.circular(14),
-                                            ),
-                                            padding: const EdgeInsets.symmetric(
-                                              vertical: 0,
-                                              horizontal: 0,
-                                            ),
+                                      OutlinedButton.icon(
+                                        onPressed: _registrarseConGoogle,
+                                        icon: const GoogleLogoIcon(size: 20),
+                                        label: const Text(
+                                          'Registrarse con Google',
+                                        ),
+                                        style: OutlinedButton.styleFrom(
+                                          minimumSize: const Size(
+                                            double.infinity,
+                                            52,
                                           ),
-                                          child: Row(
-                                            mainAxisAlignment:
-                                                MainAxisAlignment.center,
-                                            children: [
-                                              Container(
-                                                height: 36,
-                                                width: 36,
-                                                decoration: BoxDecoration(
-                                                  color: Colors.white,
-                                                  borderRadius:
-                                                      BorderRadius.circular(8),
-                                                  border: Border.all(
-                                                    color: const Color(
-                                                      0xFFDDDDDD,
-                                                    ),
-                                                    width: 1,
-                                                  ),
-                                                ),
-                                                child: const Padding(
-                                                  padding: EdgeInsets.all(6.0),
-                                                  child: GoogleLogoIcon(
-                                                    size: 24,
-                                                  ),
-                                                ),
-                                              ),
-                                              const SizedBox(width: 12),
-                                              const Text(
-                                                'Registrarse con Google',
-                                                style: TextStyle(
-                                                  color: Colors.black87,
-                                                  fontSize: 16,
-                                                  fontWeight: FontWeight.w600,
-                                                ),
-                                              ),
-                                            ],
-                                          ),
+                                          foregroundColor:
+                                              VeridiaColors.onSurface,
                                         ),
                                       ),
                                   ],
@@ -777,32 +658,10 @@ class _RegisterScreenState extends State<RegisterScreen>
                           ),
                         ),
                         const SizedBox(height: 18),
-                        SizedBox(
-                          width: double.infinity,
-                          height: 52,
-                          child: OutlinedButton(
-                            onPressed: () {
-                              Navigator.pop(context);
-                            },
-                            style: OutlinedButton.styleFrom(
-                              backgroundColor: Colors.white.withValues(
-                                alpha: 0.2,
-                              ),
-                              foregroundColor: Colors.white,
-                              side: const BorderSide(
-                                color: Colors.white,
-                                width: 1.5,
-                              ),
-                              shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(16),
-                              ),
-                              textStyle: const TextStyle(
-                                fontSize: 16,
-                                fontWeight: FontWeight.w700,
-                              ),
-                            ),
-                            child: const Text('Volver al inicio de sesión'),
-                          ),
+                        TextButton.icon(
+                          onPressed: () => Navigator.pop(context),
+                          icon: const Icon(Icons.arrow_back, size: 18),
+                          label: const Text('Volver al inicio de sesión'),
                         ),
                       ],
                     ),
@@ -811,7 +670,7 @@ class _RegisterScreenState extends State<RegisterScreen>
               ),
             ),
           ),
-        ],
+        ),
       ),
     );
   }
