@@ -22,10 +22,15 @@ void main() {
       expect(calcularBonoCompletar(0), 1);
       expect(calcularBonoCompletar(-3), 1);
     });
+
+    test('nunca da más de 10 Veridiums, por grande que sea la meta', () {
+      expect(calcularBonoCompletar(500), 10);
+      expect(calcularBonoCompletar(10000), 10);
+    });
   });
 
   group('Challenge', () {
-    Challenge crear({required int meta, int? premio}) => Challenge(
+    Challenge crear({required int meta}) => Challenge(
       id: 'c1',
       title: 'Fotografía aves',
       description: 'Registra aves de la Sabana',
@@ -35,16 +40,18 @@ void main() {
       createdDate: DateTime(2026, 8, 1),
       currentProgress: 0,
       isCompleted: false,
-      tokensReward: premio,
     );
 
-    test('calcula el bono a partir de la meta si no se indica', () {
+    test('el bono siempre se deriva de la meta', () {
       expect(crear(meta: 10).tokensReward, 1);
       expect(crear(meta: 50).tokensReward, 5);
     });
 
-    test('respeta un premio explícito', () {
-      expect(crear(meta: 10, premio: 42).tokensReward, 42);
+    test('ignora un tokensReward inflado guardado en Firestore', () {
+      // Los desafíos creados antes traían un bono fijo de 100 en el
+      // documento: leerlo hacía que una meta de 5 fotos pagara 100.
+      final map = crear(meta: 5).toMap()..['tokensReward'] = 100;
+      expect(Challenge.fromMap('c1', map).tokensReward, 1);
     });
 
     test('un desafío sin usuario asignado es global', () {

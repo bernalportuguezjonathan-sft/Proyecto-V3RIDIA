@@ -2,6 +2,11 @@ import 'package:flutter/material.dart';
 import '../theme/veridia_theme.dart';
 
 /// Logo completo (colibrí + palabra VERIDIA).
+///
+/// [size] es el ALTO del dibujo; el ancho sale de su proporción real. El PNG
+/// viene recortado al contenido y con fondo transparente, así que quien lo
+/// envuelva (por ejemplo [VeridiaMarcoLogo]) queda ajustado al logo en vez de
+/// a un lienzo cuadrado lleno de espacio vacío.
 class VeridiaLogo extends StatelessWidget {
   const VeridiaLogo({super.key, this.size = 160});
 
@@ -11,7 +16,6 @@ class VeridiaLogo extends StatelessWidget {
   Widget build(BuildContext context) {
     return Image.asset(
       'assets/images/veridia_logo_completo.png',
-      width: size,
       height: size,
       fit: BoxFit.contain,
       filterQuality: FilterQuality.high,

@@ -246,9 +246,15 @@ class _ChallengesScreenState extends State<ChallengesScreen> {
         return;
       }
 
-      final message = newProgress >= challenge.targetGoal
-          ? '¡Desafío completado! Bono entregado.'
-          : 'IA confirmó "${resultado.commonName}". Progreso: $newProgress/${challenge.targetGoal}';
+      final completado = newProgress >= challenge.targetGoal;
+      final bono = completado && !challenge.tokensAwarded
+          ? challenge.tokensReward
+          : 0;
+      final message = completado
+          ? '¡Desafío completado! +1 Veridium por la foto'
+                '${bono > 0 ? ' y +$bono de bono' : ''}.'
+          : 'IA confirmó "${resultado.commonName}". '
+                'Progreso: $newProgress/${challenge.targetGoal} (+1 Veridium)';
       messenger.showSnackBar(SnackBar(content: Text(message)));
     } finally {
       if (mounted) setState(() => _analizando.remove(challenge.id));

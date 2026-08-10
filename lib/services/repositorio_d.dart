@@ -68,26 +68,56 @@ class ChallengeRepository {
   /// Cada foto verificada da 1 Veridium. Al completar el desafío se suma
   /// ADEMÁS el bono (`tokensReward`), una sola vez: `tokensAwarded` evita
   /// repetirlo si el progreso se vuelve a tocar.
+  ///
+  /// Todo ocurre en una sola transacción de Firestore (desafío + tokens del
+  /// usuario) para que dos actualizaciones casi simultáneas no dupliquen el
+  /// bono ni pierdan progreso.
   Future<void> updateProgress(String id, int newProgress) async {
-    final matches = challenges.value.where((c) => c.id == id);
-    if (matches.isEmpty) return;
-    final challenge = matches.first;
+    final uid = FirebaseAuth.instance.currentUser?.uid;
+    if (uid == null) return;
 
-    final normalizedProgress = newProgress.clamp(0, challenge.targetGoal);
-    final isCompleted = normalizedProgress >= challenge.targetGoal;
-    final progressDelta = normalizedProgress - challenge.currentProgress;
-    if (progressDelta <= 0) return;
+    final challengeRef = _collection.doc(id);
+    final userRef = FirebaseFirestore.instance.collection('users').doc(uid);
 
-    final entregarPremio = isCompleted && !challenge.tokensAwarded;
+    int? newTokens;
+    try {
+      await FirebaseFirestore.instance
+          .runTransaction((tx) async {
+        final challengeSnapshot = await tx.get(challengeRef);
+        final userSnapshot = await tx.get(userRef);
+        final challengeData = challengeSnapshot.data();
+        if (challengeData == null) return;
 
-    await _collection.doc(id).update({
-      'currentProgress': normalizedProgress,
-      'isCompleted': isCompleted,
-      'tokensAwarded': challenge.tokensAwarded || entregarPremio,
-    });
+        final challenge = Challenge.fromMap(challengeSnapshot.id, challengeData);
+        final normalizedProgress = newProgress.clamp(0, challenge.targetGoal);
+        final isCompleted = normalizedProgress >= challenge.targetGoal;
+        final progressDelta = normalizedProgress - challenge.currentProgress;
+        if (progressDelta <= 0) return;
 
-    await UserRepository.instance.addTokens(
-      progressDelta + (entregarPremio ? challenge.tokensReward : 0),
-    );
+        final entregarPremio = isCompleted && !challenge.tokensAwarded;
+        final tokenDelta =
+            progressDelta + (entregarPremio ? challenge.tokensReward : 0);
+
+        tx.update(challengeRef, {
+          'currentProgress': normalizedProgress,
+          'isCompleted': isCompleted,
+          'tokensAwarded': challenge.tokensAwarded || entregarPremio,
+        });
+
+        final currentTokens =
+            (userSnapshot.data()?['tokens'] as int?) ?? 0;
+        final updatedTokens = currentTokens + tokenDelta;
+        newTokens = updatedTokens < 0 ? 0 : updatedTokens;
+        tx.update(userRef, {'tokens': newTokens});
+      })
+          .timeout(const Duration(seconds: 20));
+    } catch (e) {
+      debugPrint('ChallengeRepository.updateProgress transaction error: $e');
+      return;
+    }
+
+    if (newTokens != null) {
+      UserRepository.instance.syncTokensFromServer(uid, newTokens!);
+    }
   }
 }

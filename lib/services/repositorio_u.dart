@@ -204,10 +204,13 @@ class UserRepository {
             : null;
         var banReason = data != null ? data['banReason'] as String? : null;
 
+        // Suspensión temporal ya cumplida: se levanta al entrar. Si Firestore
+        // la rechaza no debe tumbar todo initializeUser() y dejar al usuario
+        // sin perfil cargado: se queda suspendido y un admin puede levantarla.
         if (currentIsBanned &&
             banExpires != null &&
-            banExpires.isBefore(DateTime.now())) {
-          await unbanUser(userId: refreshedUser.uid);
+            banExpires.isBefore(DateTime.now()) &&
+            await intentarLevantarSuspension(refreshedUser.uid)) {
           currentIsBanned = false;
           banReason = null;
         }
@@ -307,6 +310,21 @@ class UserRepository {
     });
   }
 
+  /// Levanta una suspensión temporal ya cumplida.
+  ///
+  /// Devuelve true solo si el servidor aceptó el cambio. Si lo rechaza, el
+  /// usuario sigue suspendido de verdad y quien llama no debe dejarlo entrar:
+  /// el estado de Firestore manda, no el que la app calculó en memoria.
+  Future<bool> intentarLevantarSuspension(String userId) async {
+    try {
+      await unbanUser(userId: userId);
+      return true;
+    } catch (e) {
+      debugPrint('No se pudo levantar la suspensión vencida: $e');
+      return false;
+    }
+  }
+
   Future<UserProfile?> getUserProfileById(String userId) async {
     final doc = await _firestore.collection('users').doc(userId).get();
     final data = doc.data();
@@ -338,29 +356,47 @@ class UserRepository {
     );
   }
 
-  Future<void> addTokens(int amount) =>
-      _setTokens((currentUser.value?.tokens ?? 0) + amount);
+  Future<void> addTokens(int amount) => _adjustTokens(amount);
 
-  Future<void> removeTokens(int amount) =>
-      _setTokens((currentUser.value?.tokens ?? 0) - amount);
+  Future<void> removeTokens(int amount) => _adjustTokens(-amount);
 
-  Future<void> _setTokens(int rawTotal) async {
+  /// Suma/resta tokens de forma atómica sobre el valor que tenga el
+  /// servidor en ese momento (no sobre el caché local), para que dos
+  /// ajustes casi simultáneos (p. ej. dos desafíos completados seguidos)
+  /// no se pisen entre sí.
+  Future<void> _adjustTokens(int delta) async {
     final user = currentUser.value;
     if (user == null) return;
 
-    final newTokens = rawTotal < 0 ? 0 : rawTotal;
-    currentUser.value = user.copyWith(tokens: newTokens);
-    await _cacheTokens(user.userId, newTokens);
-
-    // Persistimos en Firestore; si falla, el valor queda al menos en caché.
     try {
-      await _firestore.collection('users').doc(user.userId).update({
-        'tokens': newTokens,
+      final newTokens = await _firestore.runTransaction<int>((tx) async {
+        final ref = _firestore.collection('users').doc(user.userId);
+        final snapshot = await tx.get(ref);
+        final current = (snapshot.data()?['tokens'] as int?) ?? user.tokens;
+        final updated = current + delta;
+        final clamped = updated < 0 ? 0 : updated;
+        tx.update(ref, {'tokens': clamped});
+        return clamped;
       });
+      _applyTokensLocally(user.userId, newTokens);
     } catch (e) {
       debugPrint('Warning: failed to persist tokens: $e');
     }
   }
+
+  void _applyTokensLocally(String userId, int tokens) {
+    final user = currentUser.value;
+    if (user != null && user.userId == userId) {
+      currentUser.value = user.copyWith(tokens: tokens);
+    }
+    _cacheTokens(userId, tokens);
+  }
+
+  /// Usado por otros repositorios (p. ej. desafíos) que ya movieron los
+  /// tokens del usuario dentro de su propia transacción de Firestore, para
+  /// mantener sincronizado el estado en memoria/caché sin volver a escribir.
+  void syncTokensFromServer(String userId, int tokens) =>
+      _applyTokensLocally(userId, tokens);
 
   int getTokens() {
     return currentUser.value?.tokens ?? 0;

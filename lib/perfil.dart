@@ -4,7 +4,6 @@ import 'package:flutter_image_compress/flutter_image_compress.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
-import 'package:firebase_storage/firebase_storage.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:app_settings/app_settings.dart';
@@ -15,6 +14,7 @@ import 'historial.dart';
 import 'models/observation.dart';
 import 'models/user.dart';
 import 'privacidad_seguridad.dart';
+import 'services/foto_service.dart';
 import 'services/repositorio_o.dart';
 import 'services/repositorio_u.dart';
 import 'theme/veridia_theme.dart';
@@ -197,55 +197,27 @@ class _ProfileScreenState extends State<ProfileScreen> {
     );
   }
 
+  /// Sube la foto de perfil a Supabase Storage.
+  ///
+  /// Lanza si no se pudo subir, para que quien llama distinga "quedó solo en
+  /// este dispositivo" de "quedó guardada de verdad".
   Future<String?> _uploadProfilePhoto(Uint8List imageData) async {
     final user = FirebaseAuth.instance.currentUser;
     if (user == null) return null;
 
-    final fileName =
-        _selectedProfileImageName ??
-        '${DateTime.now().millisecondsSinceEpoch}.jpg';
-    final extension = fileName.contains('.')
-        ? fileName.split('.').last.toLowerCase()
-        : 'jpg';
-    final contentType = extension == 'png' ? 'image/png' : 'image/jpeg';
+    final fileName = _selectedProfileImageName ?? '';
+    final contentType = fileName.toLowerCase().endsWith('.png')
+        ? 'image/png'
+        : 'image/jpeg';
 
-    final storageRef = FirebaseStorage.instance
-        .ref()
-        .child('profile_photos')
-        .child(user.uid)
-        .child(fileName);
-
-    final uploadTask = storageRef.putData(
-      imageData,
-      SettableMetadata(contentType: contentType),
+    final resultado = await FotoService.instance.subirFotoPerfil(
+      bytes: imageData,
+      userId: user.uid,
+      mimeType: contentType,
     );
 
-    final TaskSnapshot snapshot = await uploadTask.snapshotEvents
-        .where(
-          (event) =>
-              event.state == TaskState.success ||
-              event.state == TaskState.error ||
-              event.state == TaskState.canceled,
-        )
-        .first
-        .timeout(
-          const Duration(seconds: 20),
-          onTimeout: () {
-            uploadTask.cancel();
-            throw TimeoutException(
-              'La subida tardó demasiado. La foto ya quedó guardada localmente.',
-            );
-          },
-        );
-
-    if (snapshot.state != TaskState.success) {
-      throw FirebaseException(
-        plugin: 'firebase_storage',
-        message: 'No se pudo subir la imagen de perfil.',
-      );
-    }
-
-    return await snapshot.ref.getDownloadURL();
+    if (!resultado.exitosa) throw Exception(resultado.error);
+    return resultado.url;
   }
 
   Future<void> _saveProfileChanges() async {

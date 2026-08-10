@@ -12,10 +12,15 @@ dependencies:
     sdk: flutter
 
   cupertino_icons: ^1.0.8
-  firebase_core:
-  firebase_auth: 
-  firebase_storage:
-  cloud_firestore:
+
+  # Fijadas a propósito: sin restricción, un `pub upgrade` podía traer una
+  # major nueva de Firebase y romper la app sin que nadie tocara el código.
+  firebase_core: ^4.11.0
+  firebase_auth: ^6.5.4
+  cloud_firestore: ^6.6.0
+  # Sin firebase_storage a propósito: las fotos van a Supabase Storage
+  # (ver lib/services/foto_service.dart). Firebase Storage no está
+  # aprovisionado en el proyecto y exigiría plan Blaze.
 
   image_picker: ^1.1.2
   google_sign_in: ^6.1.0

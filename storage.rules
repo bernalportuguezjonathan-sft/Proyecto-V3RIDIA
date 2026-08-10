@@ -1,3 +1,10 @@
+// INACTIVO. La app guarda sus fotos en Supabase Storage, no en Firebase
+// Storage (ver lib/services/foto_service.dart), así que estas reglas no
+// están desplegadas y firebase.json ya no las referencia.
+//
+// Se conservan por si algún día se activa Firebase Storage: haría falta
+// subir el proyecto al plan Blaze, volver a añadir el bloque "storage" a
+// firebase.json y ejecutar `firebase deploy --only storage`.
 rules_version = '2';
 service firebase.storage {
   match /b/{bucket}/o {

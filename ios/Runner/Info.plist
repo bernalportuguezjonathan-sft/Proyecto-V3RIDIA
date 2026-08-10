@@ -4,6 +4,14 @@
 <dict>
 	<key>CADisableMinimumFrameDurationOnPhone</key>
 	<true/>
+	<!-- iOS cierra la app al pedir cámara, fotos o ubicación si falta su
+	     descripción. Sin estas claves, la Cámara IA y el mapa la tumbaban. -->
+	<key>NSCameraUsageDescription</key>
+	<string>Veridia usa la cámara para fotografiar especies e identificarlas con IA.</string>
+	<key>NSPhotoLibraryUsageDescription</key>
+	<string>Veridia accede a tus fotos para que puedas subir avistamientos ya tomados.</string>
+	<key>NSLocationWhenInUseUsageDescription</key>
+	<string>Veridia usa tu ubicación para situar tus avistamientos en el mapa y mostrarte zonas cercanas.</string>
 	<key>CFBundleDevelopmentRegion</key>
 	<string>$(DEVELOPMENT_LANGUAGE)</string>
 	<key>CFBundleDisplayName</key>

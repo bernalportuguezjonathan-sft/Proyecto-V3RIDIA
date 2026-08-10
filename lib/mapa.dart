@@ -7,7 +7,9 @@ import 'package:latlong2/latlong.dart';
 import 'detallemapa.dart';
 import 'models/bird_zone.dart';
 import 'models/observation.dart';
+import 'models/user.dart';
 import 'services/repositorio_o.dart';
+import 'services/repositorio_u.dart';
 import 'theme/veridia_theme.dart';
 import 'identify_species.dart';
 import 'navegacion.dart';
@@ -679,10 +681,10 @@ class _MapScreenState extends State<MapScreen> {
                   ),
                   children: [
                     TileLayer(
-                      urlTemplate:
-                          'https://basemaps.cartocdn.com/dark_all/{z}/{x}/{y}@2x.png',
+                      urlTemplate: VeridiaMapa.urlTeselas,
                       userAgentPackageName: 'com.example.veridia_app',
                       retinaMode: true,
+                      tileBuilder: VeridiaMapa.teselaTenida,
                     ),
                     PolygonLayer(polygons: _buildPolygons()),
                     MarkerLayer(markers: _buildMarkers()),
@@ -737,6 +739,15 @@ class _MapScreenState extends State<MapScreen> {
                             fontSize: 10,
                             color: VeridiaColors.secondary,
                             fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                        // Atribución exigida por la licencia de los mapas.
+                        const SizedBox(height: 4),
+                        Text(
+                          VeridiaMapa.atribucion,
+                          style: TextStyle(
+                            fontSize: 8,
+                            color: VeridiaColors.onSurfaceVariant,
                           ),
                         ),
                       ],
@@ -950,12 +961,20 @@ class _MapScreenState extends State<MapScreen> {
           ),
         ],
       ),
-      floatingActionButton: FloatingActionButton.extended(
-        heroTag: 'registrar-avistamiento',
-        onPressed: () =>
-            VeridiaNav.abrir(context, const IdentifySpeciesScreen()),
-        icon: const Icon(Icons.add_a_photo_outlined, size: 20),
-        label: const Text('Registrar especie'),
+      // Registrar especies es tarea del explorador: el administrador modera
+      // y asigna desafíos, así que el botón solo le estorbaría.
+      floatingActionButton: ValueListenableBuilder<UserProfile?>(
+        valueListenable: UserRepository.instance.currentUser,
+        builder: (context, perfil, _) {
+          if (perfil?.role == 'Administrador') return const SizedBox.shrink();
+          return FloatingActionButton.extended(
+            heroTag: 'registrar-avistamiento',
+            onPressed: () =>
+                VeridiaNav.abrir(context, const IdentifySpeciesScreen()),
+            icon: const Icon(Icons.add_a_photo_outlined, size: 20),
+            label: const Text('Registrar especie'),
+          );
+        },
       ),
       bottomNavigationBar: VeridiaBottomNav(
         currentIndex: 2,

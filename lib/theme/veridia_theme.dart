@@ -54,6 +54,35 @@ abstract final class VeridiaFonts {
   static const body = 'HankenGrotesk';
 }
 
+/// Estilo del mapa, centralizado para que todas las pantallas que dibujan
+/// un mapa se vean igual.
+abstract final class VeridiaMapa {
+  /// Base cartográfica legible (CartoDB Voyager): conserva nombres de calles,
+  /// parques y cuerpos de agua. Sustituye a la base `dark_all`, que dejaba
+  /// las etiquetas casi invisibles sobre el fondo oscuro de la app.
+  static const urlTeselas =
+      'https://basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}@2x.png';
+
+  static const atribucion = '© OpenStreetMap, © CARTO';
+
+  /// Baja la saturación de la base clara, la oscurece un poco y la inclina
+  /// hacia el verde de la paleta. El resultado es un mapa en tono medio:
+  /// se leen calles y lugares, pero no desentona con el resto de la app.
+  static const tinte = ColorFilter.matrix(<double>[
+    0.7414, 0.1259, 0.0127, 0, -8, //
+    0.0383, 0.8487, 0.0130, 0, 2, //
+    0.0357, 0.1202, 0.6841, 0, -10, //
+    0, 0, 0, 1, 0, //
+  ]);
+
+  /// Aplica [tinte] a cada tesela. Se pasa a `TileLayer.tileBuilder`.
+  static Widget teselaTenida(
+    BuildContext context,
+    Widget tesela,
+    Object _,
+  ) => ColorFiltered(colorFilter: tinte, child: tesela);
+}
+
 abstract final class VeridiaRadii {
   static const sm = 8.0;
   static const md = 12.0;

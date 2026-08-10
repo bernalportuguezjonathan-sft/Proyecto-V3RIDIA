@@ -1,10 +1,11 @@
-/// Bono de Veridiums al completar un desafío: 10% de la meta, redondeado
-/// hacia arriba, mínimo 1. Reemplaza el antiguo valor fijo (100 para
-/// cualquier meta, sin relación con el esfuerzo pedido).
+/// Bono de Veridiums por CERRAR un desafío.
+///
+/// La economía es: cada foto verificada paga 1 Veridium, y completar el
+/// desafío añade este extra — un 10% de la meta, acotado entre 1 y 10. Un
+/// desafío de 5 fotos paga entonces 5 + 1 = 6 Veridiums en total.
 int calcularBonoCompletar(int metaGoal) {
-  if (metaGoal <= 0) return 1;
-  final bono = (metaGoal / 10).ceil();
-  return bono < 1 ? 1 : bono;
+  if (metaGoal <= 1) return 1;
+  return (metaGoal / 10).ceil().clamp(1, 10);
 }
 
 class Challenge {
@@ -23,8 +24,7 @@ class Challenge {
     this.assignedToEmail,
     this.assignedByAdmin,
     this.tokensAwarded = false,
-    int? tokensReward,
-  }) : tokensReward = tokensReward ?? calcularBonoCompletar(targetGoal);
+  });
 
   final String id;
   final String title;
@@ -40,7 +40,11 @@ class Challenge {
   final String? assignedToEmail;
   final String? assignedByAdmin;
   final bool tokensAwarded;
-  final int tokensReward;
+
+  /// Se DERIVA siempre de la meta, nunca se lee de Firestore. Hay desafíos
+  /// antiguos con `tokensReward: 100` guardado en el documento; confiar en
+  /// ese campo hacía que un desafío de 5 fotos pagara 100 Veridiums.
+  int get tokensReward => calcularBonoCompletar(targetGoal);
 
   bool get isGlobal => assignedToUserId == null;
 
@@ -59,7 +63,6 @@ class Challenge {
     String? assignedToEmail,
     String? assignedByAdmin,
     bool? tokensAwarded,
-    int? tokensReward,
   }) {
     return Challenge(
       id: id ?? this.id,
@@ -77,7 +80,6 @@ class Challenge {
       assignedToEmail: assignedToEmail ?? this.assignedToEmail,
       assignedByAdmin: assignedByAdmin ?? this.assignedByAdmin,
       tokensAwarded: tokensAwarded ?? this.tokensAwarded,
-      tokensReward: tokensReward ?? this.tokensReward,
     );
   }
 
@@ -119,9 +121,6 @@ class Challenge {
       assignedToEmail: map['assignedToEmail'] as String?,
       assignedByAdmin: map['assignedByAdmin'] as String?,
       tokensAwarded: map['tokensAwarded'] as bool? ?? false,
-      tokensReward:
-          (map['tokensReward'] as num?)?.toInt() ??
-          calcularBonoCompletar((map['targetGoal'] as num?)?.toInt() ?? 1),
     );
   }
 }

@@ -174,9 +174,18 @@ class _LoginScreenState extends State<LoginScreen>
 
     if (userProfile.isBanned) {
       final now = DateTime.now();
-      if (userProfile.banExpires != null &&
-          userProfile.banExpires!.isBefore(now)) {
-        await UserRepository.instance.unbanUser(userId: userProfile.userId);
+      final vencida =
+          userProfile.banExpires != null &&
+          userProfile.banExpires!.isBefore(now);
+      // Solo se deja entrar si la suspensión venció Y el servidor aceptó
+      // levantarla. Si la rechaza, el usuario sigue suspendido de verdad.
+      final levantada =
+          vencida &&
+          await UserRepository.instance.intentarLevantarSuspension(
+            userProfile.userId,
+          );
+
+      if (levantada) {
         userProfile = userProfile.copyWith(
           isBanned: false,
           banExpires: null,

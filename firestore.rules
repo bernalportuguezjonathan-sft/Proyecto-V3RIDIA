@@ -37,10 +37,42 @@ service cloud.firestore {
       allow create: if isOwner(userId) &&
         (request.resource.data.role != 'Administrador' ||
           isAdminCodeValid(request.resource.data.adminCode));
-      // Nadie puede cambiar su propio rol después de creado; solo un admin.
+      function camposTocados() {
+        return request.resource.data.diff(resource.data).affectedKeys();
+      }
+
+      // Un Explorador puede tocar su nombre/foto de perfil y sus tokens (los
+      // otorga la app al completar desafíos), pero los tokens solo pueden
+      // subir y como mucho 1000 por escritura, para que auto-asignarse
+      // Veridiums escribiendo directo a Firestore no sea trivial. Su rol
+      // nunca es editable por el propio dueño.
+      function soloEditaSuPerfil() {
+        return camposTocados().hasOnly(['displayName', 'photoURL', 'tokens']) &&
+          (!camposTocados().hasAny(['tokens']) ||
+            (request.resource.data.tokens is int &&
+              request.resource.data.tokens >= resource.data.tokens &&
+              request.resource.data.tokens <= resource.data.tokens + 1000));
+      }
+
+      // Suspensión temporal cuyo plazo ya pasó.
+      function suspensionVencida() {
+        return resource.data.get('isBanned', false) == true &&
+          resource.data.get('banExpires', null) != null &&
+          resource.data.banExpires < request.time;
+      }
+
+      // Al entrar, la app levanta sola una suspensión ya cumplida (ver
+      // UserRepository.initializeUser). Solo permite LEVANTARLA: nadie puede
+      // ponerse ni prolongarse un baneo por esta vía.
+      function soloLevantaSuSuspension() {
+        return camposTocados().hasOnly(['isBanned', 'banExpires', 'banReason']) &&
+          request.resource.data.isBanned == false &&
+          request.resource.data.get('banExpires', null) == null;
+      }
+
       allow update: if isAdmin() ||
-        (isOwner(userId) &&
-          request.resource.data.role == resource.data.role);
+        (isOwner(userId) && soloEditaSuPerfil()) ||
+        (isOwner(userId) && suspensionVencida() && soloLevantaSuSuspension());
       allow delete: if isAdmin();
     }
 
@@ -55,8 +87,15 @@ service cloud.firestore {
     match /challenges/{challengeId} {
       allow read: if isSignedIn();
       allow create, delete: if isAdmin();
+      // Un Explorador solo puede reportar progreso en un desafío global o
+      // asignado a él mismo, y solo esos tres campos: no puede tocar el
+      // progreso de un desafío ajeno ni cambiar título/meta/recompensa.
+      // `get(campo, null)` en vez de acceso directo: un documento antiguo sin
+      // el campo haría fallar la regla y bloquearía el progreso.
       allow update: if isAdmin() ||
         (isSignedIn() &&
+          (resource.data.get('assignedToUserId', null) == null ||
+            resource.data.get('assignedToUserId', null) == request.auth.uid) &&
           request.resource.data.diff(resource.data).affectedKeys()
             .hasOnly(['currentProgress', 'isCompleted', 'tokensAwarded']));
     }

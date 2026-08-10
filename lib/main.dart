@@ -143,11 +143,8 @@ class WelcomeScreen extends StatelessWidget {
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
                       const VeridiaMarcoLogo(
-                        padding: EdgeInsets.symmetric(
-                          horizontal: 26,
-                          vertical: 20,
-                        ),
-                        child: VeridiaLogo(size: 210),
+                        padding: EdgeInsets.fromLTRB(30, 26, 30, 22),
+                        child: VeridiaLogo(size: 150),
                       ),
                       const SizedBox(height: 28),
                       Text(

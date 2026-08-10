@@ -1,6 +1,21 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
+    <!-- Firebase, Supabase y la API de Gemini necesitan red. Sin declararlo
+         aquí solo hay internet en debug/profile: la build de release quedaba
+         sin conexión y fallaba todo (login, datos, IA, fotos). -->
+    <uses-permission android:name="android.permission.INTERNET" />
+
     <uses-permission android:name="android.permission.READ_MEDIA_IMAGES" />
     <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE" android:maxSdkVersion="32" />
+
+    <!-- Cámara IA para identificar especies. -->
+    <uses-permission android:name="android.permission.CAMERA" />
+
+    <!-- Georreferenciar avistamientos y centrar el mapa (geolocator). -->
+    <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />
+    <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />
+
+    <!-- La cámara es opcional: el explorador también puede subir de galería. -->
+    <uses-feature android:name="android.hardware.camera" android:required="false" />
     <application
         android:label="veridia_app"
         android:name="${applicationName}"

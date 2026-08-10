@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter/foundation.dart';
 import 'package:image_picker/image_picker.dart';
@@ -211,15 +213,18 @@ class _IdentifySpeciesScreenState extends State<IdentifySpeciesScreen> {
     final observationId = DateTime.now().millisecondsSinceEpoch.toString();
 
     String? imageUrl;
+    String? errorFoto;
     final bytes =
         _selectedImageBytes ?? await _selectedImageFile?.readAsBytes();
     if (bytes != null) {
-      imageUrl = await FotoService.instance.subirFotoObservacion(
+      final subida = await FotoService.instance.subirFotoObservacion(
         bytes: bytes,
         userId: currentUser.userId,
         observationId: observationId,
         mimeType: _selectedImageMimeType ?? 'image/jpeg',
       );
+      imageUrl = subida.url;
+      errorFoto = subida.error;
     }
 
     final observation = Observation(
@@ -246,10 +251,15 @@ class _IdentifySpeciesScreenState extends State<IdentifySpeciesScreen> {
     );
 
     try {
-      await ObservationRepository.instance.addObservation(observation);
+      await ObservationRepository.instance
+          .addObservation(observation)
+          .timeout(const Duration(seconds: 20));
     } catch (e) {
       if (mounted) setState(() => _isSaving = false);
-      _mostrarError('No se pudo guardar la observación: $e');
+      final mensaje = e is TimeoutException
+          ? 'La conexión está muy lenta y no se pudo guardar. Revisa tu internet e intenta de nuevo.'
+          : 'No se pudo guardar la observación: $e';
+      _mostrarError(mensaje);
       return;
     }
 
@@ -259,6 +269,12 @@ class _IdentifySpeciesScreenState extends State<IdentifySpeciesScreen> {
 
     if (mounted) setState(() => _isSaving = false);
     if (!mounted) return;
+
+    // La observación quedó guardada, pero sin foto: hay que decirlo en vez
+    // de dejar una tarjeta vacía y que parezca un fallo de la app.
+    if (errorFoto != null) {
+      _mostrarError('Se guardó la observación, pero sin foto. $errorFoto');
+    }
 
     if (mensajesDesafios.isNotEmpty) {
       await showDialog(
@@ -316,8 +332,13 @@ class _IdentifySpeciesScreenState extends State<IdentifySpeciesScreen> {
         continue;
       }
 
+      // Debe coincidir con lo que realmente entrega updateProgress: la foto
+      // siempre paga, y el bono solo se suma si aún no se había entregado.
       final completado = nuevoProgreso >= challenge.targetGoal;
-      final premio = completado ? challenge.tokensReward : ganados;
+      final bono = completado && !challenge.tokensAwarded
+          ? challenge.tokensReward
+          : 0;
+      final premio = ganados + bono;
       final palabra = premio == 1 ? 'Veridium' : 'Veridiums';
       mensajes.add(
         completado
