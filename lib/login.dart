@@ -4,6 +4,7 @@ import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:google_sign_in/google_sign_in.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'services/repositorio_u.dart';
 import 'models/user.dart';
 import 'admin_home.dart';
@@ -24,12 +25,18 @@ class LoginScreen extends StatefulWidget {
   State<LoginScreen> createState() => _LoginScreenState();
 }
 
+const int _maxIntentosLogin = 3;
+const int _bloqueoSegundos = 60;
+
 class _LoginScreenState extends State<LoginScreen>
     with SingleTickerProviderStateMixin {
   final _emailController = TextEditingController();
   final _passwordController = TextEditingController();
   final _adminCodeController = TextEditingController();
   String _selectedRole = 'Explorador';
+
+  Timer? _lockTimer;
+  int _segundosRestantesBloqueo = 0;
 
   late final GoogleSignIn _googleSignIn = GoogleSignIn(
     scopes: ['email'],
@@ -74,6 +81,58 @@ class _LoginScreenState extends State<LoginScreen>
     mostrarMensajeVeridia(context, mensaje, esError: true);
   }
 
+  String _claveIntentos(String email) => 'login_intentos_$email';
+  String _claveBloqueo(String email) => 'login_bloqueo_hasta_$email';
+
+  Future<int> _obtenerSegundosBloqueoRestantes(String email) async {
+    final prefs = await SharedPreferences.getInstance();
+    final bloqueadoHastaMs = prefs.getInt(_claveBloqueo(email));
+    if (bloqueadoHastaMs == null) return 0;
+    final restante =
+        DateTime.fromMillisecondsSinceEpoch(
+          bloqueadoHastaMs,
+        ).difference(DateTime.now()).inSeconds;
+    return restante > 0 ? restante : 0;
+  }
+
+  Future<void> _registrarIntentoFallido(String email) async {
+    final prefs = await SharedPreferences.getInstance();
+    final intentos = (prefs.getInt(_claveIntentos(email)) ?? 0) + 1;
+    if (intentos >= _maxIntentosLogin) {
+      final hasta = DateTime.now().add(
+        const Duration(seconds: _bloqueoSegundos),
+      );
+      await prefs.setInt(_claveBloqueo(email), hasta.millisecondsSinceEpoch);
+      await prefs.setInt(_claveIntentos(email), 0);
+      _iniciarCuentaRegresiva(_bloqueoSegundos);
+    } else {
+      await prefs.setInt(_claveIntentos(email), intentos);
+    }
+  }
+
+  Future<void> _resetearIntentos(String email) async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.remove(_claveIntentos(email));
+    await prefs.remove(_claveBloqueo(email));
+  }
+
+  void _iniciarCuentaRegresiva(int segundos) {
+    _lockTimer?.cancel();
+    setState(() => _segundosRestantesBloqueo = segundos);
+    _lockTimer = Timer.periodic(const Duration(seconds: 1), (timer) {
+      if (!mounted) {
+        timer.cancel();
+        return;
+      }
+      if (_segundosRestantesBloqueo <= 1) {
+        timer.cancel();
+        setState(() => _segundosRestantesBloqueo = 0);
+      } else {
+        setState(() => _segundosRestantesBloqueo--);
+      }
+    });
+  }
+
   Future<void> _iniciarSesion() async {
     final email = _emailController.text.trim();
     final password = _passwordController.text;
@@ -86,6 +145,17 @@ class _LoginScreenState extends State<LoginScreen>
       _mostrarAlerta('Por favor llena el campo de Contraseña');
       return;
     }
+
+    final segundosBloqueo = await _obtenerSegundosBloqueoRestantes(email);
+    if (segundosBloqueo > 0) {
+      _iniciarCuentaRegresiva(segundosBloqueo);
+      _mostrarAlerta(
+        'Demasiados intentos fallidos. Intenta de nuevo en '
+        '$segundosBloqueo segundos.',
+      );
+      return;
+    }
+    if (!mounted) return;
 
     // El rol real vive en Firestore y ya no se puede autoasignar (ver
     // firestore.rules); _handleAuthenticatedUser rechaza el login si el rol
@@ -102,6 +172,17 @@ class _LoginScreenState extends State<LoginScreen>
         email: email,
         password: password,
       );
+
+      await _resetearIntentos(email);
+
+      final authUser = FirebaseAuth.instance.currentUser;
+      if (authUser != null &&
+          !authUser.emailVerified &&
+          authUser.providerData.any((p) => p.providerId == 'password')) {
+        if (mounted) Navigator.pop(context);
+        await _mostrarDialogoCorreoNoVerificado(authUser);
+        return;
+      }
 
       try {
         await UserRepository.instance.initializeUser();
@@ -124,19 +205,128 @@ class _LoginScreenState extends State<LoginScreen>
     } on FirebaseAuthException catch (e) {
       if (mounted) Navigator.pop(context);
 
-      if (e.code == 'wrong-password') {
-        _mostrarAlerta('La contraseña es incorrecta.');
-      } else if (e.code == 'user-not-found') {
-        _mostrarAlerta('El correo no existe o es incorrecto.');
+      if (e.code == 'wrong-password' ||
+          e.code == 'user-not-found' ||
+          e.code == 'invalid-credential') {
+        await _registrarIntentoFallido(email);
+        _mostrarAlerta('Correo o contraseña incorrectos.');
       } else if (e.code == 'invalid-email') {
         _mostrarAlerta('El formato del correo es incorrecto.');
       } else if (e.code == 'user-disabled') {
         _mostrarAlerta('La cuenta ha sido deshabilitada.');
+      } else if (e.code == 'too-many-requests') {
+        _mostrarAlerta(
+          'Demasiados intentos. Espera unos minutos e inténtalo de nuevo.',
+        );
       } else {
         _mostrarAlerta('Error al iniciar sesión. Verifica tus datos.');
       }
     } catch (e) {
       if (mounted) Navigator.pop(context);
+      _mostrarAlerta('Ocurrió un error inesperado de conexión.');
+    }
+  }
+
+  Future<void> _mostrarDialogoCorreoNoVerificado(User authUser) async {
+    if (!mounted) return;
+    await showDialog(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        icon: const Icon(
+          Icons.mark_email_unread_outlined,
+          color: VeridiaColors.secondary,
+          size: 28,
+        ),
+        title: const Text('Verifica tu correo'),
+        content: const Text(
+          'Debes confirmar tu correo electrónico antes de iniciar sesión. '
+          'Revisa tu bandeja de entrada o solicita un nuevo enlace.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () async {
+              try {
+                await authUser.sendEmailVerification();
+                if (dialogContext.mounted) {
+                  mostrarMensajeVeridia(
+                    dialogContext,
+                    'Correo de verificación reenviado.',
+                  );
+                }
+              } catch (_) {
+                if (dialogContext.mounted) {
+                  mostrarMensajeVeridia(
+                    dialogContext,
+                    'No se pudo reenviar el correo. Intenta más tarde.',
+                    esError: true,
+                  );
+                }
+              }
+            },
+            child: const Text('Reenviar correo'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext),
+            child: const Text('Cerrar'),
+          ),
+        ],
+      ),
+    );
+    await FirebaseAuth.instance.signOut();
+  }
+
+  Future<void> _olvideContrasena() async {
+    final controller = TextEditingController(text: _emailController.text.trim());
+    final email = await showDialog<String>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Recuperar contraseña'),
+        content: TextField(
+          controller: controller,
+          keyboardType: TextInputType.emailAddress,
+          decoration: const InputDecoration(
+            hintText: 'Tu correo electrónico',
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Cancelar'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(context, controller.text.trim()),
+            child: const Text('Enviar enlace'),
+          ),
+        ],
+      ),
+    );
+
+    if (email == null || email.isEmpty) return;
+
+    try {
+      await FirebaseAuth.instance.sendPasswordResetEmail(email: email);
+      if (mounted) {
+        mostrarMensajeVeridia(
+          context,
+          'Si el correo está registrado, te enviamos un enlace para '
+          'restablecer tu contraseña.',
+        );
+      }
+    } on FirebaseAuthException catch (e) {
+      if (e.code == 'invalid-email') {
+        _mostrarAlerta('El formato del correo es incorrecto.');
+      } else {
+        // No confirmamos si el correo existe o no, para no filtrar esa
+        // información a un posible atacante.
+        if (mounted) {
+          mostrarMensajeVeridia(
+            context,
+            'Si el correo está registrado, te enviamos un enlace para '
+            'restablecer tu contraseña.',
+          );
+        }
+      }
+    } catch (_) {
       _mostrarAlerta('Ocurrió un error inesperado de conexión.');
     }
   }
@@ -358,6 +548,7 @@ class _LoginScreenState extends State<LoginScreen>
   void dispose() {
     _entranceController.dispose();
     _googleSignInSub?.cancel();
+    _lockTimer?.cancel();
     _emailController.dispose();
     _passwordController.dispose();
     _adminCodeController.dispose();
@@ -425,6 +616,13 @@ class _LoginScreenState extends State<LoginScreen>
                                 textInputAction: TextInputAction.done,
                                 onSubmitted: (_) => _iniciarSesion(),
                               ),
+                              Align(
+                                alignment: Alignment.centerRight,
+                                child: TextButton(
+                                  onPressed: _olvideContrasena,
+                                  child: const Text('¿Olvidaste tu contraseña?'),
+                                ),
+                              ),
                               AnimatedVisibility(
                                 visible: _selectedRole == 'Administrador',
                                 child: Column(
@@ -470,11 +668,18 @@ class _LoginScreenState extends State<LoginScreen>
                               ),
                               const SizedBox(height: 20),
                               FilledButton(
-                                onPressed: _iniciarSesion,
+                                onPressed: _segundosRestantesBloqueo > 0
+                                    ? null
+                                    : _iniciarSesion,
                                 style: FilledButton.styleFrom(
                                   minimumSize: const Size(double.infinity, 52),
                                 ),
-                                child: const Text('Entrar'),
+                                child: Text(
+                                  _segundosRestantesBloqueo > 0
+                                      ? 'Intenta de nuevo en '
+                                            '${_segundosRestantesBloqueo}s'
+                                      : 'Entrar',
+                                ),
                               ),
                               AnimatedVisibility(
                                 visible: _selectedRole != 'Administrador',

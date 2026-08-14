@@ -491,6 +491,8 @@ class VeridiaTextField extends StatefulWidget {
     this.keyboardType,
     this.textInputAction,
     this.onSubmitted,
+    this.onChanged,
+    this.focusNode,
     this.enabled = true,
     this.maxLines = 1,
   });
@@ -502,6 +504,8 @@ class VeridiaTextField extends StatefulWidget {
   final TextInputType? keyboardType;
   final TextInputAction? textInputAction;
   final ValueChanged<String>? onSubmitted;
+  final ValueChanged<String>? onChanged;
+  final FocusNode? focusNode;
   final bool enabled;
   final int maxLines;
 
@@ -518,11 +522,13 @@ class _VeridiaTextFieldState extends State<VeridiaTextField> {
 
     return TextField(
       controller: widget.controller,
+      focusNode: widget.focusNode,
       obscureText: obscure,
       enabled: widget.enabled,
       keyboardType: widget.keyboardType,
       textInputAction: widget.textInputAction,
       onSubmitted: widget.onSubmitted,
+      onChanged: widget.onChanged,
       maxLines: obscure ? 1 : widget.maxLines,
       cursorColor: VeridiaColors.primary,
       style: Theme.of(context).textTheme.bodyLarge,
@@ -545,6 +551,133 @@ class _VeridiaTextFieldState extends State<VeridiaTextField> {
               )
             : null,
       ),
+    );
+  }
+}
+
+/// Niveles de fortaleza de contraseña usados por [VeridiaPasswordStrength].
+enum PasswordStrength { vacia, debil, media, fuerte }
+
+/// Evalúa una contraseña según longitud y variedad de caracteres.
+PasswordStrength evaluarFortalezaContrasena(String password) {
+  if (password.isEmpty) return PasswordStrength.vacia;
+
+  final tieneMinuscula = password.contains(RegExp(r'[a-z]'));
+  final tieneMayuscula = password.contains(RegExp(r'[A-Z]'));
+  final tieneNumero = password.contains(RegExp(r'[0-9]'));
+  final tieneSimbolo = password.contains(RegExp(r'[^a-zA-Z0-9]'));
+
+  final variedad =
+      [tieneMinuscula, tieneMayuscula, tieneNumero, tieneSimbolo]
+          .where((v) => v)
+          .length;
+
+  if (password.length < 8 || variedad <= 1) return PasswordStrength.debil;
+  if (password.length < 12 || variedad <= 2) return PasswordStrength.media;
+  return PasswordStrength.fuerte;
+}
+
+/// Indicador visual de fortaleza de contraseña: barra + checklist de
+/// requisitos que se van marcando en verde a medida que se cumplen.
+class VeridiaPasswordStrength extends StatelessWidget {
+  const VeridiaPasswordStrength({super.key, required this.password});
+
+  final String password;
+
+  @override
+  Widget build(BuildContext context) {
+    final fortaleza = evaluarFortalezaContrasena(password);
+    final (double valor, Color color, String etiqueta) = switch (fortaleza) {
+      PasswordStrength.vacia => (0.0, VeridiaColors.outlineVariant, ''),
+      PasswordStrength.debil => (1 / 3, VeridiaColors.error, 'Débil'),
+      PasswordStrength.media => (2 / 3, Colors.amber, 'Media'),
+      PasswordStrength.fuerte => (1.0, VeridiaColors.primary, 'Fuerte'),
+    };
+
+    final requisitos = <(bool, String)>[
+      (password.length >= 8, 'Mínimo 8 caracteres'),
+      (password.contains(RegExp(r'[A-Z]')), 'Una mayúscula'),
+      (password.contains(RegExp(r'[a-z]')), 'Una minúscula'),
+      (password.contains(RegExp(r'[0-9]')), 'Un número'),
+    ];
+
+    return AnimatedContainer(
+      duration: const Duration(milliseconds: 200),
+      curve: Curves.easeOut,
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: VeridiaColors.surfaceContainerLow,
+        borderRadius: BorderRadius.circular(VeridiaRadii.md),
+        border: Border.all(color: VeridiaColors.outlineVariant),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          VeridiaProgressBar(value: valor, height: 5, color: color),
+          if (etiqueta.isNotEmpty) ...[
+            const SizedBox(height: 6),
+            Text(
+              'Seguridad de la contraseña: $etiqueta',
+              style: Theme.of(
+                context,
+              ).textTheme.labelSmall?.copyWith(color: color),
+            ),
+          ],
+          const SizedBox(height: 10),
+          Wrap(
+            spacing: 14,
+            runSpacing: 6,
+            children: [
+              for (final (cumplido, etiquetaReq) in requisitos)
+                _VeridiaRequisitoPassword(
+                  cumplido: cumplido,
+                  label: etiquetaReq,
+                ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _VeridiaRequisitoPassword extends StatelessWidget {
+  const _VeridiaRequisitoPassword({
+    required this.cumplido,
+    required this.label,
+  });
+
+  final bool cumplido;
+  final String label;
+
+  @override
+  Widget build(BuildContext context) {
+    final color = cumplido
+        ? VeridiaColors.primary
+        : VeridiaColors.onSurfaceVariant;
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        AnimatedSwitcher(
+          duration: const Duration(milliseconds: 150),
+          child: Icon(
+            cumplido ? Icons.check_circle : Icons.radio_button_unchecked,
+            key: ValueKey(cumplido),
+            size: 14,
+            color: color,
+          ),
+        ),
+        const SizedBox(width: 5),
+        Text(
+          label,
+          style: TextStyle(
+            fontFamily: VeridiaFonts.body,
+            fontSize: 11.5,
+            fontWeight: cumplido ? FontWeight.w600 : FontWeight.w400,
+            color: color,
+          ),
+        ),
+      ],
     );
   }
 }

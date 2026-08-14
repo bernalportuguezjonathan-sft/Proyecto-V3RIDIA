@@ -30,7 +30,10 @@ class _RegisterScreenState extends State<RegisterScreen>
   final _passwordController = TextEditingController();
   final _confirmPasswordController = TextEditingController();
   final _adminCodeController = TextEditingController();
+  final _passwordFocusNode = FocusNode();
   String? _selectedRole;
+  String _passwordActual = '';
+  bool _passwordEnfocado = false;
 
   late final GoogleSignIn _googleSignIn = GoogleSignIn(
     scopes: ['email'],
@@ -68,6 +71,9 @@ class _RegisterScreenState extends State<RegisterScreen>
         }
       });
     }
+    _passwordFocusNode.addListener(() {
+      setState(() => _passwordEnfocado = _passwordFocusNode.hasFocus);
+    });
   }
 
   void _mostrarAlerta(String mensaje) {
@@ -105,9 +111,21 @@ class _RegisterScreenState extends State<RegisterScreen>
       return;
     }
 
-    // 3. Validación de 8 características
+    // 3. Validación de requisitos mínimos de seguridad
     if (password.length < 8) {
-      _mostrarAlerta('La contraseña debe de tener minimo 8 caracteristicas');
+      _mostrarAlerta('La contraseña debe tener mínimo 8 caracteres');
+      return;
+    }
+    if (!password.contains(RegExp(r'[A-Z]'))) {
+      _mostrarAlerta('La contraseña debe tener al menos una mayúscula');
+      return;
+    }
+    if (!password.contains(RegExp(r'[a-z]'))) {
+      _mostrarAlerta('La contraseña debe tener al menos una minúscula');
+      return;
+    }
+    if (!password.contains(RegExp(r'[0-9]'))) {
+      _mostrarAlerta('La contraseña debe tener al menos un número');
       return;
     }
 
@@ -158,6 +176,12 @@ class _RegisterScreenState extends State<RegisterScreen>
       // Intentamos crear el usuario en Firebase
       final credential = await FirebaseAuth.instance
           .createUserWithEmailAndPassword(email: email, password: password);
+
+      try {
+        await credential.user?.sendEmailVerification();
+      } catch (e) {
+        debugPrint('No se pudo enviar el correo de verificación: $e');
+      }
 
       if (credential.user != null) {
         // Create a local profile immediately so app UI can proceed even if Firestore write is blocked
@@ -216,6 +240,30 @@ class _RegisterScreenState extends State<RegisterScreen>
       }
 
       if (mounted) Navigator.pop(context); // Cerramos el círculo de carga
+
+      if (mounted) {
+        await showDialog(
+          context: context,
+          builder: (context) => AlertDialog(
+            icon: const Icon(
+              Icons.mark_email_read_outlined,
+              color: VeridiaColors.primary,
+              size: 28,
+            ),
+            title: const Text('Verifica tu correo'),
+            content: Text(
+              'Te enviamos un enlace de verificación a $email. '
+              'Revísalo para confirmar tu cuenta.',
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(context),
+                child: const Text('Entendido'),
+              ),
+            ],
+          ),
+        );
+      }
 
       // Redirigir según rol (Admin recibe diálogo de bienvenida)
       if (mounted) {
@@ -436,6 +484,7 @@ class _RegisterScreenState extends State<RegisterScreen>
     _nameController.dispose();
     _emailController.dispose();
     _passwordController.dispose();
+    _passwordFocusNode.dispose();
     _confirmPasswordController.dispose();
     _adminCodeController.dispose();
     super.dispose();
@@ -511,11 +560,28 @@ class _RegisterScreenState extends State<RegisterScreen>
                                 icon: Icons.mail_outline,
                                 keyboardType: TextInputType.emailAddress,
                               ),
-                              _crearCampoTexto(
-                                controller: _passwordController,
-                                hintText: 'Contraseña',
-                                icon: Icons.lock_outline,
-                                isPassword: true,
+                              Padding(
+                                padding: const EdgeInsets.only(bottom: 8.0),
+                                child: VeridiaTextField(
+                                  controller: _passwordController,
+                                  focusNode: _passwordFocusNode,
+                                  hintText: 'Contraseña',
+                                  icon: Icons.lock_outline,
+                                  isPassword: true,
+                                  onChanged: (value) =>
+                                      setState(() => _passwordActual = value),
+                                ),
+                              ),
+                              AnimatedVisibility(
+                                visible:
+                                    _passwordEnfocado ||
+                                    _passwordActual.isNotEmpty,
+                                child: Padding(
+                                  padding: const EdgeInsets.only(bottom: 14.0),
+                                  child: VeridiaPasswordStrength(
+                                    password: _passwordActual,
+                                  ),
+                                ),
                               ),
                               _crearCampoTexto(
                                 controller: _confirmPasswordController,
