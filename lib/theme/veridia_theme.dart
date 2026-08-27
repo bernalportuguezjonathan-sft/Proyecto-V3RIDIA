@@ -57,13 +57,18 @@ abstract final class VeridiaFonts {
 /// Estilo del mapa, centralizado para que todas las pantallas que dibujan
 /// un mapa se vean igual.
 abstract final class VeridiaMapa {
-  /// Base cartográfica legible (CartoDB Voyager): conserva nombres de calles,
-  /// parques y cuerpos de agua. Sustituye a la base `dark_all`, que dejaba
-  /// las etiquetas casi invisibles sobre el fondo oscuro de la app.
-  static const urlTeselas =
-      'https://basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}@2x.png';
+  /// Base cartográfica legible: conserva nombres de calles, parques y
+  /// cuerpos de agua.
+  ///
+  /// Antes usaba la base "Voyager" de CARTO (`basemaps.cartocdn.com`), que
+  /// dejó de servir teselas gratis sin cuenta propia y empezó a devolver un
+  /// mosaico con el texto "API KEY REQUIRED" en vez del mapa. Los tiles
+  /// oficiales de OpenStreetMap no piden clave, pero solo existen en una
+  /// resolución (256 px, sin variante @2x): de ahí que `retinaMode` esté
+  /// apagado donde se usa esta URL.
+  static const urlTeselas = 'https://tile.openstreetmap.org/{z}/{x}/{y}.png';
 
-  static const atribucion = '© OpenStreetMap, © CARTO';
+  static const atribucion = '© OpenStreetMap';
 
   /// Baja la saturación de la base clara, la oscurece un poco y la inclina
   /// hacia el verde de la paleta. El resultado es un mapa en tono medio:
@@ -76,11 +81,8 @@ abstract final class VeridiaMapa {
   ]);
 
   /// Aplica [tinte] a cada tesela. Se pasa a `TileLayer.tileBuilder`.
-  static Widget teselaTenida(
-    BuildContext context,
-    Widget tesela,
-    Object _,
-  ) => ColorFiltered(colorFilter: tinte, child: tesela);
+  static Widget teselaTenida(BuildContext context, Widget tesela, Object _) =>
+      ColorFiltered(colorFilter: tinte, child: tesela);
 }
 
 abstract final class VeridiaRadii {
@@ -469,3 +471,36 @@ ThemeData buildVeridiaTheme() {
     ),
   );
 }
+
+/// Fecha corta con ceros a la izquierda: 05/08/2026, no 5/8/2026.
+///
+/// Estaba escrita a mano en una decena de pantallas y cada una la formateaba
+/// distinto. Aquí también se normaliza a hora local: las fechas se guardan en
+/// UTC (ver [aIsoUtc]) y pintarlas sin convertir corría el día en Colombia.
+String formatoFecha(DateTime fecha) {
+  final local = fecha.toLocal();
+  final dia = local.day.toString().padLeft(2, '0');
+  final mes = local.month.toString().padLeft(2, '0');
+  return '$dia/$mes/${local.year}';
+}
+
+/// Fecha y hora cortas: 05/08/2026 14:30.
+String formatoFechaHora(DateTime fecha) {
+  final local = fecha.toLocal();
+  final hora = local.hour.toString().padLeft(2, '0');
+  final minuto = local.minute.toString().padLeft(2, '0');
+  return '${formatoFecha(local)} $hora:$minuto';
+}
+
+/// Serializa una fecha para Firestore SIEMPRE en UTC.
+///
+/// `DateTime.now().toIso8601String()` escribe la hora local sin indicar la
+/// zona horaria. Como Firestore ordena esos campos como texto, dos
+/// dispositivos en zonas distintas producían un orden cronológico falso.
+String aIsoUtc(DateTime fecha) => fecha.toUtc().toIso8601String();
+
+/// Lee una fecha de Firestore y la devuelve en hora local.
+///
+/// Tolera los dos formatos que conviven en la base: el UTC nuevo (con `Z`) y
+/// el local antiguo sin zona horaria.
+DateTime? deIso(String? texto) => DateTime.tryParse(texto ?? '')?.toLocal();

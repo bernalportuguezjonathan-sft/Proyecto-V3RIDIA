@@ -10,6 +10,7 @@ void main() {
     String? tipo,
   }) => SpeciesIdentification(
     identified: true,
+    sha256: 'sha_de_prueba',
     commonName: comun,
     scientificName: cientifico,
     type: tipo,

@@ -1,4 +1,7 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
+import 'navegacion.dart';
+import 'raiz.dart';
 import 'services/repositorio_u.dart';
 import 'theme/veridia_theme.dart';
 import 'widgets/veridia_ui.dart';
@@ -6,10 +9,15 @@ import 'widgets/veridia_ui.dart';
 class BannedScreen extends StatelessWidget {
   const BannedScreen({super.key});
 
+  /// Mismo camino que el resto de la app para salir: una sola operación del
+  /// Navigator y después `signOut()`. Ver [VeridiaNav.cerrarSesion].
   Future<void> _signOut(BuildContext context) async {
-    if (Navigator.canPop(context)) {
-      Navigator.popUntil(context, (route) => route.isFirst);
-    }
+    unawaited(
+      Navigator.of(context).pushAndRemoveUntil(
+        MaterialPageRoute(builder: (_) => const RaizVeridia()),
+        (route) => false,
+      ),
+    );
     await UserRepository.instance.signOut();
   }
 
@@ -19,7 +27,7 @@ class BannedScreen extends StatelessWidget {
     final userProfile = UserRepository.instance.currentUser.value;
     final banLabel = userProfile?.banExpires == null
         ? 'Suspensión permanente'
-        : 'Suspendido hasta ${userProfile!.banExpires!.day}/${userProfile.banExpires!.month}/${userProfile.banExpires!.year}';
+        : 'Suspendido hasta ${formatoFecha(userProfile!.banExpires!)}';
     final banReason = userProfile?.banReason ?? 'Motivo no disponible';
 
     return Scaffold(

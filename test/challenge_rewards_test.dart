@@ -38,8 +38,6 @@ void main() {
       targetGoal: meta,
       dueDate: DateTime(2026, 9, 1),
       createdDate: DateTime(2026, 8, 1),
-      currentProgress: 0,
-      isCompleted: false,
     );
 
     test('el bono siempre se deriva de la meta', () {
@@ -67,8 +65,7 @@ void main() {
       expect(copia.targetSpecies, original.targetSpecies);
       expect(copia.targetGoal, original.targetGoal);
       expect(copia.tokensReward, original.tokensReward);
-      expect(copia.currentProgress, original.currentProgress);
-      expect(copia.isCompleted, original.isCompleted);
+      expect(copia.completadoPor, original.completadoPor);
       expect(copia.dueDate, original.dueDate);
     });
 
@@ -76,11 +73,56 @@ void main() {
       final map = crear(meta: 40).toMap()..remove('tokensReward');
       expect(Challenge.fromMap('c1', map).tokensReward, 4);
     });
+
+    test('el desafío ya no guarda progreso: eso es de cada explorador', () {
+      expect(crear(meta: 10).toMap().containsKey('currentProgress'), isFalse);
+      expect(crear(meta: 10).toMap().containsKey('isCompleted'), isFalse);
+    });
+
+    test('actualizar no arrastra el contador de completados', () {
+      // El contador lo mueve solo la Cloud Function guardarObservacion.
+      final conCompletados = crear(meta: 10).copyWith(completadoPor: 4);
+      expect(conCompletados.completadoPor, 4);
+      expect(conCompletados.copyWith(title: 'Otro').completadoPor, 4);
+    });
+  });
+
+  group('ProgresoDesafio', () {
+    test('quien no ha empezado va en cero y sin bono', () {
+      const vacio = ProgresoDesafio.vacio('c1');
+      expect(vacio.progreso, 0);
+      expect(vacio.completado, isFalse);
+      expect(vacio.bonoPagado, isFalse);
+    });
+
+    test('sobrevive el viaje de ida y vuelta a Firestore', () {
+      final original = ProgresoDesafio(
+        challengeId: 'c1',
+        progreso: 3,
+        completado: false,
+        bonoPagado: false,
+        actualizado: DateTime(2026, 8, 25, 9),
+      );
+      final copia = ProgresoDesafio.fromMap('c1', original.toMap());
+
+      expect(copia.challengeId, 'c1');
+      expect(copia.progreso, 3);
+      expect(copia.completado, isFalse);
+      expect(copia.bonoPagado, isFalse);
+      expect(copia.actualizado, original.actualizado);
+    });
+
+    test('un documento incompleto no rompe la lectura', () {
+      final progreso = ProgresoDesafio.fromMap('c1', const {});
+      expect(progreso.progreso, 0);
+      expect(progreso.completado, isFalse);
+    });
   });
 
   group('Veridiums entregados al avanzar', () {
-    /// Réplica de la fórmula de ChallengeRepository.updateProgress: no se puede
-    /// llamar al repositorio en tests porque necesita Firebase.
+    /// Réplica de la fórmula de la Cloud Function guardarObservacion (ver
+    /// functions/index.js): no se puede llamar a la función real en estos
+    /// tests porque necesita Firebase.
     int veridiumsPorAvance({
       required int meta,
       required int progresoPrevio,

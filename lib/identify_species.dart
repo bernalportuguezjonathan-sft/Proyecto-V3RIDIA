@@ -4,15 +4,14 @@ import 'package:flutter/material.dart';
 import 'package:flutter/foundation.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:geolocator/geolocator.dart';
-import 'package:permission_handler/permission_handler.dart';
 import 'dart:io';
 import 'historial.dart';
 import 'models/observation.dart';
 import 'services/especie_ia_service.dart';
 import 'services/foto_service.dart';
-import 'services/repositorio_d.dart';
 import 'services/repositorio_o.dart';
 import 'services/repositorio_u.dart';
+import 'services/ubicacion_foto.dart';
 import 'theme/veridia_theme.dart';
 import 'navegacion.dart';
 import 'widgets/veridia_ui.dart';
@@ -29,9 +28,11 @@ class _IdentifySpeciesScreenState extends State<IdentifySpeciesScreen> {
   File? _selectedImageFile;
   Uint8List? _selectedImageBytes;
   String? _selectedImageMimeType;
-  String _currentLocation = 'Obteniendo ubicación...';
-  double? _latitude;
-  double? _longitude;
+
+  /// Dónde se tomó la observación. Se resuelve por foto (EXIF) y solo se
+  /// cae al GPS del dispositivo si la imagen no trae coordenadas.
+  UbicacionFoto _ubicacion = const UbicacionFoto.desconocida();
+  String _mensajeUbicacion = 'Toma o elige una foto para ubicar la especie.';
   String? _selectedSpecies;
   final ImagePicker _imagePicker = ImagePicker();
   final EspecieIAService _especieIAService = EspecieIAService();
@@ -44,67 +45,10 @@ class _IdentifySpeciesScreenState extends State<IdentifySpeciesScreen> {
   @override
   void initState() {
     super.initState();
-    _requestLocationPermission();
-  }
-
-  Future<void> _requestLocationPermission() async {
-    if (kIsWeb) {
-      try {
-        LocationPermission permission = await Geolocator.checkPermission();
-        if (permission == LocationPermission.denied) {
-          permission = await Geolocator.requestPermission();
-        }
-        if (permission == LocationPermission.denied ||
-            permission == LocationPermission.deniedForever) {
-          if (!mounted) return;
-          setState(() {
-            _currentLocation = 'Permiso de ubicación no otorgado';
-          });
-          return;
-        }
-        final position = await Geolocator.getCurrentPosition(
-          locationSettings: const LocationSettings(
-            accuracy: LocationAccuracy.high,
-          ),
-        );
-        if (!mounted) return;
-        setState(() {
-          _latitude = position.latitude;
-          _longitude = position.longitude;
-          _currentLocation =
-              '${position.latitude.toStringAsFixed(4)}, ${position.longitude.toStringAsFixed(4)}';
-        });
-      } catch (e) {
-        if (!mounted) return;
-        setState(() {
-          _currentLocation = 'No se pudo obtener la ubicación en el navegador';
-        });
-      }
-      return;
-    }
-
-    final status = await Permission.location.request();
-    if (!mounted) return;
-
-    if (status.isGranted) {
-      final position = await Geolocator.getCurrentPosition(
-        locationSettings: const LocationSettings(
-          accuracy: LocationAccuracy.high,
-        ),
-      );
-      if (!mounted) return;
-      setState(() {
-        _latitude = position.latitude;
-        _longitude = position.longitude;
-        _currentLocation =
-            '${position.latitude.toStringAsFixed(4)}, ${position.longitude.toStringAsFixed(4)}';
-      });
-    } else {
-      if (!mounted) return;
-      setState(() {
-        _currentLocation = 'Permiso de ubicación no otorgado';
-      });
-    }
+    // Se pide el permiso de una vez para que el diálogo del sistema no
+    // aparezca en mitad del flujo de la foto, pero la ubicación que se
+    // guarda NO se decide aquí: se decide en _resolverUbicacion().
+    Geolocator.requestPermission().ignore();
   }
 
   Future<void> _takePhotoFromCamera() async {
@@ -117,38 +61,33 @@ class _IdentifySpeciesScreenState extends State<IdentifySpeciesScreen> {
 
   Future<void> _pickPhoto(ImageSource source, String sourceLabel) async {
     try {
-      final XFile? photo = await _imagePicker.pickImage(
-        source: source,
-        imageQuality: 85,
-      );
-      if (photo == null) {
-        return;
-      }
+      // Sin `imageQuality`: ese parámetro hace que el selector reescriba el
+      // JPEG y en el camino BORRA el EXIF, que es de donde sacamos dónde y
+      // cuándo se tomó la foto de verdad.
+      final XFile? photo = await _imagePicker.pickImage(source: source);
+      if (photo == null) return;
 
       final mimeType = photo.mimeType ?? 'image/jpeg';
+      final bytes = await photo.readAsBytes();
+      if (!mounted) return;
 
-      if (kIsWeb) {
-        final bytes = await photo.readAsBytes();
-        if (!mounted) return;
-        setState(() {
+      setState(() {
+        if (kIsWeb) {
           _selectedImageBytes = bytes;
           _selectedImageFile = null;
-          _selectedImageMimeType = mimeType;
-          _photoTaken = true;
-          _aiResult = null;
-          _aiError = null;
-        });
-      } else {
-        if (!mounted) return;
-        setState(() {
+        } else {
           _selectedImageFile = File(photo.path);
           _selectedImageBytes = null;
-          _selectedImageMimeType = mimeType;
-          _photoTaken = true;
-          _aiResult = null;
-          _aiError = null;
-        });
-      }
+        }
+        _selectedImageMimeType = mimeType;
+        _photoTaken = true;
+        _aiResult = null;
+        _aiError = null;
+        _ubicacion = const UbicacionFoto.desconocida();
+        _mensajeUbicacion = 'Ubicando la foto...';
+      });
+
+      await _resolverUbicacion(bytes, esCamara: source == ImageSource.camera);
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -156,6 +95,35 @@ class _IdentifySpeciesScreenState extends State<IdentifySpeciesScreen> {
         );
       }
     }
+  }
+
+  /// Decide dónde se tomó la foto.
+  ///
+  /// Prioridad: las coordenadas que la propia foto trae en su EXIF y, solo si
+  /// no las trae, el GPS del celular. Es lo que evita que una foto tomada en
+  /// casa quede registrada donde el explorador la subió.
+  Future<void> _resolverUbicacion(
+    Uint8List bytes, {
+    required bool esCamara,
+  }) async {
+    final ubicacion = await ubicacionDeObservacion(bytes);
+    if (!mounted) return;
+
+    setState(() {
+      _ubicacion = ubicacion;
+      _mensajeUbicacion = switch (ubicacion.origen) {
+        OrigenUbicacion.foto =>
+          'Tomada en ${ubicacion.etiqueta} (según la foto)',
+        OrigenUbicacion.dispositivo =>
+          esCamara
+              ? 'Tomada en ${ubicacion.etiqueta}'
+              : 'La foto no trae ubicación; se usará donde estás ahora '
+                    '(${ubicacion.etiqueta})',
+        OrigenUbicacion.desconocida =>
+          'Sin ubicación: la foto no la trae y el GPS no respondió. '
+              'Se guardará sin punto en el mapa.',
+      };
+    });
   }
 
   Future<void> _analizarConIA() async {
@@ -170,9 +138,14 @@ class _IdentifySpeciesScreenState extends State<IdentifySpeciesScreen> {
     });
 
     try {
+      // La Cloud Function `identificarEspecie` revisa fotos repetidas ANTES
+      // de llamar a Gemini (así una foto ya usada no gasta cuota de IA) y
+      // devuelve un [SpeciesIdentification] que ya trae el sha256 que hará
+      // falta al guardar.
       final result = await _especieIAService.identify(
         bytes,
         _selectedImageMimeType ?? 'image/jpeg',
+        origen: 'una observación',
       );
       if (!mounted) return;
       setState(() {
@@ -181,6 +154,9 @@ class _IdentifySpeciesScreenState extends State<IdentifySpeciesScreen> {
           _selectedSpecies = result.commonName;
         }
       });
+    } on FotoDuplicadaException catch (e) {
+      if (!mounted) return;
+      setState(() => _aiError = e.message);
     } on SpeciesIdentificationException catch (e) {
       if (!mounted) return;
       setState(() {
@@ -210,12 +186,13 @@ class _IdentifySpeciesScreenState extends State<IdentifySpeciesScreen> {
 
     setState(() => _isSaving = true);
 
-    final observationId = DateTime.now().millisecondsSinceEpoch.toString();
+    final observationId = ObservationRepository.instance.nuevoId();
 
     String? imageUrl;
     String? errorFoto;
     final bytes =
         _selectedImageBytes ?? await _selectedImageFile?.readAsBytes();
+
     if (bytes != null) {
       final subida = await FotoService.instance.subirFotoObservacion(
         bytes: bytes,
@@ -227,45 +204,76 @@ class _IdentifySpeciesScreenState extends State<IdentifySpeciesScreen> {
       errorFoto = subida.error;
     }
 
-    final observation = Observation(
-      id: observationId,
-      commonName: aiIdentified
-          ? _aiResult!.commonName ?? 'Especie observada'
-          : _selectedSpecies ?? 'Especie observada',
-      scientificName: aiIdentified
-          ? _aiResult!.scientificName ?? 'Sin confirmar'
-          : _selectedSpecies != null
-          ? 'Referencia visual'
-          : 'Sin confirmar',
-      location: _currentLocation,
-      notes: aiIdentified
-          ? (_aiResult!.description ?? 'Identificado con IA')
-          : 'Registrado desde la guía de observación',
-      dateTime: DateTime.now(),
-      imagePath: imageUrl,
-      latitude: _latitude,
-      longitude: _longitude,
-      type: aiIdentified ? _aiResult!.type : null,
-      userId: currentUser.userId,
-      userDisplayName: currentUser.displayName,
-    );
+    List<String> mensajesDesafios = const [];
 
-    try {
-      await ObservationRepository.instance
-          .addObservation(observation)
-          .timeout(const Duration(seconds: 20));
-    } catch (e) {
-      if (mounted) setState(() => _isSaving = false);
-      final mensaje = e is TimeoutException
-          ? 'La conexión está muy lenta y no se pudo guardar. Revisa tu internet e intenta de nuevo.'
-          : 'No se pudo guardar la observación: $e';
-      _mostrarError(mensaje);
-      return;
+    if (aiIdentified) {
+      // La IA sí identificó algo: guardar y avanzar desafíos es trabajo del
+      // servidor (Cloud Function `guardarObservacion`), que ya tiene en
+      // caché la identificación que Gemini dio para este sha256 — el
+      // cliente no le manda su propio `_aiResult`, así que no hay forma de
+      // fingir un resultado distinto.
+      try {
+        final resultado = await ObservationRepository.instance.guardarConIA(
+          identificacion: _aiResult!,
+          observationId: observationId,
+          imageUrl: imageUrl,
+          latitude: _ubicacion.latitude,
+          longitude: _ubicacion.longitude,
+          location: _ubicacion.etiqueta,
+        );
+        mensajesDesafios = resultado.avances.map((avance) {
+          final palabra = avance.veridiumsGanados == 1
+              ? 'Veridium'
+              : 'Veridiums';
+          return avance.completado
+              ? '🏆 Completaste "${avance.title}" — '
+                    '¡+${avance.veridiumsGanados} $palabra!'
+              : '🎯 Avanzaste en "${avance.title}": '
+                    '${avance.progreso}/${avance.meta} '
+                    '(+${avance.veridiumsGanados} $palabra)';
+        }).toList();
+      } on GuardarObservacionException catch (e) {
+        if (mounted) setState(() => _isSaving = false);
+        _mostrarError(e.message);
+        return;
+      } catch (e) {
+        if (mounted) setState(() => _isSaving = false);
+        _mostrarError('No se pudo guardar la observación: $e');
+        return;
+      }
+    } else {
+      // Sin IA (especie elegida a mano de la guía): no otorga Veridiums ni
+      // toca ningún desafío, así que sigue escribiendo directo desde aquí.
+      final observation = Observation(
+        id: observationId,
+        commonName: _selectedSpecies ?? 'Especie observada',
+        scientificName: _selectedSpecies != null
+            ? 'Referencia visual'
+            : 'Sin confirmar',
+        location: _ubicacion.etiqueta,
+        notes: 'Registrado desde la guía de observación',
+        dateTime: _ubicacion.fecha ?? DateTime.now(),
+        imagePath: imageUrl,
+        latitude: _ubicacion.latitude,
+        longitude: _ubicacion.longitude,
+        type: null,
+        userId: currentUser.userId,
+        userDisplayName: currentUser.displayName,
+      );
+
+      try {
+        await ObservationRepository.instance
+            .addObservation(observation)
+            .timeout(const Duration(seconds: 20));
+      } catch (e) {
+        if (mounted) setState(() => _isSaving = false);
+        final mensaje = e is TimeoutException
+            ? 'La conexión está muy lenta y no se pudo guardar. Revisa tu internet e intenta de nuevo.'
+            : 'No se pudo guardar la observación: $e';
+        _mostrarError(mensaje);
+        return;
+      }
     }
-
-    final mensajesDesafios = aiIdentified
-        ? await _actualizarDesafios(_aiResult!)
-        : <String>[];
 
     if (mounted) setState(() => _isSaving = false);
     if (!mounted) return;
@@ -293,61 +301,12 @@ class _IdentifySpeciesScreenState extends State<IdentifySpeciesScreen> {
     }
 
     if (!mounted) return;
-    Navigator.pushReplacement(
-      context,
-      MaterialPageRoute(builder: (context) => const HistoryScreen()),
+    unawaited(
+      Navigator.pushReplacement(
+        context,
+        MaterialPageRoute(builder: (context) => const HistoryScreen()),
+      ),
     );
-  }
-
-  /// Suma progreso a los desafíos activos cuya especie objetivo coincide con
-  /// lo que identificó la IA. Devuelve los mensajes a mostrar al usuario.
-  Future<List<String>> _actualizarDesafios(SpeciesIdentification ia) async {
-    final mensajes = <String>[];
-    final currentUserId = UserRepository.instance.currentUser.value?.userId;
-
-    final coincidencias = ChallengeRepository.instance.challenges.value.where((
-      c,
-    ) {
-      if (c.isCompleted) return false;
-      // Solo desafíos globales o asignados a este usuario.
-      if (!c.isGlobal && c.assignedToUserId != currentUserId) return false;
-      return especieCoincide(c.targetSpecies, ia);
-    }).toList();
-
-    for (final challenge in coincidencias) {
-      final nuevoProgreso = (challenge.currentProgress + 1).clamp(
-        0,
-        challenge.targetGoal,
-      );
-      final ganados = nuevoProgreso - challenge.currentProgress;
-      if (ganados <= 0) continue;
-
-      try {
-        await ChallengeRepository.instance.updateProgress(
-          challenge.id,
-          nuevoProgreso,
-        );
-      } catch (e) {
-        debugPrint('No se pudo actualizar el desafío ${challenge.id}: $e');
-        continue;
-      }
-
-      // Debe coincidir con lo que realmente entrega updateProgress: la foto
-      // siempre paga, y el bono solo se suma si aún no se había entregado.
-      final completado = nuevoProgreso >= challenge.targetGoal;
-      final bono = completado && !challenge.tokensAwarded
-          ? challenge.tokensReward
-          : 0;
-      final premio = ganados + bono;
-      final palabra = premio == 1 ? 'Veridium' : 'Veridiums';
-      mensajes.add(
-        completado
-            ? '🏆 Completaste "${challenge.title}" — ¡+$premio $palabra!'
-            : '🎯 Avanzaste en "${challenge.title}": $nuevoProgreso/${challenge.targetGoal} (+$premio $palabra)',
-      );
-    }
-
-    return mensajes;
   }
 
   void _mostrarError(String mensaje) {
@@ -409,14 +368,14 @@ class _IdentifySpeciesScreenState extends State<IdentifySpeciesScreen> {
                               ),
                               const SizedBox(width: 8),
                               Text(
-                                'Tu ubicación',
+                                'Ubicación del avistamiento',
                                 style: Theme.of(context).textTheme.titleSmall,
                               ),
                             ],
                           ),
                           const SizedBox(height: 8),
                           Text(
-                            _currentLocation,
+                            _mensajeUbicacion,
                             style: Theme.of(context).textTheme.bodySmall,
                           ),
                           const SizedBox(height: 10),

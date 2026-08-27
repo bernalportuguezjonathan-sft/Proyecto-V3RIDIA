@@ -4,10 +4,24 @@ import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
 
 import '../config/gemini_config.dart';
+import 'huella_foto.dart';
+import 'repositorio_u.dart';
 
+/// Resultado de identificar una foto.
+///
+/// NOTA (2026-08-26): `identify()` llama a Gemini DIRECTO desde el cliente,
+/// de forma temporal. La clave (`lib/config/gemini_config.dart`) vuelve a
+/// viajar dentro de la app mientras el proyecto no tenga el plan Blaze de
+/// Firebase activo — sin Blaze no se pueden desplegar las Cloud Functions
+/// que la sacan de ahí. La versión segura ya existe, probada, en
+/// `functions/` (ver [[project-veridia-backend]] en la memoria del
+/// proyecto): cuando se active Blaze, hay que volver a apuntar esta clase a
+/// `identificarEspecie`/`guardarObservacion` en vez de llamar a Gemini y a
+/// Firestore directo.
 class SpeciesIdentification {
   const SpeciesIdentification({
     required this.identified,
+    required this.sha256,
     this.commonName,
     this.scientificName,
     this.description,
@@ -17,6 +31,11 @@ class SpeciesIdentification {
   });
 
   final bool identified;
+
+  /// Huella exacta de la foto (sha256). Se usa para marcarla como usada en
+  /// `HuellaFotoService` y así no se pueda reutilizar en otra captura.
+  final String sha256;
+
   final String? commonName;
   final String? scientificName;
   final String? description;
@@ -34,7 +53,17 @@ class SpeciesIdentificationException implements Exception {
   String toString() => message;
 }
 
-// 'gemini-flash-latest' pasó a apuntar a un modelo con cuota gratuita de
+/// La foto ya se usó antes (exacta o "prácticamente igual" a una anterior).
+class FotoDuplicadaException implements Exception {
+  FotoDuplicadaException(this.message);
+
+  final String message;
+
+  @override
+  String toString() => message;
+}
+
+// 'gemini-flash-lite-latest' pasó a apuntar a un modelo con cuota gratuita de
 // solo 20 peticiones/día (se agota en minutos). 'gemini-flash-lite-latest'
 // tiene cuota gratuita mucho más alta y sigue siendo Alias — no se fija a
 // una versión concreta que luego pueda perder cuota, como ya pasó antes.
@@ -145,14 +174,33 @@ class EspecieIAService {
   /// hacer esperar al explorador más de medio minuto por una foto.
   static const _maxIntentos = 2;
 
+  /// Identifica una foto con Gemini.
+  ///
+  /// Antes de gastar la petición de IA revisa si la foto ya se usó (huella
+  /// sha256 + ahash sobre `users/{uid}/fotos`): así una imagen repetida no
+  /// vuelve a analizarse ni a sumar Veridiums. [origen] es solo descriptivo
+  /// ("una observación", "el desafío X"...) para ese registro de huellas.
   Future<SpeciesIdentification> identify(
     Uint8List imageBytes,
-    String mimeType,
-  ) async {
+    String mimeType, {
+    String? origen,
+  }) async {
     if (geminiApiKey.isEmpty || geminiApiKey.startsWith('PON_AQUI')) {
       throw SpeciesIdentificationException(
         'Falta configurar la clave de Gemini en lib/config/gemini_config.dart',
       );
+    }
+
+    final huella = await calcularHuella(imageBytes);
+    final perfil = UserRepository.instance.currentUser.value;
+    if (perfil != null) {
+      final duplicada = await HuellaFotoService.instance.buscarDuplicado(
+        userId: perfil.userId,
+        huella: huella,
+      );
+      if (duplicada != null) {
+        throw FotoDuplicadaException(duplicada.mensaje);
+      }
     }
 
     final body = jsonEncode({
@@ -173,9 +221,9 @@ class EspecieIAService {
 
     final response = await _enviarConReintentos(body);
 
-    final Map<String, dynamic> decoded;
+    final SpeciesIdentification resultado;
     try {
-      decoded = jsonDecode(response.body) as Map<String, dynamic>;
+      final decoded = jsonDecode(response.body) as Map<String, dynamic>;
       final candidates = decoded['candidates'] as List<dynamic>;
       final content = candidates.first as Map<String, dynamic>;
       final parts =
@@ -192,8 +240,9 @@ class EspecieIAService {
 
       final json = jsonDecode(cleanedText) as Map<String, dynamic>;
 
-      return SpeciesIdentification(
+      resultado = SpeciesIdentification(
         identified: json['identificado'] as bool? ?? false,
+        sha256: huella.sha256,
         commonName: json['nombre_comun'] as String?,
         scientificName: json['nombre_cientifico'] as String?,
         type: json['tipo'] as String?,
@@ -209,6 +258,18 @@ class EspecieIAService {
         'No se pudo interpretar la respuesta de la IA. Intenta de nuevo.',
       );
     }
+
+    // Se marca usada YA (identifique algo o no): así una foto borrosa que
+    // Gemini rechaza tampoco se puede reintentar en bucle gastando cuota.
+    if (perfil != null) {
+      await HuellaFotoService.instance.registrar(
+        userId: perfil.userId,
+        huella: huella,
+        origen: origen ?? 'la Cámara IA',
+      );
+    }
+
+    return resultado;
   }
 
   /// Envía la petición reintentando los errores temporales.
@@ -224,8 +285,14 @@ class EspecieIAService {
       try {
         response = await http
             .post(
-              Uri.parse('$_endpoint?key=$geminiApiKey'),
-              headers: {'Content-Type': 'application/json'},
+              Uri.parse(_endpoint),
+              // La clave va en la CABECERA, no en la query string: las URLs
+              // acaban en los logs de proxies, en el historial del navegador
+              // y en las trazas de error, y ahí la clave quedaría a la vista.
+              headers: {
+                'Content-Type': 'application/json',
+                'x-goog-api-key': geminiApiKey,
+              },
               body: body,
             )
             .timeout(const Duration(seconds: 20));

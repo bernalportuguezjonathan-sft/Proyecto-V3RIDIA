@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
+import 'identify_species.dart';
 import 'models/bird_zone.dart';
+import 'models/observation.dart';
 import 'theme/veridia_theme.dart';
 import 'navegacion.dart';
 import 'widgets/veridia_ui.dart';
@@ -7,7 +9,16 @@ import 'widgets/veridia_ui.dart';
 class MapDetailScreen extends StatefulWidget {
   final BirdZone zone;
 
-  const MapDetailScreen({super.key, required this.zone});
+  /// Fotos que los exploradores ya registraron dentro de esta zona. El mapa
+  /// las calcula una sola vez y las pasa hechas para no repetir aquí el
+  /// cruce de coordenadas contra los polígonos.
+  final List<Observation> avistamientos;
+
+  const MapDetailScreen({
+    super.key,
+    required this.zone,
+    this.avistamientos = const [],
+  });
 
   @override
   State<MapDetailScreen> createState() => _MapDetailScreenState();
@@ -215,23 +226,66 @@ class _MapDetailScreenState extends State<MapDetailScreen> {
                         return _crearTarjetaEspecie(species);
                       }).toList(),
                     ),
+                    const SizedBox(height: 24),
+                    Row(
+                      children: [
+                        const Text(
+                          'Fotos registradas en la zona',
+                          style: TextStyle(
+                            fontSize: 15,
+                            fontWeight: FontWeight.bold,
+                            color: VeridiaColors.onSurface,
+                          ),
+                        ),
+                        const Spacer(),
+                        VeridiaTag(
+                          label: '${widget.avistamientos.length}',
+                          icon: Icons.photo_camera_outlined,
+                          color: VeridiaColors.secondary,
+                          dense: true,
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 10),
+                    if (widget.avistamientos.isEmpty)
+                      Container(
+                        width: double.infinity,
+                        padding: const EdgeInsets.all(16),
+                        decoration: BoxDecoration(
+                          color: VeridiaColors.surfaceContainer,
+                          borderRadius: BorderRadius.circular(14),
+                        ),
+                        child: Text(
+                          'Nadie ha fotografiado especies aquí todavía. '
+                          'Puedes ser el primero.',
+                          style: TextStyle(
+                            fontSize: 12,
+                            color: VeridiaColors.onSurfaceVariant,
+                          ),
+                        ),
+                      )
+                    else
+                      GridView.count(
+                        crossAxisCount: 3,
+                        crossAxisSpacing: 10,
+                        mainAxisSpacing: 10,
+                        shrinkWrap: true,
+                        physics: const NeverScrollableScrollPhysics(),
+                        children: widget.avistamientos
+                            .map((o) => _TarjetaAvistamiento(observacion: o))
+                            .toList(),
+                      ),
                     const SizedBox(height: 20),
                     SizedBox(
                       width: double.infinity,
                       height: 50,
                       child: ElevatedButton.icon(
-                        onPressed: () {
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            SnackBar(
-                              content: Text(
-                                'Tu misión: toma una foto de una ave en ${widget.zone.name}',
-                              ),
-                              behavior: SnackBarBehavior.floating,
-                            ),
-                          );
-                        },
-                        icon: const Icon(Icons.camera_alt),
-                        label: const Text('Capturar observación'),
+                        onPressed: () => VeridiaNav.abrir(
+                          context,
+                          const IdentifySpeciesScreen(),
+                        ),
+                        icon: const Icon(Icons.add_a_photo_outlined),
+                        label: const Text('Capturar observación aquí'),
                         style: ElevatedButton.styleFrom(
                           shape: RoundedRectangleBorder(
                             borderRadius: BorderRadius.circular(10),
@@ -320,6 +374,113 @@ class _MapDetailScreenState extends State<MapDetailScreen> {
             ),
           ),
         ],
+      ),
+    );
+  }
+}
+
+/// Miniatura de una foto registrada en la zona, con el nombre de la especie.
+class _TarjetaAvistamiento extends StatelessWidget {
+  const _TarjetaAvistamiento({required this.observacion});
+
+  final Observation observacion;
+
+  void _mostrarDetalle(BuildContext context) {
+    showDialog(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: Text(observacion.commonName),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            if (observacion.hasPhoto)
+              ClipRRect(
+                borderRadius: BorderRadius.circular(12),
+                child: Image.network(
+                  observacion.imagePath!,
+                  height: 180,
+                  width: double.infinity,
+                  fit: BoxFit.cover,
+                  errorBuilder: (_, _, _) => const SizedBox.shrink(),
+                ),
+              ),
+            const SizedBox(height: 12),
+            Text(
+              observacion.scientificName,
+              style: const TextStyle(fontStyle: FontStyle.italic, fontSize: 12),
+            ),
+            const SizedBox(height: 8),
+            Text(observacion.notes, style: const TextStyle(fontSize: 12)),
+            const SizedBox(height: 8),
+            Text(
+              'Por ${observacion.userDisplayName ?? 'Explorador'} · '
+              '${formatoFecha(observacion.dateTime)}',
+              style: const TextStyle(fontSize: 11),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext),
+            child: const Text('Cerrar'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: () => _mostrarDetalle(context),
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(12),
+        child: Stack(
+          fit: StackFit.expand,
+          children: [
+            if (observacion.hasPhoto)
+              Image.network(
+                observacion.imagePath!,
+                fit: BoxFit.cover,
+                cacheWidth: 320,
+                errorBuilder: (_, _, _) => Container(
+                  color: VeridiaColors.surfaceContainerHigh,
+                  child: const Icon(
+                    Icons.eco_outlined,
+                    color: VeridiaColors.primary,
+                  ),
+                ),
+              )
+            else
+              Container(
+                color: VeridiaColors.surfaceContainerHigh,
+                child: const Icon(
+                  Icons.eco_outlined,
+                  color: VeridiaColors.primary,
+                ),
+              ),
+            Positioned(
+              left: 0,
+              right: 0,
+              bottom: 0,
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 4),
+                color: Colors.black.withValues(alpha: 0.55),
+                child: Text(
+                  observacion.commonName,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(
+                    fontSize: 9,
+                    fontWeight: FontWeight.w700,
+                    color: VeridiaColors.onSurface,
+                  ),
+                ),
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }

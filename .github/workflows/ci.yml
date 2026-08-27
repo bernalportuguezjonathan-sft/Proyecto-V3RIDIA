@@ -1,0 +1,42 @@
+# Revisión automática en cada push y cada pull request.
+#
+# Existe para que nadie tenga que acordarse de correr `flutter analyze` antes
+# de subir: si algo no compila o un test se rompe, GitHub lo marca en rojo
+# antes de que llegue a main.
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  verificar:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          cache: true
+
+      # Las claves reales están en .gitignore, así que en CI no existen y sin
+      # ellas el proyecto ni siquiera compila. Se copian las plantillas: los
+      # tests son puros y no llaman a ningún servicio.
+      - name: Preparar configuración de ejemplo
+        run: |
+          cp lib/config/gemini_config.example.dart lib/config/gemini_config.dart
+          cp lib/config/supabase_config.example.dart lib/config/supabase_config.dart
+
+      - name: Instalar dependencias
+        run: flutter pub get
+
+      - name: Comprobar formato
+        run: dart format --set-exit-if-changed lib test
+
+      - name: Analizar
+        run: flutter analyze
+
+      - name: Tests
+        run: flutter test

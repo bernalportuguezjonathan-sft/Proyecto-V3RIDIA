@@ -42,15 +42,24 @@ service cloud.firestore {
       }
 
       // Un Explorador puede tocar su nombre/foto de perfil y sus tokens (los
-      // otorga la app al completar desafíos), pero los tokens solo pueden
-      // subir y como mucho 1000 por escritura, para que auto-asignarse
-      // Veridiums escribiendo directo a Firestore no sea trivial. Su rol
-      // nunca es editable por el propio dueño.
+      // otorga la app al completar desafíos y los descuenta al canjear
+      // recompensas). Subirlos está acotado a 1000 por escritura para que
+      // auto-asignarse Veridiums escribiendo directo a Firestore no sea
+      // trivial; bajarlos es libre porque solo se perjudica a sí mismo. Su
+      // rol nunca es editable por el propio dueño.
+      //
+      // NOTA (2026-08-26): esto vuelve a permitir que el CLIENTE suba sus
+      // propios tokens, de forma temporal, porque `registrarFoto` en
+      // `services/repositorio_d.dart` corre otra vez en el cliente mientras
+      // el proyecto no tenga el plan Blaze de Firebase activo. La versión
+      // dura de esta regla (que solo deja bajar tokens) está pensada para
+      // cuando las Cloud Functions estén desplegadas — ver
+      // [[project-veridia-backend]] en la memoria del proyecto.
       function soloEditaSuPerfil() {
         return camposTocados().hasOnly(['displayName', 'photoURL', 'tokens']) &&
           (!camposTocados().hasAny(['tokens']) ||
             (request.resource.data.tokens is int &&
-              request.resource.data.tokens >= resource.data.tokens &&
+              request.resource.data.tokens >= 0 &&
               request.resource.data.tokens <= resource.data.tokens + 1000));
       }
 
@@ -74,6 +83,49 @@ service cloud.firestore {
         (isOwner(userId) && soloEditaSuPerfil()) ||
         (isOwner(userId) && suspensionVencida() && soloLevantaSuSuspension());
       allow delete: if isAdmin();
+
+      // Huellas de las fotos ya usadas por este explorador (sha256 + ahash).
+      // Solo se pueden AÑADIR: si se pudieran borrar o reescribir, bastaría
+      // con eliminar la huella para volver a subir la misma foto y cobrar
+      // dos veces el mismo avistamiento.
+      //
+      // NOTA (2026-08-26): el cliente vuelve a escribir aquí directamente de
+      // forma temporal (ver nota en soloEditaSuPerfil() arriba).
+      match /fotos/{huella} {
+        allow read: if isOwner(userId) || isAdmin();
+        allow create: if isOwner(userId);
+        allow update: if false;
+        allow delete: if isAdmin();
+      }
+
+      // Progreso PERSONAL en cada desafío. Vive aquí y no dentro del desafío
+      // porque es privado: nadie más lo lee ni lo mueve, y un desafío global
+      // avanza distinto en cada cuenta.
+      //
+      // NOTA (2026-08-26): el cliente vuelve a escribir aquí directamente de
+      // forma temporal (ver nota en soloEditaSuPerfil() arriba).
+      match /desafios/{challengeId} {
+        allow read: if isOwner(userId) || isAdmin();
+        allow write: if isOwner(userId) &&
+          request.resource.data.progreso is int &&
+          request.resource.data.progreso >= 0;
+      }
+    }
+
+    // Recompensas canjeadas. El explorador crea las suyas (el descuento de
+    // Veridiums va en la misma transacción) y solo un administrador puede
+    // marcarlas como entregadas o borrarlas.
+    match /canjes/{canjeId} {
+      allow read: if isAdmin() ||
+        (isSignedIn() && resource.data.userId == request.auth.uid);
+      // Nacen siempre 'activo': ya no hay aprobación del administrador, la
+      // recompensa se entrega en el mismo momento del pago.
+      allow create: if isSignedIn() &&
+        request.resource.data.userId == request.auth.uid &&
+        request.resource.data.costo is int &&
+        request.resource.data.costo >= 0 &&
+        request.resource.data.estado == 'activo';
+      allow update, delete: if isAdmin();
     }
 
     match /avistamientos/{sightingId} {
@@ -87,17 +139,21 @@ service cloud.firestore {
     match /challenges/{challengeId} {
       allow read: if isSignedIn();
       allow create, delete: if isAdmin();
-      // Un Explorador solo puede reportar progreso en un desafío global o
-      // asignado a él mismo, y solo esos tres campos: no puede tocar el
-      // progreso de un desafío ajeno ni cambiar título/meta/recompensa.
-      // `get(campo, null)` en vez de acceso directo: un documento antiguo sin
-      // el campo haría fallar la regla y bloquearía el progreso.
+      // El desafío solo guarda su DEFINICIÓN; el progreso de cada explorador
+      // está en users/{uid}/desafios. Lo único que un Explorador puede tocar
+      // aquí es el contador de cuántos lo han completado, y solo sumando de
+      // uno en uno cuando el desafío es suyo o global.
+      //
+      // NOTA (2026-08-26): el cliente vuelve a poder tocar este contador de
+      // forma temporal (ver nota en soloEditaSuPerfil() arriba).
       allow update: if isAdmin() ||
         (isSignedIn() &&
           (resource.data.get('assignedToUserId', null) == null ||
             resource.data.get('assignedToUserId', null) == request.auth.uid) &&
           request.resource.data.diff(resource.data).affectedKeys()
-            .hasOnly(['currentProgress', 'isCompleted', 'tokensAwarded']));
+            .hasOnly(['completadoPor']) &&
+          request.resource.data.completadoPor ==
+            resource.data.get('completadoPor', 0) + 1);
     }
 
     match /assignments/{assignmentId} {

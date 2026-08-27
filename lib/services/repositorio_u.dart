@@ -1,9 +1,12 @@
+import 'dart:async';
 import 'package:flutter/foundation.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:google_sign_in/google_sign_in.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../models/user.dart';
+
+import '../theme/veridia_theme.dart';
 
 const webGoogleClientId =
     '523510024166-g4se2aa356mnlmkotah178gss2efve3a.apps.googleusercontent.com';
@@ -177,6 +180,12 @@ class UserRepository {
           }
         }
 
+        // Cuentas de administrador creadas antes de que se dejara de guardar
+        // el código: se limpia al entrar, sin bloquear el arranque.
+        if (data != null && data['adminCode'] != null) {
+          unawaited(_borrarCodigoAdmin(refreshedUser.uid));
+        }
+
         final currentTokens = data != null
             ? (data['tokens'] as int? ?? cachedTokens)
             : cachedTokens;
@@ -260,14 +269,37 @@ class UserRepository {
       'displayName': displayName,
       'role': role,
       'tokens': 0,
-      'createdDate': now.toIso8601String(),
+      'createdDate': aIsoUtc(now),
       'photoURL': null,
       'isBanned': false,
       'banExpires': null,
       'banReason': null,
+      // El código va SOLO en la escritura de creación: firestore.rules lo
+      // compara contra config/secrets con `request.resource.data.adminCode`.
+      // Se borra justo después para no dejarlo guardado (ver _borrarCodigoAdmin).
       if (role == 'Administrador') 'adminCode': adminCode,
     });
+    if (role == 'Administrador') {
+      await _borrarCodigoAdmin(userId);
+    }
     await _cacheUserProfile(userId, 0, role, displayName);
+  }
+
+  /// Quita el `adminCode` del documento del usuario.
+  ///
+  /// Las reglas necesitan el campo en el momento de crear el perfil, pero
+  /// dejarlo ahí significa guardar el secreto compartido de los
+  /// administradores en texto plano tantas veces como administradores haya.
+  /// Cualquiera con acceso a uno de esos documentos podría crear más
+  /// administradores. Aquí se borra en cuanto ha cumplido su función.
+  Future<void> _borrarCodigoAdmin(String userId) async {
+    try {
+      await _firestore.collection('users').doc(userId).update({
+        'adminCode': FieldValue.delete(),
+      });
+    } catch (e) {
+      debugPrint('No se pudo borrar el adminCode de $userId: $e');
+    }
   }
 
   Future<void> updateUserProfile({
@@ -323,6 +355,15 @@ class UserRepository {
       debugPrint('No se pudo levantar la suspensión vencida: $e');
       return false;
     }
+  }
+
+  /// Borra el perfil de Firestore (solo administradores, ver firestore.rules).
+  ///
+  /// Es lo que hace falta cuando se elimina una cuenta desde la consola de
+  /// Firebase Authentication: allí desaparece el login, pero el documento de
+  /// `users` sobrevive y la app lo sigue listando.
+  Future<void> eliminarPerfil(String userId) async {
+    await _firestore.collection('users').doc(userId).delete();
   }
 
   Future<UserProfile?> getUserProfileById(String userId) async {

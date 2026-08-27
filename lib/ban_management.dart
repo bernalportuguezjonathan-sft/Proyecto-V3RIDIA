@@ -161,6 +161,59 @@ class _BanManagementScreenState extends State<BanManagementScreen> {
     }
   }
 
+  /// Borra el perfil de Firestore.
+  ///
+  /// Existe porque eliminar la cuenta en Firebase Authentication NO borra su
+  /// documento en Firestore: la app lee `users`, así que esas cuentas
+  /// fantasma seguían apareciendo en la lista aunque ya no pudieran entrar.
+  Future<void> _eliminarUsuario(UserProfile user) async {
+    final confirmado = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        icon: const Icon(
+          Icons.delete_forever_rounded,
+          color: VeridiaColors.error,
+          size: 26,
+        ),
+        title: const Text('Eliminar de la base de datos'),
+        content: Text(
+          'Se borrará el perfil de ${user.displayName} (${user.email}) y '
+          'dejará de aparecer en la app.\n\n'
+          'Sus avistamientos ya publicados NO se borran: siguen en el mapa a '
+          'nombre suyo.\n\n'
+          'Esto no se puede deshacer.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext, false),
+            child: const Text('Cancelar'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(dialogContext, true),
+            style: FilledButton.styleFrom(
+              backgroundColor: VeridiaColors.errorContainer,
+              foregroundColor: VeridiaColors.onErrorContainer,
+            ),
+            child: const Text('Eliminar'),
+          ),
+        ],
+      ),
+    );
+    if (confirmado != true || !mounted) return;
+
+    try {
+      await UserRepository.instance.eliminarPerfil(user.userId);
+      if (!mounted) return;
+      mostrarMensajeVeridia(
+        context,
+        '${user.displayName} se eliminó de la base de datos.',
+      );
+    } catch (e) {
+      if (!mounted) return;
+      mostrarMensajeVeridia(context, 'No se pudo eliminar: $e', esError: true);
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -256,8 +309,12 @@ class _BanManagementScreenState extends State<BanManagementScreen> {
                     for (final user in visibles) ...[
                       _FilaUsuario(
                         user: user,
+                        esYo:
+                            user.userId ==
+                            UserRepository.instance.currentUser.value?.userId,
                         onBan: () => _showBanDialog(user),
                         onUnban: () => _unbanUser(user),
+                        onEliminar: () => _eliminarUsuario(user),
                       ),
                       const SizedBox(height: 12),
                     ],
@@ -274,13 +331,21 @@ class _BanManagementScreenState extends State<BanManagementScreen> {
 class _FilaUsuario extends StatelessWidget {
   const _FilaUsuario({
     required this.user,
+    required this.esYo,
     required this.onBan,
     required this.onUnban,
+    required this.onEliminar,
   });
 
   final UserProfile user;
+
+  /// El administrador con la sesión abierta no puede suspenderse ni
+  /// borrarse a sí mismo: se quedaría fuera de su propio panel.
+  final bool esYo;
+
   final VoidCallback onBan;
   final VoidCallback onUnban;
+  final VoidCallback onEliminar;
 
   @override
   Widget build(BuildContext context) {
@@ -288,7 +353,7 @@ class _FilaUsuario extends StatelessWidget {
     final estado = user.isBanned
         ? (user.banExpires == null
               ? 'Suspensión permanente'
-              : 'Hasta ${user.banExpires!.day}/${user.banExpires!.month}/${user.banExpires!.year}')
+              : 'Hasta ${formatoFecha(user.banExpires!)}')
         : 'Activo';
 
     return VeridiaCard(
@@ -380,24 +445,40 @@ class _FilaUsuario extends StatelessWidget {
             ),
           ],
           const SizedBox(height: 14),
-          SizedBox(
-            width: double.infinity,
-            child: user.isBanned
-                ? OutlinedButton.icon(
-                    onPressed: onUnban,
-                    icon: const Icon(Icons.lock_open_rounded, size: 18),
-                    label: const Text('Levantar suspensión'),
-                  )
-                : FilledButton.icon(
-                    onPressed: onBan,
-                    icon: const Icon(Icons.gavel_rounded, size: 18),
-                    label: const Text('Suspender'),
-                    style: FilledButton.styleFrom(
-                      backgroundColor: VeridiaColors.errorContainer,
-                      foregroundColor: VeridiaColors.onErrorContainer,
-                    ),
-                  ),
-          ),
+          if (esYo)
+            Text(
+              'Es tu propia cuenta: no puedes suspenderla ni eliminarla.',
+              style: text.bodySmall,
+            )
+          else
+            Row(
+              children: [
+                Expanded(
+                  child: user.isBanned
+                      ? OutlinedButton.icon(
+                          onPressed: onUnban,
+                          icon: const Icon(Icons.lock_open_rounded, size: 18),
+                          label: const Text('Levantar'),
+                        )
+                      : FilledButton.icon(
+                          onPressed: onBan,
+                          icon: const Icon(Icons.gavel_rounded, size: 18),
+                          label: const Text('Suspender'),
+                          style: FilledButton.styleFrom(
+                            backgroundColor: VeridiaColors.errorContainer,
+                            foregroundColor: VeridiaColors.onErrorContainer,
+                          ),
+                        ),
+                ),
+                const SizedBox(width: 8),
+                IconButton(
+                  onPressed: onEliminar,
+                  tooltip: 'Eliminar de la base de datos',
+                  icon: const Icon(Icons.delete_forever_rounded),
+                  color: VeridiaColors.error,
+                ),
+              ],
+            ),
         ],
       ),
     );

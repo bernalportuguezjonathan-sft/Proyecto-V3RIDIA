@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 
 import 'desafios.dart';
@@ -6,6 +7,7 @@ import 'home.dart';
 import 'identify_species.dart';
 import 'mapa.dart';
 import 'perfil.dart';
+import 'raiz.dart';
 import 'services/repositorio_u.dart';
 import 'theme/veridia_theme.dart';
 
@@ -14,10 +16,20 @@ enum VeridiaSeccion { inicio, camara, mapa, diario, perfil }
 
 /// Navegación unificada: evita repetir el switch de rutas en cada pantalla.
 abstract final class VeridiaNav {
-  /// Reemplaza la pantalla actual por la sección elegida.
+  /// Salta a una sección de la barra inferior.
   ///
-  /// Usa `pushReplacement` en vez de `push` para que la pila no crezca sin
-  /// límite al saltar entre secciones desde la barra inferior.
+  /// Usa `pushAndRemoveUntil` conservando la PRIMERA ruta, no
+  /// `pushReplacement`. La diferencia es la causa del bug de cierre de sesión:
+  /// [RaizVeridia] (el widget que escucha `authStateChanges` y decide entre
+  /// bienvenida, home, panel admin o pantalla de baneado) vive en la primera
+  /// ruta. Con `pushReplacement`, la primera vez que se tocaba la barra
+  /// inferior desde Inicio esa ruta se REEMPLAZABA y la raíz quedaba fuera
+  /// del árbol: al cerrar sesión ya no había nadie escuchando, la app se
+  /// quedaba en la pantalla de turno sin sesión y con los listeners de
+  /// Firestore muriendo con permission-denied.
+  ///
+  /// Conservando la primera ruta la pila nunca pasa de dos niveles y la raíz
+  /// sobrevive a cualquier recorrido por la app.
   static void ir(BuildContext context, VeridiaSeccion destino, int actual) {
     if (destino.index == actual) return;
 
@@ -29,13 +41,14 @@ abstract final class VeridiaNav {
       VeridiaSeccion.perfil => const ProfileScreen(),
     };
 
-    Navigator.pushReplacement(
+    Navigator.pushAndRemoveUntil(
       context,
       PageRouteBuilder(
         pageBuilder: (_, animation, _) =>
             FadeTransition(opacity: animation, child: pantalla),
         transitionDuration: const Duration(milliseconds: 180),
       ),
+      (route) => route.isFirst,
     );
   }
 
@@ -53,16 +66,31 @@ abstract final class VeridiaNav {
 
   /// Pide confirmación y cierra sesión.
   ///
-  /// El orden importa: primero se vacía la pila hasta la raíz y sólo después
-  /// se llama a `signOut()`. La raíz es el `StreamBuilder` de
-  /// `authStateChanges` en main.dart; si se cierra sesión primero, ese stream
-  /// reconstruye la raíz mientras el Navigator todavía está haciendo pop de
-  /// las rutas superiores y la app se congela.
+  /// Deja la pila con EXACTAMENTE una ruta —una [RaizVeridia] recién
+  /// creada— y solo después llama a `signOut()`. Así:
+  ///
+  /// - No queda ninguna pantalla viva escuchando Firestore sin sesión, que
+  ///   es lo que provocaba una lluvia de `permission-denied` y pantallas en
+  ///   blanco al salir.
+  /// - Funciona aunque la raíz original ya no estuviera en el árbol.
+  /// - Es UNA sola operación del Navigator, no un `pop` seguido de un
+  ///   rebuild: no hay carrera entre ambos (esa carrera congelaba la app si
+  ///   se cerraba sesión antes de vaciar la pila).
+  ///
+  /// El orden —navegar y luego cerrar sesión— es a propósito: la raíz nueva
+  /// muestra su pantalla de carga durante el instante que tarda `signOut()`,
+  /// y en cuanto la sesión cae pinta la bienvenida.
   static Future<void> cerrarSesion(BuildContext context) async {
     final confirmado = await confirmarCerrarSesion(context);
     if (!confirmado || !context.mounted) return;
 
-    Navigator.of(context).popUntil((route) => route.isFirst);
+    unawaited(
+      Navigator.of(context).pushAndRemoveUntil(
+        MaterialPageRoute(builder: (_) => const RaizVeridia()),
+        (route) => false,
+      ),
+    );
+
     await UserRepository.instance.signOut();
   }
 

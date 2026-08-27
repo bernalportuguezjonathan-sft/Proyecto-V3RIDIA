@@ -6,16 +6,17 @@ import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import 'package:app_settings/app_settings.dart';
-import 'home.dart';
-import 'identify_species.dart';
-import 'mapa.dart';
-import 'historial.dart';
+import 'acerca_de.dart';
+import 'actividad.dart';
+import 'ajustes.dart';
 import 'models/observation.dart';
+import 'models/recompensa.dart';
 import 'models/user.dart';
-import 'privacidad_seguridad.dart';
+import 'publicaciones.dart';
+import 'recompensas.dart';
 import 'services/foto_service.dart';
 import 'services/repositorio_o.dart';
+import 'services/repositorio_r.dart';
 import 'services/repositorio_u.dart';
 import 'theme/veridia_theme.dart';
 import 'navegacion.dart';
@@ -40,6 +41,15 @@ class _ProfileScreenState extends State<ProfileScreen> {
   bool _isSaving = false;
   bool _isEditingProfile = false;
 
+  /// Recompensas digitales que el explorador ya canjeó: marco del avatar,
+  /// título junto al nombre e insignias.
+  Recompensa? get _marco => RewardRepository.instance.marcoActivo();
+  String? get _titulo => RewardRepository.instance.tituloActivo();
+  List<Recompensa> get _insignias => RewardRepository.instance
+      .desbloqueadas()
+      .where((r) => r.tipo == TipoRecompensa.insignia)
+      .toList();
+
   @override
   void initState() {
     super.initState();
@@ -48,6 +58,13 @@ class _ProfileScreenState extends State<ProfileScreen> {
     _loadCachedProfileImage();
 
     UserRepository.instance.currentUser.addListener(_onUserProfileChanged);
+    // Sin esto, una recompensa recién canjeada no se vería en el perfil
+    // hasta reabrir la pantalla.
+    RewardRepository.instance.misCanjes.addListener(_onCanjesChanged);
+  }
+
+  void _onCanjesChanged() {
+    if (mounted) setState(() {});
   }
 
   void _onUserProfileChanged() {
@@ -84,6 +101,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
   @override
   void dispose() {
     UserRepository.instance.currentUser.removeListener(_onUserProfileChanged);
+    RewardRepository.instance.misCanjes.removeListener(_onCanjesChanged);
     _nameController.dispose();
     super.dispose();
   }
@@ -430,10 +448,20 @@ class _ProfileScreenState extends State<ProfileScreen> {
                               decoration: BoxDecoration(
                                 color: VeridiaColors.surfaceContainer,
                                 shape: BoxShape.circle,
-                                boxShadow: const [
+                                // El marco es una recompensa canjeada: si no
+                                // tiene ninguno, el avatar va sin borde.
+                                border: _marco == null
+                                    ? null
+                                    : Border.all(
+                                        color: _marco!.color,
+                                        width: 3,
+                                      ),
+                                boxShadow: [
                                   BoxShadow(
-                                    color: Color.fromRGBO(0, 0, 0, 0.2),
-                                    blurRadius: 8,
+                                    color:
+                                        _marco?.color.withValues(alpha: 0.35) ??
+                                        const Color.fromRGBO(0, 0, 0, 0.2),
+                                    blurRadius: _marco == null ? 8 : 16,
                                   ),
                                 ],
                               ),
@@ -510,6 +538,15 @@ class _ProfileScreenState extends State<ProfileScreen> {
                             color: VeridiaColors.onSurface,
                           ),
                         ),
+                        if (_titulo != null) ...[
+                          const SizedBox(height: 6),
+                          VeridiaTag(
+                            label: _titulo!,
+                            icon: Icons.workspace_premium_rounded,
+                            color: VeridiaColors.veridium,
+                            dense: true,
+                          ),
+                        ],
                         const SizedBox(height: 4),
                         Text(
                           _currentUser?.email ?? 'email@example.com',
@@ -518,6 +555,25 @@ class _ProfileScreenState extends State<ProfileScreen> {
                             color: VeridiaColors.onSurfaceVariant,
                           ),
                         ),
+                        if (_insignias.isNotEmpty) ...[
+                          const SizedBox(height: 10),
+                          Wrap(
+                            spacing: 8,
+                            runSpacing: 8,
+                            alignment: WrapAlignment.center,
+                            children: _insignias
+                                .map(
+                                  (insignia) => VeridiaTag(
+                                    label:
+                                        '${insignia.valor ?? ''} ${insignia.nombre}'
+                                            .trim(),
+                                    color: insignia.color,
+                                    dense: true,
+                                  ),
+                                )
+                                .toList(),
+                          ),
+                        ],
                         const SizedBox(height: 16),
                         if (_isEditingProfile) ...[
                           TextField(
@@ -745,6 +801,11 @@ class _ProfileScreenState extends State<ProfileScreen> {
                             );
                           },
                         ),
+                        _crearOpcionPerfil(
+                          icon: Icons.card_giftcard_outlined,
+                          titulo: 'Recompensas y canjes',
+                          onTap: () => abrirRecompensas(context),
+                        ),
                       ],
                     ),
                   ),
@@ -822,38 +883,10 @@ class _ProfileScreenState extends State<ProfileScreen> {
           ),
           BottomNavigationBarItem(icon: Icon(Icons.person), label: 'Perfil'),
         ],
-        onTap: (index) {
-          switch (index) {
-            case 0:
-              Navigator.pushReplacement(
-                context,
-                MaterialPageRoute(builder: (context) => const HomeScreen()),
-              );
-              break;
-            case 1:
-              Navigator.pushReplacement(
-                context,
-                MaterialPageRoute(
-                  builder: (context) => const IdentifySpeciesScreen(),
-                ),
-              );
-              break;
-            case 2:
-              Navigator.pushReplacement(
-                context,
-                MaterialPageRoute(builder: (context) => const MapScreen()),
-              );
-              break;
-            case 3:
-              Navigator.pushReplacement(
-                context,
-                MaterialPageRoute(builder: (context) => const HistoryScreen()),
-              );
-              break;
-            case 4:
-              break; // Ya estamos aquí
-          }
-        },
+        // Delegado en VeridiaNav: hacer pushReplacement a mano aquí era
+        // otra vía por la que la ruta raíz se perdía (ver navegacion.dart).
+        onTap: (index) =>
+            VeridiaNav.ir(context, VeridiaSeccion.values[index], 4),
       ),
     );
   }
@@ -934,666 +967,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
               ],
             ),
           ),
-        ),
-      ),
-    );
-  }
-}
-
-class ActivityScreen extends StatelessWidget {
-  const ActivityScreen({super.key});
-
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(title: const Text('Mi actividad')),
-      body: StreamBuilder<List<Observation>>(
-        stream: ObservationRepository.instance.streamForUser(
-          UserRepository.instance.currentUser.value?.userId ?? '',
-        ),
-        builder: (context, snapshot) {
-          final observations = snapshot.data ?? [];
-          final totalObservations = observations.length;
-          final uniqueSpecies = observations
-              .map((observation) => observation.commonName)
-              .toSet()
-              .length;
-          final lastObservation = observations.isNotEmpty
-              ? observations.first.dateTime
-              : null;
-
-          return Padding(
-            padding: const EdgeInsets.all(24),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                const Text(
-                  'Tu huella en la naturaleza',
-                  style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold),
-                ),
-                const SizedBox(height: 16),
-                const Text(
-                  'Sigue tus descubrimientos y comprueba cómo cada aporte suma al cuidado de la flora y fauna.',
-                  style: TextStyle(
-                    fontSize: 15,
-                    color: VeridiaColors.onSurface,
-                  ),
-                ),
-                const SizedBox(height: 24),
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    _statCard(
-                      icon: Icons.nature,
-                      title: '$totalObservations',
-                      subtitle: 'Observaciones',
-                    ),
-                    _statCard(
-                      icon: Icons.flare,
-                      title: '$uniqueSpecies',
-                      subtitle: 'Especies únicas',
-                    ),
-                    _statCard(
-                      icon: Icons.schedule,
-                      title: lastObservation != null
-                          ? '${lastObservation.day}/${lastObservation.month}/${lastObservation.year}'
-                          : '-',
-                      subtitle: 'Última fecha',
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 24),
-                _infoCard(
-                  icon: Icons.photo_camera,
-                  title: 'Observaciones recientes',
-                  description:
-                      'Revisa las últimas fotos y datos que has registrado en tu viaje natural.',
-                ),
-                _infoCard(
-                  icon: Icons.emoji_events,
-                  title: 'Retos completados',
-                  description:
-                      'Sigue tu progreso y mira cómo avanzas con cada desafío superado.',
-                ),
-                _infoCard(
-                  icon: Icons.monetization_on,
-                  title: 'Recompensas',
-                  description:
-                      'Consigue monedas por cada contribución y conviértelas en logros dentro de Verídia.',
-                ),
-              ],
-            ),
-          );
-        },
-      ),
-    );
-  }
-
-  Widget _statCard({
-    required IconData icon,
-    required String title,
-    required String subtitle,
-  }) {
-    return Expanded(
-      child: Container(
-        padding: const EdgeInsets.all(16),
-        margin: const EdgeInsets.only(right: 8),
-        decoration: BoxDecoration(
-          color: VeridiaColors.surfaceContainer,
-          borderRadius: BorderRadius.circular(18),
-          boxShadow: const [
-            BoxShadow(color: Color.fromRGBO(0, 0, 0, 0.35), blurRadius: 10),
-          ],
-        ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Icon(icon, color: VeridiaColors.primary, size: 28),
-            const SizedBox(height: 12),
-            Text(
-              title,
-              style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
-            ),
-            const SizedBox(height: 8),
-            Text(
-              subtitle,
-              style: const TextStyle(
-                fontSize: 13,
-                color: VeridiaColors.onSurfaceVariant,
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _infoCard({
-    required IconData icon,
-    required String title,
-    required String description,
-  }) {
-    return Container(
-      margin: const EdgeInsets.only(bottom: 16),
-      padding: const EdgeInsets.all(18),
-      decoration: BoxDecoration(
-        color: VeridiaColors.surfaceContainer,
-        borderRadius: BorderRadius.circular(18),
-        boxShadow: const [
-          BoxShadow(color: Color.fromRGBO(0, 0, 0, 0.35), blurRadius: 10),
-        ],
-      ),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Icon(icon, color: VeridiaColors.primary, size: 28),
-          const SizedBox(width: 16),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  title,
-                  style: const TextStyle(
-                    fontSize: 16,
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
-                const SizedBox(height: 8),
-                Text(
-                  description,
-                  style: const TextStyle(
-                    fontSize: 14,
-                    color: VeridiaColors.onSurface,
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class PublicationsScreen extends StatelessWidget {
-  const PublicationsScreen({super.key});
-
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(title: const Text('Mis publicaciones')),
-      body: StreamBuilder<List<Observation>>(
-        stream: ObservationRepository.instance.streamForUser(
-          UserRepository.instance.currentUser.value?.userId ?? '',
-        ),
-        builder: (context, snapshot) {
-          final observations = snapshot.data ?? [];
-          return Padding(
-            padding: const EdgeInsets.all(16),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                const SizedBox(height: 12),
-                Row(
-                  children: [
-                    const Icon(
-                      Icons.bookmark_outline,
-                      color: VeridiaColors.primary,
-                      size: 24,
-                    ),
-                    const SizedBox(width: 12),
-                    Text(
-                      '${observations.length} publicaciones',
-                      style: const TextStyle(
-                        fontSize: 18,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 12),
-                const Text(
-                  'Tus observaciones más recientes están aquí. Revísalas, edítalas o compártelas con tu comunidad.',
-                  style: TextStyle(
-                    fontSize: 15,
-                    color: VeridiaColors.onSurface,
-                  ),
-                ),
-                const SizedBox(height: 20),
-                Expanded(
-                  child: observations.isEmpty
-                      ? Center(
-                          child: Column(
-                            mainAxisSize: MainAxisSize.min,
-                            children: const [
-                              Icon(
-                                Icons.photo_library_outlined,
-                                size: 72,
-                                color: VeridiaColors.primary,
-                              ),
-                              SizedBox(height: 24),
-                              Text(
-                                'Aún no tienes publicaciones cargadas.',
-                                style: TextStyle(
-                                  fontSize: 16,
-                                  color: VeridiaColors.onSurfaceVariant,
-                                ),
-                              ),
-                              SizedBox(height: 8),
-                              Text(
-                                'Sube tu primera foto para empezar a construir tu colección natural.',
-                                style: TextStyle(
-                                  fontSize: 14,
-                                  color: VeridiaColors.onSurfaceVariant,
-                                ),
-                                textAlign: TextAlign.center,
-                              ),
-                            ],
-                          ),
-                        )
-                      : ListView.separated(
-                          itemCount: observations.length,
-                          separatorBuilder: (context, index) =>
-                              const SizedBox(height: 12),
-                          itemBuilder: (context, index) {
-                            final observation = observations[index];
-                            return _publicationCard(observation);
-                          },
-                        ),
-                ),
-              ],
-            ),
-          );
-        },
-      ),
-    );
-  }
-
-  Widget _publicationCard(Observation observation) {
-    return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: VeridiaColors.surfaceContainer,
-        borderRadius: BorderRadius.circular(18),
-        boxShadow: const [
-          BoxShadow(color: Color.fromRGBO(0, 0, 0, 0.35), blurRadius: 10),
-        ],
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              const Icon(Icons.nature, color: VeridiaColors.primary, size: 22),
-              const SizedBox(width: 10),
-              Expanded(
-                child: Text(
-                  observation.commonName,
-                  style: const TextStyle(
-                    fontSize: 16,
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 6),
-          Text(
-            observation.scientificName,
-            style: const TextStyle(
-              fontSize: 13,
-              color: VeridiaColors.onSurfaceVariant,
-            ),
-          ),
-          const SizedBox(height: 10),
-          Row(
-            children: [
-              const Icon(
-                Icons.location_on,
-                size: 16,
-                color: VeridiaColors.onSurfaceVariant,
-              ),
-              const SizedBox(width: 6),
-              Expanded(
-                child: Text(
-                  observation.location,
-                  style: const TextStyle(
-                    fontSize: 13,
-                    color: VeridiaColors.onSurfaceVariant,
-                  ),
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 10),
-          Text(
-            observation.notes,
-            style: const TextStyle(
-              fontSize: 14,
-              color: VeridiaColors.onSurface,
-            ),
-          ),
-          const SizedBox(height: 12),
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Text(
-                'Fecha: ${observation.dateTime.day}/${observation.dateTime.month}/${observation.dateTime.year}',
-                style: const TextStyle(
-                  fontSize: 12,
-                  color: VeridiaColors.onSurfaceVariant,
-                ),
-              ),
-              const Icon(
-                Icons.arrow_forward_ios,
-                size: 14,
-                color: VeridiaColors.onSurfaceVariant,
-              ),
-            ],
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class SettingsScreen extends StatefulWidget {
-  const SettingsScreen({super.key});
-
-  @override
-  State<SettingsScreen> createState() => _SettingsScreenState();
-}
-
-class _SettingsScreenState extends State<SettingsScreen> {
-  void _openNotificationSettings() {
-    AppSettings.openNotificationSettings();
-  }
-
-  void _abrirPrivacidadYSeguridad() {
-    Navigator.push(
-      context,
-      MaterialPageRoute(builder: (_) => const PrivacySecurityScreen()),
-    );
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(title: const Text('Configuración')),
-      body: Padding(
-        padding: const EdgeInsets.all(24),
-        child: ValueListenableBuilder<UserProfile?>(
-          valueListenable: UserRepository.instance.currentUser,
-          builder: (context, user, child) {
-            return Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                const Text(
-                  'Ajustes',
-                  style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold),
-                ),
-                const SizedBox(height: 16),
-                Text(
-                  'Revisa los datos de tu cuenta y los permisos de la app.',
-                  style: Theme.of(context).textTheme.bodySmall,
-                ),
-                const SizedBox(height: 24),
-                _infoTile(
-                  icon: Icons.person,
-                  title: 'Nombre',
-                  subtitle: user?.displayName ?? 'Explorador',
-                ),
-                _infoTile(
-                  icon: Icons.email,
-                  title: 'Email',
-                  subtitle: user?.email ?? 'No disponible',
-                ),
-                _infoTile(
-                  icon: Icons.monetization_on,
-                  title: 'Monedas',
-                  subtitle: '${user?.tokens ?? 0}',
-                ),
-                const SizedBox(height: 16),
-                _settingTile(
-                  icon: Icons.notifications,
-                  title: 'Notificaciones',
-                  subtitle: 'Abrir ajustes de notificaciones del sistema.',
-                  onTap: _openNotificationSettings,
-                ),
-                _settingTile(
-                  icon: Icons.lock_outline,
-                  title: 'Privacidad y seguridad',
-                  subtitle: 'Cambiar contraseña y ver qué datos usamos.',
-                  onTap: _abrirPrivacidadYSeguridad,
-                ),
-              ],
-            );
-          },
-        ),
-      ),
-    );
-  }
-
-  Widget _infoTile({
-    required IconData icon,
-    required String title,
-    required String subtitle,
-  }) {
-    return Container(
-      margin: const EdgeInsets.only(bottom: 14),
-      padding: const EdgeInsets.all(18),
-      decoration: BoxDecoration(
-        color: VeridiaColors.surfaceContainer,
-        borderRadius: BorderRadius.circular(18),
-        boxShadow: const [
-          BoxShadow(color: Color.fromRGBO(0, 0, 0, 0.35), blurRadius: 10),
-        ],
-      ),
-      child: Row(
-        children: [
-          Icon(icon, color: VeridiaColors.primary, size: 26),
-          const SizedBox(width: 14),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  title,
-                  style: const TextStyle(
-                    fontSize: 14,
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
-                const SizedBox(height: 6),
-                Text(
-                  subtitle,
-                  style: const TextStyle(
-                    fontSize: 14,
-                    color: VeridiaColors.onSurface,
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _settingTile({
-    required IconData icon,
-    required String title,
-    required String subtitle,
-    required VoidCallback onTap,
-  }) {
-    return InkWell(
-      onTap: onTap,
-      borderRadius: BorderRadius.circular(18),
-      child: Container(
-        margin: const EdgeInsets.only(bottom: 16),
-        padding: const EdgeInsets.all(18),
-        decoration: BoxDecoration(
-          color: VeridiaColors.surfaceContainer,
-          borderRadius: BorderRadius.circular(18),
-          boxShadow: const [
-            BoxShadow(color: Color.fromRGBO(0, 0, 0, 0.35), blurRadius: 10),
-          ],
-        ),
-        child: Row(
-          children: [
-            Icon(icon, color: VeridiaColors.primary, size: 24),
-            const SizedBox(width: 14),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    title,
-                    style: const TextStyle(
-                      fontSize: 16,
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
-                  const SizedBox(height: 8),
-                  Text(
-                    subtitle,
-                    style: const TextStyle(
-                      fontSize: 14,
-                      color: VeridiaColors.onSurface,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-            const Icon(
-              Icons.chevron_right,
-              color: VeridiaColors.onSurfaceVariant,
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-class AboutVeridiaScreen extends StatelessWidget {
-  const AboutVeridiaScreen({super.key});
-
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(title: const Text('Acerca de Veridia')),
-      body: StreamBuilder<List<Observation>>(
-        stream: ObservationRepository.instance.streamForUser(
-          UserRepository.instance.currentUser.value?.userId ?? '',
-        ),
-        builder: (context, snapshot) {
-          final observations = snapshot.data ?? [];
-          final totalObservations = observations.length;
-          final uniqueSpecies = observations
-              .map((observation) => observation.commonName)
-              .toSet()
-              .length;
-
-          return Padding(
-            padding: const EdgeInsets.all(24),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                const Text(
-                  'Verídia',
-                  style: TextStyle(fontSize: 28, fontWeight: FontWeight.bold),
-                ),
-                const SizedBox(height: 16),
-                const Text(
-                  'Verídia es una app pensada para gamificar de forma intuitiva y divertida el aprendizaje sobre ambientes naturales, fauna y flora. Aquí puedes explorar ecosistemas, descubrir especies y ganar recompensas mientras te conviertes en un guardián activo de la naturaleza.',
-                  style: TextStyle(
-                    fontSize: 16,
-                    color: VeridiaColors.onSurface,
-                    height: 1.5,
-                  ),
-                ),
-                const SizedBox(height: 24),
-                Row(
-                  children: [
-                    _aboutStatTile(
-                      icon: Icons.nature_people,
-                      label: 'Observaciones',
-                      value: '$totalObservations',
-                    ),
-                    const SizedBox(width: 12),
-                    _aboutStatTile(
-                      icon: Icons.eco,
-                      label: 'Especies',
-                      value: '$uniqueSpecies',
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 24),
-                const Text(
-                  '¿Qué puedes hacer en Verídia?',
-                  style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-                ),
-                const SizedBox(height: 12),
-                const Text(
-                  '• Completar retos con fotos reales de la naturaleza.',
-                ),
-                const Text(
-                  '• Aprender sobre especies y hábitats desde tu propia experiencia.',
-                ),
-                const Text(
-                  '• Ganar monedas y logros por cada contribución ecológica.',
-                ),
-                const SizedBox(height: 24),
-                const Text(
-                  'Únete a una comunidad que valora la curiosidad, el respeto por el medio ambiente y la diversión mientras aprendes.',
-                  style: TextStyle(
-                    fontSize: 15,
-                    color: VeridiaColors.onSurface,
-                  ),
-                ),
-              ],
-            ),
-          );
-        },
-      ),
-    );
-  }
-
-  Widget _aboutStatTile({
-    required IconData icon,
-    required String label,
-    required String value,
-  }) {
-    return Expanded(
-      child: Container(
-        padding: const EdgeInsets.all(16),
-        decoration: BoxDecoration(
-          color: VeridiaColors.surfaceContainer,
-          borderRadius: BorderRadius.circular(18),
-          boxShadow: const [
-            BoxShadow(color: Color.fromRGBO(0, 0, 0, 0.35), blurRadius: 10),
-          ],
-        ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Icon(icon, color: VeridiaColors.primary, size: 28),
-            const SizedBox(height: 12),
-            Text(
-              value,
-              style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
-            ),
-            const SizedBox(height: 8),
-            Text(
-              label,
-              style: const TextStyle(
-                fontSize: 13,
-                color: VeridiaColors.onSurfaceVariant,
-              ),
-            ),
-          ],
         ),
       ),
     );

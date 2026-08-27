@@ -625,60 +625,13 @@ class _AdminProfileScreenState extends State<AdminProfileScreen> {
                     ),
                   ),
                   const SizedBox(height: 12),
-                  // "Volver al Panel" se quitó: la flecha de la barra
-                  // superior ya hace exactamente lo mismo.
-                  _buildActionButton(
-                    icon: Icons.logout,
-                    label: 'Cerrar sesión',
-                    onTap: _cerrarSesion,
-                  ),
+                  // Aquí no va nada de navegación duplicada: "Volver al
+                  // Panel" lo hace la flecha de la barra superior y
+                  // "Cerrar sesión" el icono de la esquina derecha.
                 ],
               ),
             ),
           ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildActionButton({
-    required IconData icon,
-    required String label,
-    required VoidCallback onTap,
-  }) {
-    return Container(
-      margin: const EdgeInsets.only(bottom: 12),
-      decoration: BoxDecoration(
-        color: VeridiaColors.surfaceContainer,
-        borderRadius: BorderRadius.circular(12),
-        boxShadow: const [
-          BoxShadow(color: Color.fromRGBO(0, 0, 0, 0.35), blurRadius: 8),
-        ],
-      ),
-      child: Material(
-        color: Colors.transparent,
-        child: InkWell(
-          onTap: onTap,
-          borderRadius: BorderRadius.circular(12),
-          child: Padding(
-            padding: const EdgeInsets.all(16),
-            child: Row(
-              children: [
-                Icon(icon, color: VeridiaColors.primary),
-                const SizedBox(width: 16),
-                Text(
-                  label,
-                  style: const TextStyle(fontWeight: FontWeight.w500),
-                ),
-                const Spacer(),
-                const Icon(
-                  Icons.arrow_forward_ios,
-                  size: 16,
-                  color: VeridiaColors.onSurfaceVariant,
-                ),
-              ],
-            ),
-          ),
         ),
       ),
     );

@@ -9,6 +9,15 @@
 # packages, and plugins designed to encourage good coding practices.
 include: package:flutter_lints/flutter.yaml
 
+analyzer:
+  exclude:
+    - build/**
+    - "**/*.g.dart"
+  errors:
+    # Un import sin usar o una variable muerta no deberían pasar la revisión.
+    unused_import: error
+    unused_local_variable: error
+
 linter:
   # The lint rules applied to this project can be customized in the
   # section below to disable rules from the `package:flutter_lints/flutter.yaml`
@@ -21,8 +30,21 @@ linter:
   # `// ignore_for_file: name_of_lint` syntax on the line or in the file
   # producing the lint.
   rules:
-    # avoid_print: false  # Uncomment to disable the `avoid_print` rule
-    # prefer_single_quotes: true  # Uncomment to enable the `prefer_single_quotes` rule
+    # Estilo uniforme: el proyecto ya usa comillas simples y comas finales
+    # en todas partes; con la regla activa el analizador lo hace cumplir en
+    # vez de depender de que a nadie se le olvide.
+    - prefer_single_quotes
+    - require_trailing_commas
+
+    # `print` deja rastros en producción; para depurar se usa debugPrint,
+    # que el modo release descarta solo.
+    - avoid_print
+
+    # Un Future sin await ni `unawaited()` es un error silencioso: si falla,
+    # la excepción se pierde y nadie se entera.
+    - unawaited_futures
+
+    - prefer_final_locals
 
 # Additional information about this file can be found at
 # https://dart.dev/guides/language/analysis-options

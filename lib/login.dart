@@ -88,10 +88,9 @@ class _LoginScreenState extends State<LoginScreen>
     final prefs = await SharedPreferences.getInstance();
     final bloqueadoHastaMs = prefs.getInt(_claveBloqueo(email));
     if (bloqueadoHastaMs == null) return 0;
-    final restante =
-        DateTime.fromMillisecondsSinceEpoch(
-          bloqueadoHastaMs,
-        ).difference(DateTime.now()).inSeconds;
+    final restante = DateTime.fromMillisecondsSinceEpoch(
+      bloqueadoHastaMs,
+    ).difference(DateTime.now()).inSeconds;
     return restante > 0 ? restante : 0;
   }
 
@@ -161,10 +160,12 @@ class _LoginScreenState extends State<LoginScreen>
     // firestore.rules); _handleAuthenticatedUser rechaza el login si el rol
     // elegido aquí no coincide con el guardado.
 
-    showDialog(
-      context: context,
-      barrierDismissible: false,
-      builder: (context) => const Center(child: VeridiaLoader()),
+    unawaited(
+      showDialog(
+        context: context,
+        barrierDismissible: false,
+        builder: (context) => const Center(child: VeridiaLoader()),
+      ),
     );
 
     try {
@@ -276,7 +277,9 @@ class _LoginScreenState extends State<LoginScreen>
   }
 
   Future<void> _olvideContrasena() async {
-    final controller = TextEditingController(text: _emailController.text.trim());
+    final controller = TextEditingController(
+      text: _emailController.text.trim(),
+    );
     final email = await showDialog<String>(
       context: context,
       builder: (context) => AlertDialog(
@@ -284,9 +287,7 @@ class _LoginScreenState extends State<LoginScreen>
         content: TextField(
           controller: controller,
           keyboardType: TextInputType.emailAddress,
-          decoration: const InputDecoration(
-            hintText: 'Tu correo electrónico',
-          ),
+          decoration: const InputDecoration(hintText: 'Tu correo electrónico'),
         ),
         actions: [
           TextButton(
@@ -385,7 +386,7 @@ class _LoginScreenState extends State<LoginScreen>
       } else {
         final banLabel = userProfile.banExpires == null
             ? 'Suspensión Permanente'
-            : 'Suspendido hasta ${userProfile.banExpires!.day}/${userProfile.banExpires!.month}/${userProfile.banExpires!.year}';
+            : 'Suspendido hasta ${formatoFecha(userProfile.banExpires!)}';
         final banReason = userProfile.banReason ?? 'Motivo no disponible';
         if (!mounted) return;
         await showDialog(
@@ -438,9 +439,11 @@ class _LoginScreenState extends State<LoginScreen>
         : const HomeScreen();
 
     if (!mounted) return;
-    Navigator.pushReplacement(
-      context,
-      MaterialPageRoute(builder: (context) => nextPage),
+    unawaited(
+      Navigator.pushReplacement(
+        context,
+        MaterialPageRoute(builder: (context) => nextPage),
+      ),
     );
   }
 
@@ -473,10 +476,12 @@ class _LoginScreenState extends State<LoginScreen>
     var didShowDialog = false;
     if (!mounted) return;
     didShowDialog = true;
-    showDialog(
-      context: context,
-      barrierDismissible: false,
-      builder: (context) => const Center(child: VeridiaLoader()),
+    unawaited(
+      showDialog(
+        context: context,
+        barrierDismissible: false,
+        builder: (context) => const Center(child: VeridiaLoader()),
+      ),
     );
 
     try {
@@ -620,7 +625,9 @@ class _LoginScreenState extends State<LoginScreen>
                                 alignment: Alignment.centerRight,
                                 child: TextButton(
                                   onPressed: _olvideContrasena,
-                                  child: const Text('¿Olvidaste tu contraseña?'),
+                                  child: const Text(
+                                    '¿Olvidaste tu contraseña?',
+                                  ),
                                 ),
                               ),
                               AnimatedVisibility(

@@ -18,6 +18,14 @@ dependencies:
   firebase_core: ^4.11.0
   firebase_auth: ^6.5.4
   cloud_firestore: ^6.6.0
+  # Llama a las Cloud Functions en functions/ (identificarEspecie,
+  # guardarObservacion): ahí vive la clave de Gemini y la transacción que
+  # otorga Veridiums, fuera del alcance de un cliente modificado.
+  # SIN USAR por ahora (2026-08-26): el proyecto no tiene el plan Blaze
+  # activo, así que esas Cloud Functions no se pueden desplegar todavía y la
+  # app llama a Gemini/Firestore directo mientras tanto. Se deja declarada
+  # para no tener que resolverla otra vez cuando se reactive ese camino.
+  cloud_functions: ^6.1.0
   # Sin firebase_storage a propósito: las fotos van a Supabase Storage
   # (ver lib/services/foto_service.dart). Firebase Storage no está
   # aprovisionado en el proyecto y exigiría plan Blaze.
@@ -30,6 +38,11 @@ dependencies:
   supabase_flutter: ^2.3.1
 
   http: ^1.1.2
+  # sha256 para la huella exacta de cada foto (anti-repetición en desafíos).
+  crypto: ^3.0.6
+  # Lee los metadatos EXIF de la foto (GPS y fecha de captura) para guardar
+  # DÓNDE se tomó y no dónde estaba el celular al subirla.
+  exif: ^3.3.0
   flutter_image_compress: ^2.0.2
   shared_preferences: ^2.0.0
   app_settings: ^4.1.1

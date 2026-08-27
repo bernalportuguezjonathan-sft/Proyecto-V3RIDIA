@@ -1,3 +1,5 @@
+import '../theme/veridia_theme.dart';
+
 /// Bono de Veridiums por CERRAR un desafío.
 ///
 /// La economía es: cada foto verificada paga 1 Veridium, y completar el
@@ -8,6 +10,57 @@ int calcularBonoCompletar(int metaGoal) {
   return (metaGoal / 10).ceil().clamp(1, 10);
 }
 
+/// Avance de UN explorador en UN desafío.
+///
+/// Vive en `users/{uid}/desafios/{challengeId}`, no dentro del desafío: el
+/// progreso es personal. Antes un desafío global guardaba un único
+/// `currentProgress` compartido, así que la foto de un explorador subía la
+/// barra de todos y el bono se pagaba una sola vez para toda la app.
+class ProgresoDesafio {
+  const ProgresoDesafio({
+    required this.challengeId,
+    required this.progreso,
+    required this.completado,
+    required this.bonoPagado,
+    this.actualizado,
+  });
+
+  /// Estado inicial de quien todavía no ha subido ninguna foto.
+  const ProgresoDesafio.vacio(this.challengeId)
+    : progreso = 0,
+      completado = false,
+      bonoPagado = false,
+      actualizado = null;
+
+  final String challengeId;
+  final int progreso;
+  final bool completado;
+
+  /// Evita pagar dos veces el bono de cierre si el progreso se vuelve a tocar.
+  final bool bonoPagado;
+
+  final DateTime? actualizado;
+
+  Map<String, dynamic> toMap() => {
+    'progreso': progreso,
+    'completado': completado,
+    'bonoPagado': bonoPagado,
+    'actualizado': aIsoUtc(actualizado ?? DateTime.now()),
+  };
+
+  factory ProgresoDesafio.fromMap(String id, Map<String, dynamic> map) {
+    return ProgresoDesafio(
+      challengeId: id,
+      progreso: (map['progreso'] as num?)?.toInt() ?? 0,
+      completado: map['completado'] as bool? ?? false,
+      bonoPagado: map['bonoPagado'] as bool? ?? false,
+      actualizado: deIso(map['actualizado'] as String? ?? ''),
+    );
+  }
+}
+
+/// Definición de un desafío. NO guarda progreso: eso es de cada explorador
+/// (ver [ProgresoDesafio]).
 class Challenge {
   Challenge({
     required this.id,
@@ -17,13 +70,11 @@ class Challenge {
     required this.targetGoal,
     required this.dueDate,
     required this.createdDate,
-    required this.currentProgress,
-    required this.isCompleted,
     this.assignedToUserId,
     this.assignedToDisplayName,
     this.assignedToEmail,
     this.assignedByAdmin,
-    this.tokensAwarded = false,
+    this.completadoPor = 0,
   });
 
   final String id;
@@ -33,13 +84,15 @@ class Challenge {
   final int targetGoal;
   final DateTime dueDate;
   final DateTime createdDate;
-  final int currentProgress;
-  final bool isCompleted;
   final String? assignedToUserId;
   final String? assignedToDisplayName;
   final String? assignedToEmail;
   final String? assignedByAdmin;
-  final bool tokensAwarded;
+
+  /// Cuántos exploradores lo han completado. Es un contador desnormalizado:
+  /// contarlo de verdad exigiría leer la subcolección de cada usuario, que es
+  /// caro y además el administrador no puede leer datos de todos.
+  final int completadoPor;
 
   /// Se DERIVA siempre de la meta, nunca se lee de Firestore. Hay desafíos
   /// antiguos con `tokensReward: 100` guardado en el documento; confiar en
@@ -47,6 +100,9 @@ class Challenge {
   int get tokensReward => calcularBonoCompletar(targetGoal);
 
   bool get isGlobal => assignedToUserId == null;
+
+  /// true si la fecha límite ya pasó.
+  bool get vencido => DateTime.now().isAfter(dueDate);
 
   Challenge copyWith({
     String? id,
@@ -56,13 +112,11 @@ class Challenge {
     int? targetGoal,
     DateTime? dueDate,
     DateTime? createdDate,
-    int? currentProgress,
-    bool? isCompleted,
     String? assignedToUserId,
     String? assignedToDisplayName,
     String? assignedToEmail,
     String? assignedByAdmin,
-    bool? tokensAwarded,
+    int? completadoPor,
   }) {
     return Challenge(
       id: id ?? this.id,
@@ -72,14 +126,12 @@ class Challenge {
       targetGoal: targetGoal ?? this.targetGoal,
       dueDate: dueDate ?? this.dueDate,
       createdDate: createdDate ?? this.createdDate,
-      currentProgress: currentProgress ?? this.currentProgress,
-      isCompleted: isCompleted ?? this.isCompleted,
       assignedToUserId: assignedToUserId ?? this.assignedToUserId,
       assignedToDisplayName:
           assignedToDisplayName ?? this.assignedToDisplayName,
       assignedToEmail: assignedToEmail ?? this.assignedToEmail,
       assignedByAdmin: assignedByAdmin ?? this.assignedByAdmin,
-      tokensAwarded: tokensAwarded ?? this.tokensAwarded,
+      completadoPor: completadoPor ?? this.completadoPor,
     );
   }
 
@@ -89,15 +141,13 @@ class Challenge {
       'description': description,
       'targetSpecies': targetSpecies,
       'targetGoal': targetGoal,
-      'dueDate': dueDate.toIso8601String(),
-      'createdDate': createdDate.toIso8601String(),
-      'currentProgress': currentProgress,
-      'isCompleted': isCompleted,
+      'dueDate': aIsoUtc(dueDate),
+      'createdDate': aIsoUtc(createdDate),
       'assignedToUserId': assignedToUserId,
       'assignedToDisplayName': assignedToDisplayName,
       'assignedToEmail': assignedToEmail,
       'assignedByAdmin': assignedByAdmin,
-      'tokensAwarded': tokensAwarded,
+      'completadoPor': completadoPor,
       'tokensReward': tokensReward,
     };
   }
@@ -109,18 +159,13 @@ class Challenge {
       description: map['description'] as String? ?? '',
       targetSpecies: map['targetSpecies'] as String? ?? '',
       targetGoal: (map['targetGoal'] as num?)?.toInt() ?? 1,
-      dueDate:
-          DateTime.tryParse(map['dueDate'] as String? ?? '') ?? DateTime.now(),
-      createdDate:
-          DateTime.tryParse(map['createdDate'] as String? ?? '') ??
-          DateTime.now(),
-      currentProgress: (map['currentProgress'] as num?)?.toInt() ?? 0,
-      isCompleted: map['isCompleted'] as bool? ?? false,
+      dueDate: deIso(map['dueDate'] as String? ?? '') ?? DateTime.now(),
+      createdDate: deIso(map['createdDate'] as String? ?? '') ?? DateTime.now(),
       assignedToUserId: map['assignedToUserId'] as String?,
       assignedToDisplayName: map['assignedToDisplayName'] as String?,
       assignedToEmail: map['assignedToEmail'] as String?,
       assignedByAdmin: map['assignedByAdmin'] as String?,
-      tokensAwarded: map['tokensAwarded'] as bool? ?? false,
+      completadoPor: (map['completadoPor'] as num?)?.toInt() ?? 0,
     );
   }
 }

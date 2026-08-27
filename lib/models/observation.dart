@@ -1,3 +1,6 @@
+import '../theme/veridia_theme.dart';
+import '../utils/texto_busqueda.dart';
+
 class Observation {
   Observation({
     required this.id,
@@ -38,7 +41,7 @@ class Observation {
       'scientificName': scientificName,
       'location': location,
       'notes': notes,
-      'dateTime': dateTime.toIso8601String(),
+      'dateTime': aIsoUtc(dateTime),
       'imagePath': imagePath,
       'latitude': latitude,
       'longitude': longitude,
@@ -55,8 +58,7 @@ class Observation {
       scientificName: map['scientificName'] as String? ?? 'Sin confirmar',
       location: map['location'] as String? ?? '',
       notes: map['notes'] as String? ?? '',
-      dateTime:
-          DateTime.tryParse(map['dateTime'] as String? ?? '') ?? DateTime.now(),
+      dateTime: deIso(map['dateTime'] as String? ?? '') ?? DateTime.now(),
       imagePath: map['imagePath'] as String?,
       latitude: (map['latitude'] as num?)?.toDouble(),
       longitude: (map['longitude'] as num?)?.toDouble(),
@@ -65,4 +67,37 @@ class Observation {
       userDisplayName: map['userDisplayName'] as String?,
     );
   }
+}
+
+/// true si la observación responde a la búsqueda (nombre común, científico,
+/// tipo, lugar, notas o quién la registró).
+///
+/// Es difusa: tolera errores de tipeo razonables (ver
+/// `utils/texto_busqueda.dart`), así "colibries" o "colibrí" encuentran
+/// igual una foto guardada como "Colibrí Chillón".
+bool observacionCoincide(Observation observacion, String consulta) {
+  final campos = [
+    observacion.commonName,
+    observacion.scientificName,
+    observacion.type ?? '',
+    observacion.location,
+    observacion.notes,
+    observacion.userDisplayName ?? '',
+  ].join(' ');
+  return coincideDifuso(campos, consulta);
+}
+
+/// Filtra avistamientos por texto libre y, opcionalmente, por especie exacta
+/// (la misma que selecciona el chip de especies del mapa).
+List<Observation> filtrarObservaciones(
+  List<Observation> observaciones, {
+  String query = '',
+  String? especie,
+}) {
+  return observaciones.where((observacion) {
+    if (!observacionCoincide(observacion, query)) return false;
+    if (especie == null || especie.isEmpty) return true;
+    final nombres = '${observacion.commonName} ${observacion.scientificName}';
+    return coincideDifuso(nombres, especie);
+  }).toList();
 }

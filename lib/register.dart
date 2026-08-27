@@ -166,10 +166,12 @@ class _RegisterScreenState extends State<RegisterScreen>
     // permission-denied más abajo.
 
     // Si todo está perfecto, mostramos el círculo de carga
-    showDialog(
-      context: context,
-      barrierDismissible: false,
-      builder: (context) => const Center(child: VeridiaLoader()),
+    unawaited(
+      showDialog(
+        context: context,
+        barrierDismissible: false,
+        builder: (context) => const Center(child: VeridiaLoader()),
+      ),
     );
 
     try {
@@ -283,14 +285,18 @@ class _RegisterScreenState extends State<RegisterScreen>
           );
           if (!mounted) return;
 
-          Navigator.pushReplacement(
-            context,
-            MaterialPageRoute(builder: (context) => const AdminHomeScreen()),
+          unawaited(
+            Navigator.pushReplacement(
+              context,
+              MaterialPageRoute(builder: (context) => const AdminHomeScreen()),
+            ),
           );
         } else {
-          Navigator.pushReplacement(
-            context,
-            MaterialPageRoute(builder: (context) => const HomeScreen()),
+          unawaited(
+            Navigator.pushReplacement(
+              context,
+              MaterialPageRoute(builder: (context) => const HomeScreen()),
+            ),
           );
         }
       }
@@ -377,9 +383,11 @@ class _RegisterScreenState extends State<RegisterScreen>
         : const HomeScreen();
 
     if (!mounted) return;
-    Navigator.pushReplacement(
-      context,
-      MaterialPageRoute(builder: (context) => nextPage),
+    unawaited(
+      Navigator.pushReplacement(
+        context,
+        MaterialPageRoute(builder: (context) => nextPage),
+      ),
     );
   }
 
@@ -415,10 +423,12 @@ class _RegisterScreenState extends State<RegisterScreen>
 
     if (!mounted) return;
     var dialogClosed = false;
-    showDialog(
-      context: context,
-      barrierDismissible: false,
-      builder: (context) => const Center(child: VeridiaLoader()),
+    unawaited(
+      showDialog(
+        context: context,
+        barrierDismissible: false,
+        builder: (context) => const Center(child: VeridiaLoader()),
+      ),
     );
 
     try {

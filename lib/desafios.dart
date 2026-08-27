@@ -1,10 +1,15 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import 'models/desafio.dart';
 import 'models/user.dart';
+import 'recompensas.dart';
 import 'services/especie_ia_service.dart';
+import 'services/foto_service.dart';
 import 'services/repositorio_d.dart';
+import 'services/repositorio_o.dart';
 import 'services/repositorio_u.dart';
+import 'services/ubicacion_foto.dart';
 import 'theme/veridia_theme.dart';
 import 'navegacion.dart';
 import 'widgets/veridia_ui.dart';
@@ -40,148 +45,207 @@ class _ChallengesScreenState extends State<ChallengesScreen> {
 
     showDialog(
       context: context,
-      builder: (context) => AlertDialog(
-        title: Text(challenge == null ? 'Nuevo Desafío' : 'Editar Desafío'),
-        content: Form(
-          key: formKey,
-          child: SingleChildScrollView(
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                TextFormField(
-                  controller: titleController,
-                  decoration: const InputDecoration(
-                    labelText: 'Título del desafío',
-                  ),
-                  validator: (value) => value == null || value.trim().isEmpty
-                      ? 'Requerido'
-                      : null,
-                ),
-                TextFormField(
-                  controller: descriptionController,
-                  decoration: const InputDecoration(labelText: 'Descripción'),
-                  maxLines: 2,
-                ),
-                TextFormField(
-                  controller: speciesController,
-                  decoration: const InputDecoration(
-                    labelText: 'Especie objetivo',
-                  ),
-                  validator: (value) => value == null || value.trim().isEmpty
-                      ? 'Requerido'
-                      : null,
-                ),
-                TextFormField(
-                  controller: goalController,
-                  decoration: const InputDecoration(
-                    labelText: 'Meta (cantidad)',
-                  ),
-                  keyboardType: TextInputType.number,
-                  validator: (value) => value == null || value.trim().isEmpty
-                      ? 'Requerido'
-                      : null,
-                ),
-                const SizedBox(height: 12),
-                Row(
-                  children: [
-                    Expanded(
-                      child: Text(
-                        'Fecha límite: ${selectedDate.day}/${selectedDate.month}/${selectedDate.year}',
-                        style: const TextStyle(fontSize: 12),
-                      ),
+      // StatefulBuilder: sin él, cambiar la fecha límite no repinta el
+      // diálogo y el administrador seguía viendo la fecha anterior.
+      builder: (context) => StatefulBuilder(
+        builder: (context, setDialogState) => AlertDialog(
+          title: Text(challenge == null ? 'Nuevo Desafío' : 'Editar Desafío'),
+          content: Form(
+            key: formKey,
+            child: SingleChildScrollView(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  TextFormField(
+                    controller: titleController,
+                    decoration: const InputDecoration(
+                      labelText: 'Título del desafío',
                     ),
-                    TextButton(
-                      onPressed: () async {
-                        final picked = await showDatePicker(
-                          context: context,
-                          initialDate: selectedDate,
-                          firstDate: DateTime.now(),
-                          lastDate: DateTime.now().add(
-                            const Duration(days: 365),
-                          ),
-                        );
-                        if (picked != null) {
-                          selectedDate = picked;
-                        }
-                      },
-                      child: const Text('Cambiar'),
+                    validator: (value) => value == null || value.trim().isEmpty
+                        ? 'Requerido'
+                        : null,
+                  ),
+                  TextFormField(
+                    controller: descriptionController,
+                    decoration: const InputDecoration(labelText: 'Descripción'),
+                    maxLines: 2,
+                  ),
+                  TextFormField(
+                    controller: speciesController,
+                    decoration: const InputDecoration(
+                      labelText: 'Especie objetivo',
                     ),
-                  ],
-                ),
-              ],
-            ),
-          ),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('Cancelar'),
-          ),
-          ElevatedButton(
-            onPressed: () async {
-              if (formKey.currentState?.validate() ?? false) {
-                final navigator = Navigator.of(context);
-                final messenger = ScaffoldMessenger.of(context);
-                try {
-                  if (challenge == null) {
-                    await ChallengeRepository.instance.addChallenge(
-                      Challenge(
-                        id: DateTime.now().millisecondsSinceEpoch.toString(),
-                        title: titleController.text.trim(),
-                        description: descriptionController.text.trim(),
-                        targetSpecies: speciesController.text.trim(),
-                        targetGoal: int.parse(goalController.text),
-                        dueDate: selectedDate,
-                        createdDate: DateTime.now(),
-                        currentProgress: 0,
-                        isCompleted: false,
+                    validator: (value) => value == null || value.trim().isEmpty
+                        ? 'Requerido'
+                        : null,
+                  ),
+                  TextFormField(
+                    controller: goalController,
+                    decoration: const InputDecoration(
+                      labelText: 'Meta (cantidad)',
+                    ),
+                    keyboardType: TextInputType.number,
+                    validator: (value) => value == null || value.trim().isEmpty
+                        ? 'Requerido'
+                        : null,
+                  ),
+                  const SizedBox(height: 12),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: Text(
+                          'Fecha límite: ${formatoFecha(selectedDate)}',
+                          style: const TextStyle(fontSize: 12),
+                        ),
                       ),
-                    );
-                  } else {
-                    await ChallengeRepository.instance.updateChallenge(
-                      Challenge(
-                        id: challenge.id,
-                        title: titleController.text.trim(),
-                        description: descriptionController.text.trim(),
-                        targetSpecies: speciesController.text.trim(),
-                        targetGoal: int.parse(goalController.text),
-                        dueDate: selectedDate,
-                        createdDate: challenge.createdDate,
-                        currentProgress: challenge.currentProgress,
-                        isCompleted: challenge.isCompleted,
+                      TextButton(
+                        onPressed: () async {
+                          final picked = await showDatePicker(
+                            context: context,
+                            initialDate: selectedDate,
+                            firstDate: DateTime.now(),
+                            lastDate: DateTime.now().add(
+                              const Duration(days: 365),
+                            ),
+                          );
+                          if (picked != null) {
+                            setDialogState(() => selectedDate = picked);
+                          }
+                        },
+                        child: const Text('Cambiar'),
                       ),
-                    );
-                  }
-                } catch (e) {
-                  messenger.showSnackBar(
-                    SnackBar(content: Text('No se pudo guardar: $e')),
-                  );
-                  return;
-                }
-                navigator.pop();
-              }
-            },
-            style: ElevatedButton.styleFrom(
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(16),
+                    ],
+                  ),
+                ],
               ),
-              padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 24),
             ),
-            child: const Text('Guardar'),
           ),
-        ],
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text('Cancelar'),
+            ),
+            ElevatedButton(
+              onPressed: () async {
+                if (formKey.currentState?.validate() ?? false) {
+                  final navigator = Navigator.of(context);
+                  final messenger = ScaffoldMessenger.of(context);
+                  try {
+                    if (challenge == null) {
+                      await ChallengeRepository.instance.addChallenge(
+                        Challenge(
+                          id: ChallengeRepository.instance.nuevoId(),
+                          title: titleController.text.trim(),
+                          description: descriptionController.text.trim(),
+                          targetSpecies: speciesController.text.trim(),
+                          targetGoal: int.parse(goalController.text),
+                          dueDate: selectedDate,
+                          createdDate: DateTime.now(),
+                        ),
+                      );
+                    } else {
+                      // copyWith y no un Challenge nuevo: construirlo a
+                      // mano perdía a quién estaba asignado y si el bono ya
+                      // se había pagado, y el desafío se volvía global y
+                      // volvía a pagar bono al cerrarse.
+                      await ChallengeRepository.instance.updateChallenge(
+                        challenge.copyWith(
+                          title: titleController.text.trim(),
+                          description: descriptionController.text.trim(),
+                          targetSpecies: speciesController.text.trim(),
+                          targetGoal: int.parse(goalController.text),
+                          dueDate: selectedDate,
+                        ),
+                      );
+                    }
+                  } catch (e) {
+                    messenger.showSnackBar(
+                      SnackBar(content: Text('No se pudo guardar: $e')),
+                    );
+                    return;
+                  }
+                  navigator.pop();
+                }
+              },
+              style: ElevatedButton.styleFrom(
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(16),
+                ),
+                padding: const EdgeInsets.symmetric(
+                  vertical: 14,
+                  horizontal: 24,
+                ),
+              ),
+              child: const Text('Guardar'),
+            ),
+          ],
+        ),
       ),
     );
   }
 
-  /// Sube una foto y solo cuenta como progreso si la IA confirma que
-  /// muestra la especie objetivo del desafío. Ya no basta con subir
-  /// cualquier imagen.
-  Future<void> _pickImageFromGallery(Challenge challenge) async {
+  /// Deja elegir entre cámara y galería. En web la cámara del picker no está
+  /// disponible, así que allí se va directo a la galería.
+  Future<ImageSource?> _elegirOrigen() async {
+    if (kIsWeb) return ImageSource.gallery;
+
+    return showModalBottomSheet<ImageSource>(
+      context: context,
+      backgroundColor: VeridiaColors.surfaceContainer,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (sheetContext) => SafeArea(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const SizedBox(height: 8),
+            ListTile(
+              leading: const Icon(
+                Icons.photo_camera_rounded,
+                color: VeridiaColors.primary,
+              ),
+              title: const Text('Tomar foto ahora'),
+              subtitle: const Text('Lo más rápido y no se puede repetir'),
+              onTap: () => Navigator.pop(sheetContext, ImageSource.camera),
+            ),
+            ListTile(
+              leading: const Icon(
+                Icons.photo_library_rounded,
+                color: VeridiaColors.secondary,
+              ),
+              title: const Text('Elegir de la galería'),
+              subtitle: const Text('Debe ser una foto que no hayas usado'),
+              onTap: () => Navigator.pop(sheetContext, ImageSource.gallery),
+            ),
+            const SizedBox(height: 8),
+          ],
+        ),
+      ),
+    );
+  }
+
+  /// Registra una foto para un desafío.
+  ///
+  /// La identificación con Gemini Y el otorgamiento de Veridiums corren en
+  /// el servidor (Cloud Functions `identificarEspecie` + `guardarObservacion`
+  /// — ver functions/index.js): el cliente solo manda la foto, nunca puede
+  /// inventarse un resultado de IA ni escribir el progreso él mismo. La
+  /// comparación local de especie es solo para dar feedback inmediato sin
+  /// esperar una ida y vuelta a la nube; la que de verdad paga Veridiums es
+  /// la del servidor.
+  Future<void> _capturarParaDesafio(Challenge challenge) async {
     if (_analizando.contains(challenge.id)) return;
 
-    final picker = ImagePicker();
-    final pickedFile = await picker.pickImage(source: ImageSource.gallery);
+    final perfil = UserRepository.instance.currentUser.value;
+    if (perfil == null) return;
+
+    final origen = await _elegirOrigen();
+    if (origen == null || !mounted) return;
+
+    // Sin `imageQuality`: recomprimir borra el EXIF y con él la ubicación
+    // real de la foto (ver services/ubicacion_foto.dart).
+    final pickedFile = await ImagePicker().pickImage(source: origen);
     if (!mounted || pickedFile == null) return;
 
     final messenger = ScaffoldMessenger.of(context);
@@ -193,7 +257,14 @@ class _ChallengesScreenState extends State<ChallengesScreen> {
 
       final SpeciesIdentification resultado;
       try {
-        resultado = await _especieIAService.identify(bytes, mimeType);
+        resultado = await _especieIAService.identify(
+          bytes,
+          mimeType,
+          origen: 'el desafío "${challenge.title}"',
+        );
+      } on FotoDuplicadaException catch (e) {
+        messenger.showSnackBar(veridiaSnackBarError(e.message));
+        return;
       } on SpeciesIdentificationException catch (e) {
         messenger.showSnackBar(veridiaSnackBarError(e.message));
         return;
@@ -219,31 +290,56 @@ class _ChallengesScreenState extends State<ChallengesScreen> {
         return;
       }
 
-      final newProgress = (challenge.currentProgress + 1).clamp(
-        0,
-        challenge.targetGoal,
+      // La ubicación sale del EXIF de la foto y solo cae al GPS del celular
+      // si la imagen no la trae: así una foto de casa subida desde otro
+      // sitio no queda marcada en el sitio equivocado.
+      final ubicacion = await ubicacionDeObservacion(bytes);
+      final observationId = ObservationRepository.instance.nuevoId();
+      final subida = await FotoService.instance.subirFotoObservacion(
+        bytes: bytes,
+        userId: perfil.userId,
+        observationId: observationId,
+        mimeType: mimeType,
       );
+
+      final ResultadoGuardarObservacion resultadoGuardado;
       try {
-        await ChallengeRepository.instance.updateProgress(
-          challenge.id,
-          newProgress,
+        resultadoGuardado = await ObservationRepository.instance.guardarConIA(
+          identificacion: resultado,
+          observationId: observationId,
+          imageUrl: subida.url,
+          latitude: ubicacion.latitude,
+          longitude: ubicacion.longitude,
+          location: ubicacion.etiqueta,
         );
-      } catch (e) {
-        messenger.showSnackBar(
-          SnackBar(content: Text('No se pudo actualizar el progreso: $e')),
-        );
+      } on GuardarObservacionException catch (e) {
+        messenger.showSnackBar(veridiaSnackBarError(e.message));
         return;
       }
 
-      final completado = newProgress >= challenge.targetGoal;
-      final bono = completado && !challenge.tokensAwarded
-          ? challenge.tokensReward
-          : 0;
-      final message = completado
-          ? '¡Desafío completado! +1 Veridium por la foto'
-                '${bono > 0 ? ' y +$bono de bono' : ''}.'
-          : 'IA confirmó "${resultado.commonName}". '
-                'Progreso: $newProgress/${challenge.targetGoal} (+1 Veridium)';
+      // Una sola foto puede coincidir con más de un desafío activo a la
+      // vez; el servidor los avanza todos, no solo el de esta tarjeta.
+      final avances = resultadoGuardado.avances;
+      final propio = avances.where((a) => a.challengeId == challenge.id);
+      final otros = avances.where((a) => a.challengeId != challenge.id).length;
+
+      final String message;
+      if (propio.isEmpty) {
+        // Ya estaba completo antes de esta foto, o algo lo bloqueó server-
+        // side pese al chequeo local: se avisa sin fingir un progreso falso.
+        message =
+            'La IA confirmó "${resultado.commonName}", pero este '
+            'desafío ya no aceptaba más progreso.';
+      } else {
+        final avance = propio.first;
+        final palabra = avance.veridiumsGanados == 1 ? 'Veridium' : 'Veridiums';
+        message = avance.completado
+            ? '¡Desafío completado! +${avance.veridiumsGanados} $palabra.'
+            : 'IA confirmó "${resultado.commonName}". '
+                  'Progreso: ${avance.progreso}/${avance.meta} '
+                  '(+${avance.veridiumsGanados} $palabra)'
+                  '${otros > 0 ? ' · también avanzó $otros desafío(s) más' : ''}';
+      }
       messenger.showSnackBar(SnackBar(content: Text(message)));
     } finally {
       if (mounted) setState(() => _analizando.remove(challenge.id));
@@ -305,8 +401,10 @@ class _ChallengesScreenState extends State<ChallengesScreen> {
         actions: [
           ValueListenableBuilder<UserProfile?>(
             valueListenable: UserRepository.instance.currentUser,
-            builder: (context, userProfile, child) =>
-                VeridiaTokenBadge(tokens: userProfile?.tokens ?? 0),
+            builder: (context, userProfile, child) => VeridiaTokenBadge(
+              tokens: userProfile?.tokens ?? 0,
+              onTap: () => abrirRecompensas(context),
+            ),
           ),
           const SizedBox(width: 10),
           VeridiaAppBarAction(
@@ -317,275 +415,340 @@ class _ChallengesScreenState extends State<ChallengesScreen> {
           const SizedBox(width: 12),
         ],
       ),
-      body: ValueListenableBuilder<List<Challenge>>(
-        valueListenable: ChallengeRepository.instance.challenges,
-        builder: (context, allChallenges, child) {
-          final profile = UserRepository.instance.currentUser.value;
-          // Un explorador solo ve los desafíos globales y los suyos.
-          final challenges = profile?.role == 'Administrador'
-              ? allChallenges
-              : ChallengeRepository.instance.challengesForUser(profile?.userId);
-          return Stack(
-            children: [
-              Container(color: VeridiaColors.background),
-              SafeArea(
-                child: challenges.isEmpty
-                    ? Center(
-                        child: Column(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
-                            Icon(
-                              Icons.emoji_events_outlined,
-                              size: 64,
-                              color: VeridiaColors.outline,
-                            ),
-                            const SizedBox(height: 16),
-                            Text(
-                              'No hay desafíos aún',
-                              style: TextStyle(
-                                fontSize: 16,
-                                fontWeight: FontWeight.bold,
-                                color: VeridiaColors.onSurfaceVariant,
+      body: ValueListenableBuilder<Map<String, ProgresoDesafio>>(
+        valueListenable: ChallengeRepository.instance.misProgresos,
+        builder: (context, _, _) => ValueListenableBuilder<List<Challenge>>(
+          valueListenable: ChallengeRepository.instance.challenges,
+          builder: (context, allChallenges, child) {
+            final profile = UserRepository.instance.currentUser.value;
+            // Un explorador solo ve los desafíos globales y los suyos.
+            final challenges = profile?.role == 'Administrador'
+                ? allChallenges
+                : ChallengeRepository.instance.challengesForUser(
+                    profile?.userId,
+                  );
+            return Stack(
+              children: [
+                Container(color: VeridiaColors.background),
+                SafeArea(
+                  child: challenges.isEmpty
+                      ? Center(
+                          child: Column(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              Icon(
+                                Icons.emoji_events_outlined,
+                                size: 64,
+                                color: VeridiaColors.outline,
                               ),
-                            ),
-                            const SizedBox(height: 8),
-                            Text(
-                              'Crea tu primer desafío mensual',
-                              style: TextStyle(color: VeridiaColors.outline),
-                            ),
-                          ],
-                        ),
-                      )
-                    : ListView.builder(
-                        padding: const EdgeInsets.all(16),
-                        itemCount: challenges.length,
-                        itemBuilder: (context, index) {
-                          final challenge = challenges[index];
-
-                          return Container(
-                            margin: const EdgeInsets.only(bottom: 12),
-                            decoration: BoxDecoration(
-                              color: VeridiaColors.surfaceContainer,
-                              borderRadius: BorderRadius.circular(18),
-                              boxShadow: [
-                                const BoxShadow(
-                                  color: Color.fromRGBO(0, 0, 0, 0.35),
-                                  blurRadius: 8,
-                                  offset: Offset(0, 2),
+                              const SizedBox(height: 16),
+                              Text(
+                                'No hay desafíos aún',
+                                style: TextStyle(
+                                  fontSize: 16,
+                                  fontWeight: FontWeight.bold,
+                                  color: VeridiaColors.onSurfaceVariant,
                                 ),
-                              ],
-                            ),
-                            child: Padding(
-                              padding: const EdgeInsets.all(16),
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Row(
-                                    children: [
-                                      Expanded(
-                                        child: Column(
-                                          crossAxisAlignment:
-                                              CrossAxisAlignment.start,
-                                          children: [
-                                            Text(
-                                              challenge.title,
-                                              style: const TextStyle(
-                                                fontSize: 16,
-                                                fontWeight: FontWeight.bold,
-                                                color: VeridiaColors.onSurface,
-                                              ),
-                                            ),
-                                            const SizedBox(height: 4),
-                                            Text(
-                                              'Objetivo: ${challenge.targetSpecies}',
-                                              style: TextStyle(
-                                                fontSize: 12,
-                                                color: VeridiaColors
-                                                    .onSurfaceVariant,
-                                              ),
-                                            ),
-                                          ],
-                                        ),
-                                      ),
-                                      if (challenge.isCompleted)
-                                        Container(
-                                          padding: const EdgeInsets.symmetric(
-                                            horizontal: 8,
-                                            vertical: 4,
-                                          ),
-                                          decoration: BoxDecoration(
-                                            color:
-                                                VeridiaColors.primaryContainer,
-                                            borderRadius: BorderRadius.circular(
-                                              8,
-                                            ),
-                                          ),
-                                          child: Row(
+                              ),
+                              const SizedBox(height: 8),
+                              Text(
+                                'Crea tu primer desafío mensual',
+                                style: TextStyle(color: VeridiaColors.outline),
+                              ),
+                            ],
+                          ),
+                        )
+                      : ListView.builder(
+                          padding: const EdgeInsets.all(16),
+                          itemCount: challenges.length,
+                          itemBuilder: (context, index) {
+                            final challenge = challenges[index];
+                            final avance = ChallengeRepository.instance
+                                .progreso(challenge.id);
+                            final completado = avance.completado;
+
+                            return Container(
+                              margin: const EdgeInsets.only(bottom: 12),
+                              decoration: BoxDecoration(
+                                color: VeridiaColors.surfaceContainer,
+                                borderRadius: BorderRadius.circular(18),
+                                boxShadow: [
+                                  const BoxShadow(
+                                    color: Color.fromRGBO(0, 0, 0, 0.35),
+                                    blurRadius: 8,
+                                    offset: Offset(0, 2),
+                                  ),
+                                ],
+                              ),
+                              child: Padding(
+                                padding: const EdgeInsets.all(16),
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Row(
+                                      children: [
+                                        Expanded(
+                                          child: Column(
+                                            crossAxisAlignment:
+                                                CrossAxisAlignment.start,
                                             children: [
-                                              const Icon(
-                                                Icons.emoji_events,
-                                                size: 12,
-                                                color: VeridiaColors.secondary,
-                                              ),
-                                              const SizedBox(width: 4),
                                               Text(
-                                                '+${challenge.tokensReward}',
+                                                challenge.title,
                                                 style: const TextStyle(
-                                                  fontSize: 11,
-                                                  color: VeridiaColors
-                                                      .onPrimaryContainer,
+                                                  fontSize: 16,
                                                   fontWeight: FontWeight.bold,
+                                                  color:
+                                                      VeridiaColors.onSurface,
+                                                ),
+                                              ),
+                                              const SizedBox(height: 4),
+                                              Text(
+                                                'Objetivo: ${challenge.targetSpecies}',
+                                                style: TextStyle(
+                                                  fontSize: 12,
+                                                  color: VeridiaColors
+                                                      .onSurfaceVariant,
                                                 ),
                                               ),
                                             ],
                                           ),
                                         ),
-                                    ],
-                                  ),
-                                  const SizedBox(height: 12),
-                                  Text(
-                                    challenge.description,
-                                    style: TextStyle(
-                                      fontSize: 12,
-                                      color: VeridiaColors.onSurfaceVariant,
-                                    ),
-                                  ),
-                                  const SizedBox(height: 12),
-                                  Row(
-                                    children: [
-                                      Text(
-                                        'Progreso: ${challenge.currentProgress}/${challenge.targetGoal}',
-                                        style: const TextStyle(
-                                          fontSize: 11,
-                                          fontWeight: FontWeight.w600,
-                                        ),
-                                      ),
-                                      const Spacer(),
-                                      Text(
-                                        'Vence: ${challenge.dueDate.day}/${challenge.dueDate.month}/${challenge.dueDate.year}',
-                                        style: TextStyle(
-                                          fontSize: 11,
-                                          color: VeridiaColors.onSurfaceVariant,
-                                        ),
-                                      ),
-                                    ],
-                                  ),
-                                  const SizedBox(height: 8),
-                                  ClipRRect(
-                                    borderRadius: BorderRadius.circular(8),
-                                    child: LinearProgressIndicator(
-                                      value: challenge.targetGoal <= 0
-                                          ? 0
-                                          : (challenge.currentProgress /
-                                                    challenge.targetGoal)
-                                                .clamp(0.0, 1.0),
-                                      minHeight: 6,
-                                      backgroundColor:
-                                          VeridiaColors.surfaceContainerHighest,
-                                      valueColor: AlwaysStoppedAnimation<Color>(
-                                        challenge.isCompleted
-                                            ? VeridiaColors.secondary
-                                            : VeridiaColors.primary,
-                                      ),
-                                    ),
-                                  ),
-                                  const SizedBox(height: 12),
-                                  Row(
-                                    mainAxisAlignment:
-                                        MainAxisAlignment.spaceBetween,
-                                    children: [
-                                      Expanded(
-                                        child: ElevatedButton.icon(
-                                          onPressed:
-                                              _analizando.contains(challenge.id)
-                                              ? null
-                                              : () => _pickImageFromGallery(
-                                                  challenge,
+                                        if (completado)
+                                          Container(
+                                            padding: const EdgeInsets.symmetric(
+                                              horizontal: 8,
+                                              vertical: 4,
+                                            ),
+                                            decoration: BoxDecoration(
+                                              color: VeridiaColors
+                                                  .primaryContainer,
+                                              borderRadius:
+                                                  BorderRadius.circular(8),
+                                            ),
+                                            child: Row(
+                                              children: [
+                                                const Icon(
+                                                  Icons.emoji_events,
+                                                  size: 12,
+                                                  color:
+                                                      VeridiaColors.secondary,
                                                 ),
-                                          icon:
-                                              _analizando.contains(challenge.id)
-                                              ? const SizedBox(
-                                                  width: 16,
-                                                  height: 16,
-                                                  child:
-                                                      CircularProgressIndicator(
-                                                        strokeWidth: 2,
+                                                const SizedBox(width: 4),
+                                                Text(
+                                                  '+${challenge.tokensReward}',
+                                                  style: const TextStyle(
+                                                    fontSize: 11,
+                                                    color: VeridiaColors
+                                                        .onPrimaryContainer,
+                                                    fontWeight: FontWeight.bold,
+                                                  ),
+                                                ),
+                                              ],
+                                            ),
+                                          ),
+                                      ],
+                                    ),
+                                    const SizedBox(height: 12),
+                                    Text(
+                                      challenge.description,
+                                      style: TextStyle(
+                                        fontSize: 12,
+                                        color: VeridiaColors.onSurfaceVariant,
+                                      ),
+                                    ),
+                                    const SizedBox(height: 12),
+                                    Row(
+                                      children: [
+                                        Text(
+                                          'Mi progreso: ${avance.progreso}/${challenge.targetGoal}',
+                                          style: const TextStyle(
+                                            fontSize: 11,
+                                            fontWeight: FontWeight.w600,
+                                          ),
+                                        ),
+                                        const Spacer(),
+                                        Text(
+                                          'Vence: ${formatoFecha(challenge.dueDate)}',
+                                          style: TextStyle(
+                                            fontSize: 11,
+                                            color:
+                                                VeridiaColors.onSurfaceVariant,
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                    const SizedBox(height: 8),
+                                    ClipRRect(
+                                      borderRadius: BorderRadius.circular(8),
+                                      child: LinearProgressIndicator(
+                                        value: challenge.targetGoal <= 0
+                                            ? 0
+                                            : (avance.progreso /
+                                                      challenge.targetGoal)
+                                                  .clamp(0.0, 1.0),
+                                        minHeight: 6,
+                                        backgroundColor: VeridiaColors
+                                            .surfaceContainerHighest,
+                                        valueColor:
+                                            AlwaysStoppedAnimation<Color>(
+                                              completado
+                                                  ? VeridiaColors.secondary
+                                                  : VeridiaColors.primary,
+                                            ),
+                                      ),
+                                    ),
+                                    const SizedBox(height: 12),
+                                    Row(
+                                      mainAxisAlignment:
+                                          MainAxisAlignment.spaceBetween,
+                                      children: [
+                                        // El administrador modera: no captura
+                                        // fotos ni gana Veridiums.
+                                        if (UserRepository
+                                                .instance
+                                                .currentUser
+                                                .value
+                                                ?.role !=
+                                            'Administrador')
+                                          Expanded(
+                                            child: completado
+                                                ? OutlinedButton.icon(
+                                                    onPressed: () =>
+                                                        abrirRecompensas(
+                                                          context,
+                                                        ),
+                                                    icon: const Icon(
+                                                      Icons
+                                                          .card_giftcard_rounded,
+                                                      size: 18,
+                                                    ),
+                                                    label: const Text(
+                                                      'Canjear Veridiums',
+                                                    ),
+                                                    style: OutlinedButton.styleFrom(
+                                                      foregroundColor:
+                                                          VeridiaColors
+                                                              .veridium,
+                                                      side: const BorderSide(
                                                         color: VeridiaColors
-                                                            .onSurface,
+                                                            .veridium,
                                                       ),
-                                                )
-                                              : const Icon(
-                                                  Icons.photo_library,
+                                                      shape: RoundedRectangleBorder(
+                                                        borderRadius:
+                                                            BorderRadius.circular(
+                                                              16,
+                                                            ),
+                                                      ),
+                                                      padding:
+                                                          const EdgeInsets.symmetric(
+                                                            vertical: 14,
+                                                          ),
+                                                    ),
+                                                  )
+                                                : ElevatedButton.icon(
+                                                    onPressed:
+                                                        _analizando.contains(
+                                                          challenge.id,
+                                                        )
+                                                        ? null
+                                                        : () =>
+                                                              _capturarParaDesafio(
+                                                                challenge,
+                                                              ),
+                                                    icon:
+                                                        _analizando.contains(
+                                                          challenge.id,
+                                                        )
+                                                        ? const SizedBox(
+                                                            width: 16,
+                                                            height: 16,
+                                                            child: CircularProgressIndicator(
+                                                              strokeWidth: 2,
+                                                              color:
+                                                                  VeridiaColors
+                                                                      .onSurface,
+                                                            ),
+                                                          )
+                                                        : const Icon(
+                                                            Icons
+                                                                .add_a_photo_outlined,
+                                                            size: 18,
+                                                          ),
+                                                    label: Text(
+                                                      _analizando.contains(
+                                                            challenge.id,
+                                                          )
+                                                          ? 'Analizando...'
+                                                          : 'Registrar foto',
+                                                    ),
+                                                    style: ElevatedButton.styleFrom(
+                                                      backgroundColor:
+                                                          VeridiaColors.primary,
+                                                      foregroundColor:
+                                                          VeridiaColors
+                                                              .onPrimary,
+                                                      shape: RoundedRectangleBorder(
+                                                        borderRadius:
+                                                            BorderRadius.circular(
+                                                              16,
+                                                            ),
+                                                      ),
+                                                      padding:
+                                                          const EdgeInsets.symmetric(
+                                                            vertical: 14,
+                                                          ),
+                                                    ),
+                                                  ),
+                                          ),
+                                        if (UserRepository
+                                                .instance
+                                                .currentUser
+                                                .value
+                                                ?.role ==
+                                            'Administrador')
+                                          Row(
+                                            children: [
+                                              IconButton(
+                                                onPressed: () =>
+                                                    _showChallengeForm(
+                                                      challenge: challenge,
+                                                    ),
+                                                icon: const Icon(
+                                                  Icons.edit,
                                                   size: 18,
                                                 ),
-                                          label: Text(
-                                            _analizando.contains(challenge.id)
-                                                ? 'Analizando...'
-                                                : 'Subir foto',
-                                          ),
-                                          style: ElevatedButton.styleFrom(
-                                            backgroundColor:
-                                                VeridiaColors.primary,
-                                            foregroundColor:
-                                                VeridiaColors.onPrimary,
-                                            shape: RoundedRectangleBorder(
-                                              borderRadius:
-                                                  BorderRadius.circular(16),
-                                            ),
-                                            padding: const EdgeInsets.symmetric(
-                                              vertical: 14,
-                                            ),
-                                          ),
-                                        ),
-                                      ),
-                                      if (UserRepository
-                                              .instance
-                                              .currentUser
-                                              .value
-                                              ?.role ==
-                                          'Administrador')
-                                        Row(
-                                          children: [
-                                            IconButton(
-                                              onPressed: () =>
-                                                  _showChallengeForm(
-                                                    challenge: challenge,
-                                                  ),
-                                              icon: const Icon(
-                                                Icons.edit,
-                                                size: 18,
+                                                color: VeridiaColors.primary,
+                                                visualDensity:
+                                                    VisualDensity.compact,
                                               ),
-                                              color: VeridiaColors.primary,
-                                              visualDensity:
-                                                  VisualDensity.compact,
-                                            ),
-                                            IconButton(
-                                              onPressed: () =>
-                                                  _showDeleteConfirm(
-                                                    challenge.id,
-                                                  ),
-                                              icon: const Icon(
-                                                Icons.delete,
-                                                size: 18,
+                                              IconButton(
+                                                onPressed: () =>
+                                                    _showDeleteConfirm(
+                                                      challenge.id,
+                                                    ),
+                                                icon: const Icon(
+                                                  Icons.delete,
+                                                  size: 18,
+                                                ),
+                                                color: VeridiaColors.error,
+                                                visualDensity:
+                                                    VisualDensity.compact,
                                               ),
-                                              color: VeridiaColors.error,
-                                              visualDensity:
-                                                  VisualDensity.compact,
-                                            ),
-                                          ],
-                                        ),
-                                    ],
-                                  ),
-                                ],
+                                            ],
+                                          ),
+                                      ],
+                                    ),
+                                  ],
+                                ),
                               ),
-                            ),
-                          );
-                        },
-                      ),
-              ),
-            ],
-          );
-        },
+                            );
+                          },
+                        ),
+                ),
+              ],
+            );
+          },
+        ),
       ),
       bottomNavigationBar: VeridiaBottomNav(
         currentIndex: 0,

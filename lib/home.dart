@@ -8,6 +8,7 @@ import 'mapa.dart';
 import 'models/observation.dart';
 import 'models/user.dart';
 import 'navegacion.dart';
+import 'recompensas.dart';
 import 'services/repositorio_o.dart';
 import 'services/repositorio_u.dart';
 import 'theme/veridia_theme.dart';
@@ -55,8 +56,10 @@ class _HomeScreenState extends State<HomeScreen> {
         actions: [
           ValueListenableBuilder<UserProfile?>(
             valueListenable: UserRepository.instance.currentUser,
-            builder: (context, perfil, _) =>
-                VeridiaTokenBadge(tokens: perfil?.tokens ?? 0),
+            builder: (context, perfil, _) => VeridiaTokenBadge(
+              tokens: perfil?.tokens ?? 0,
+              onTap: () => abrirRecompensas(context),
+            ),
           ),
           const SizedBox(width: 10),
           VeridiaAppBarAction(
@@ -152,6 +155,18 @@ class _HomeScreenState extends State<HomeScreen> {
                     descripcion: 'Gana Veridiums',
                     onTap: () =>
                         VeridiaNav.abrir(context, const ChallengesScreen()),
+                  ),
+                  _AccesoRapido(
+                    icon: Icons.card_giftcard_rounded,
+                    titulo: 'Recompensas',
+                    descripcion: 'Canjea tus Veridiums',
+                    onTap: () => abrirRecompensas(context),
+                  ),
+                  _AccesoRapido(
+                    icon: Icons.travel_explore_rounded,
+                    titulo: 'Fotos por zona',
+                    descripcion: 'Qué se ha visto cerca',
+                    onTap: () => VeridiaNav.abrir(context, const MapScreen()),
                   ),
                 ],
               ),
@@ -289,9 +304,10 @@ class _TarjetaCaptura extends StatelessWidget {
                     ? Image.network(
                         observacion.imagePath!,
                         fit: BoxFit.cover,
-                        errorBuilder: (_, _, _) => const _FotoPlaceholder(),
+                        cacheWidth: 320,
+                        errorBuilder: (_, _, _) => const VeridiaFotoVacia(),
                       )
-                    : const _FotoPlaceholder(),
+                    : const VeridiaFotoVacia(),
               ),
             ),
             Padding(
@@ -319,23 +335,6 @@ class _TarjetaCaptura extends StatelessWidget {
             ),
           ],
         ),
-      ),
-    );
-  }
-}
-
-class _FotoPlaceholder extends StatelessWidget {
-  const _FotoPlaceholder();
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      color: VeridiaColors.surfaceContainerHigh,
-      alignment: Alignment.center,
-      child: const Icon(
-        Icons.eco_outlined,
-        color: VeridiaColors.primary,
-        size: 26,
       ),
     );
   }

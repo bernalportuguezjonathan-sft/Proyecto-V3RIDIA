@@ -1,0 +1,19 @@
+{
+  "name": "veridia-functions",
+  "description": "Backend de Veridia: proxy de Gemini y anti-trampa de Veridiums, fuera del cliente.",
+  "private": true,
+  "engines": {
+    "node": "20"
+  },
+  "main": "index.js",
+  "scripts": {
+    "test": "node --test test/*.test.js",
+    "serve": "firebase emulators:start --only functions",
+    "deploy": "firebase deploy --only functions"
+  },
+  "dependencies": {
+    "firebase-admin": "^12.7.0",
+    "firebase-functions": "^6.3.1",
+    "sharp": "^0.33.5"
+  }
+}

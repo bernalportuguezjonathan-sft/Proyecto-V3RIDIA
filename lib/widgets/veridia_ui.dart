@@ -567,10 +567,12 @@ PasswordStrength evaluarFortalezaContrasena(String password) {
   final tieneNumero = password.contains(RegExp(r'[0-9]'));
   final tieneSimbolo = password.contains(RegExp(r'[^a-zA-Z0-9]'));
 
-  final variedad =
-      [tieneMinuscula, tieneMayuscula, tieneNumero, tieneSimbolo]
-          .where((v) => v)
-          .length;
+  final variedad = [
+    tieneMinuscula,
+    tieneMayuscula,
+    tieneNumero,
+    tieneSimbolo,
+  ].where((v) => v).length;
 
   if (password.length < 8 || variedad <= 1) return PasswordStrength.debil;
   if (password.length < 12 || variedad <= 2) return PasswordStrength.media;
@@ -776,4 +778,27 @@ void mostrarMensajeVeridia(
       margin: const EdgeInsets.all(16),
     ),
   );
+}
+
+/// Marco vacío para una foto que no existe o no cargó.
+///
+/// Estaba duplicado en cuatro pantallas (inicio, mapa, detalle de zona e
+/// historial), cada una con su propio tamaño de icono y su propio color.
+class VeridiaFotoVacia extends StatelessWidget {
+  const VeridiaFotoVacia({super.key, this.tamanoIcono = 26});
+
+  final double tamanoIcono;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      color: VeridiaColors.surfaceContainerHigh,
+      alignment: Alignment.center,
+      child: Icon(
+        Icons.eco_outlined,
+        color: VeridiaColors.primary,
+        size: tamanoIcono,
+      ),
+    );
+  }
 }

@@ -1,3 +1,5 @@
+import '../theme/veridia_theme.dart';
+
 class AssignmentRecord {
   AssignmentRecord({
     required this.id,
@@ -38,7 +40,7 @@ class AssignmentRecord {
       'challengeTitle': challengeTitle,
       'eventType': eventType,
       'note': note,
-      'dateTime': dateTime.toIso8601String(),
+      'dateTime': aIsoUtc(dateTime),
       'targetUserId': targetUserId,
       'targetUserDisplayName': targetUserDisplayName,
       'targetUserEmail': targetUserEmail,
@@ -53,8 +55,7 @@ class AssignmentRecord {
       challengeTitle: map['challengeTitle'] as String? ?? '',
       eventType: map['eventType'] as String? ?? '',
       note: map['note'] as String? ?? '',
-      dateTime:
-          DateTime.tryParse(map['dateTime'] as String? ?? '') ?? DateTime.now(),
+      dateTime: deIso(map['dateTime'] as String? ?? '') ?? DateTime.now(),
       targetUserId: map['targetUserId'] as String?,
       targetUserDisplayName: map['targetUserDisplayName'] as String?,
       targetUserEmail: map['targetUserEmail'] as String?,

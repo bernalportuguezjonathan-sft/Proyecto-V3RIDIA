@@ -6,7 +6,9 @@ import 'services/repositorio_a.dart';
 import 'services/repositorio_d.dart';
 import 'services/repositorio_u.dart';
 import 'admin_profile.dart';
+import 'analitica.dart';
 import 'ban_management.dart';
+import 'canjes_admin.dart';
 import 'mapa.dart';
 import 'assignment_history.dart';
 import 'navegacion.dart';
@@ -175,7 +177,7 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
                     children: [
                       Expanded(
                         child: Text(
-                          'Vence: ${selectedDate.day}/${selectedDate.month}/${selectedDate.year}',
+                          'Vence: ${formatoFecha(selectedDate)}',
                           style: const TextStyle(fontSize: 13),
                         ),
                       ),
@@ -243,15 +245,13 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
                         );
                   final now = DateTime.now();
                   final challenge = Challenge(
-                    id: 'admin-${now.millisecondsSinceEpoch}',
+                    id: ChallengeRepository.instance.nuevoId(),
                     title: titleController.text.trim(),
                     description: descriptionController.text.trim(),
                     targetSpecies: speciesController.text.trim(),
                     targetGoal: int.parse(goalController.text),
                     dueDate: selectedDate,
                     createdDate: now,
-                    currentProgress: 0,
-                    isCompleted: false,
                     assignedToUserId: selectedPlayer?.userId,
                     assignedToDisplayName: selectedPlayer?.displayName,
                     assignedToEmail: selectedPlayer?.email,
@@ -266,7 +266,7 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
                     await ChallengeRepository.instance.addChallenge(challenge);
                     await AssignmentRepository.instance.addRecord(
                       AssignmentRecord(
-                        id: 'assignment-${now.millisecondsSinceEpoch}',
+                        id: AssignmentRepository.instance.nuevoId(),
                         challengeId: challenge.id,
                         challengeTitle: challenge.title,
                         eventType: isGlobal ? 'Creación global' : 'Asignación',
@@ -472,6 +472,25 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
                         color: VeridiaColors.primary,
                         onTap: _mostrarPuntosDeInteres,
                       ),
+                      _buildActionCard(
+                        icon: Icons.insights_rounded,
+                        label: 'Analítica',
+                        subtitle:
+                            'Actividad, especies, zonas y economía en vivo',
+                        color: VeridiaColors.secondary,
+                        onTap: () =>
+                            VeridiaNav.abrir(context, const AnalyticsScreen()),
+                      ),
+                      _buildActionCard(
+                        icon: Icons.card_giftcard_rounded,
+                        label: 'Canjes',
+                        subtitle: 'Recompensas pedidas y entregas pendientes',
+                        color: VeridiaColors.veridium,
+                        onTap: () => VeridiaNav.abrir(
+                          context,
+                          const CanjesAdminScreen(),
+                        ),
+                      ),
                     ],
                   ),
                   const SizedBox(height: 26),
@@ -541,9 +560,19 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
                                           ),
                                           VeridiaTag(
                                             label:
-                                                'Vence ${challenge.dueDate.day}/${challenge.dueDate.month}',
+                                                'Vence ${formatoFecha(challenge.dueDate)}',
                                             icon: Icons.event_outlined,
                                             color: VeridiaColors.tertiary,
+                                            dense: true,
+                                          ),
+                                          // El progreso es privado de cada
+                                          // explorador; lo único agregado
+                                          // que hay es cuántos lo cerraron.
+                                          VeridiaTag(
+                                            label:
+                                                '${challenge.completadoPor} completado(s)',
+                                            icon: Icons.verified_outlined,
+                                            color: VeridiaColors.veridium,
                                             dense: true,
                                           ),
                                         ],

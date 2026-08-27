@@ -4,6 +4,7 @@ import 'package:flutter/services.dart';
 import 'package:latlong2/latlong.dart';
 
 import '../theme/veridia_theme.dart';
+import '../utils/texto_busqueda.dart';
 
 class BirdSpecies {
   final String name;
@@ -193,23 +194,28 @@ List<LatLng> _areaPointsForZone(String id, double latitude, double longitude) {
   }
 }
 
+/// Todo el texto buscable de una zona en un solo bloque: nombre, ubicación,
+/// descripción y sus especies (comunes y científicas).
+String _textoBuscableDeZona(BirdZone zone) => [
+  zone.name,
+  zone.location,
+  zone.description,
+  zone.habitat,
+  for (final s in zone.species) ...[s.name, s.scientificName],
+].join(' ');
+
+/// Filtra zonas por texto libre y, si se eligió un chip, por especie exacta.
+///
+/// La búsqueda de texto es difusa (ver `utils/texto_busqueda.dart`): admite
+/// errores de tipeo razonables y no exige que la palabra esté completa, así
+/// "graza" o "gars" encuentran igual "Garza Real".
 List<BirdZone> filterBirdZones(
   List<BirdZone> zones, {
   String query = '',
   String? selectedSpecies,
 }) {
-  final normalizedQuery = query.trim().toLowerCase();
   return zones.where((zone) {
-    final matchesQuery =
-        normalizedQuery.isEmpty ||
-        zone.name.toLowerCase().contains(normalizedQuery) ||
-        zone.location.toLowerCase().contains(normalizedQuery) ||
-        zone.description.toLowerCase().contains(normalizedQuery) ||
-        zone.species.any(
-          (species) =>
-              species.name.toLowerCase().contains(normalizedQuery) ||
-              species.scientificName.toLowerCase().contains(normalizedQuery),
-        );
+    final matchesQuery = coincideDifuso(_textoBuscableDeZona(zone), query);
 
     final matchesSpecies =
         selectedSpecies == null ||
@@ -228,4 +234,54 @@ List<String> getAvailableSpecies(List<BirdZone> zones) {
     }
   }
   return species.toList()..sort();
+}
+
+/// true si el punto cae dentro del polígono de la zona (ray casting).
+bool zonaContiene(BirdZone zona, double lat, double lng) {
+  final puntos = zona.areaPoints;
+  if (puntos.length < 3) return false;
+
+  var dentro = false;
+  for (var i = 0, j = puntos.length - 1; i < puntos.length; j = i++) {
+    final yi = puntos[i].latitude, xi = puntos[i].longitude;
+    final yj = puntos[j].latitude, xj = puntos[j].longitude;
+    final cruza =
+        (yi > lat) != (yj > lat) &&
+        lng < (xj - xi) * (lat - yi) / (yj - yi) + xi;
+    if (cruza) dentro = !dentro;
+  }
+  return dentro;
+}
+
+/// Zona a la que pertenece un punto: primero por polígono y, si cae fuera de
+/// todos, la más cercana dentro de [radioKm].
+///
+/// Los polígonos de las zonas son pequeños (unos cientos de metros) y el GPS
+/// de un celular tiene error: sin el radio de cortesía, casi ninguna foto
+/// quedaría asignada a su zona.
+BirdZone? zonaDePunto(
+  List<BirdZone> zonas,
+  double lat,
+  double lng, {
+  double radioKm = 3,
+}) {
+  for (final zona in zonas) {
+    if (zonaContiene(zona, lat, lng)) return zona;
+  }
+
+  const distancia = Distance();
+  BirdZone? mejor;
+  var mejorKm = double.infinity;
+  for (final zona in zonas) {
+    final km = distancia.as(
+      LengthUnit.Kilometer,
+      LatLng(lat, lng),
+      LatLng(zona.latitude, zona.longitude),
+    );
+    if (km < mejorKm) {
+      mejorKm = km.toDouble();
+      mejor = zona;
+    }
+  }
+  return mejorKm <= radioKm ? mejor : null;
 }
