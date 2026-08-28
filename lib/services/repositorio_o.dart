@@ -1,8 +1,14 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:flutter/foundation.dart';
+import 'package:latlong2/latlong.dart';
 
+import '../models/bird_zone.dart';
 import '../models/observation.dart';
+import '../utils/texto_busqueda.dart';
+import 'economia.dart';
 import 'especie_ia_service.dart';
 import 'repositorio_d.dart' hide AvanceDesafio;
+import 'repositorio_m.dart';
 import 'repositorio_u.dart';
 
 /// Cuánto avanzó UN desafío al guardar una observación identificada por IA.
@@ -36,10 +42,20 @@ class ResultadoGuardarObservacion {
   const ResultadoGuardarObservacion({
     required this.observacionId,
     required this.avances,
+    this.veridiumsPorLaFoto = 0,
+    this.bonoMascota,
   });
 
   final String observacionId;
   final List<AvanceDesafio> avances;
+
+  /// Veridiums que pagó la foto en sí (base + mejora de la mascota), aparte
+  /// de lo que hayan pagado los desafíos.
+  final int veridiumsPorLaFoto;
+
+  /// Qué aportó la mascota, para poder contarlo en pantalla. null si no
+  /// aplicó ninguna mejora.
+  final BonoMascota? bonoMascota;
 }
 
 class GuardarObservacionException implements Exception {
@@ -176,10 +192,182 @@ class ObservationRepository {
       );
     }
 
+    // La foto se paga aparte de los desafíos, y una sola vez.
+    //
+    // Antes, una foto que no coincidiera con ningún desafío activo no daba
+    // NADA: se podía salir a caminar toda la tarde, registrar diez especies
+    // y volver con cero Veridiums. Ahora toda foto verificada paga —salvo
+    // que ya la haya pagado un desafío, para no cobrarla dos veces— y encima
+    // se le suma la mejora de la mascota que se lleve puesta.
+    final contexto = await contextoDeFoto(
+      userId: observation.userId,
+      momento: observation.dateTime,
+      latitude: latitude,
+      longitude: longitude,
+      tipoEspecie: identificacion.type,
+      especieActual: observation.commonName,
+      excluirObservacionId: observationId,
+    );
+    final mascota = MascotaRepository.instance.mascotaActiva(perfil);
+    final bono = bonoDeMascota(mascota?.id, contexto);
+    final base = avances.isEmpty ? 1 : 0;
+    final total = base + bono.veridiums;
+
+    var pagado = 0;
+    if (total > 0) {
+      final seOtorgo = await UserRepository.instance.otorgar(
+        cantidad: total,
+        motivo: 'foto',
+        referencia: observationId,
+        detalle: bono.motivo,
+      );
+      if (seOtorgo) pagado = total;
+    }
+
     return ResultadoGuardarObservacion(
       observacionId: observationId,
       avances: avances,
+      veridiumsPorLaFoto: pagado,
+      bonoMascota: bono.aplica && pagado > 0 ? bono : null,
     );
+  }
+
+  /// Reúne lo que las mejoras de mascota necesitan saber de una foto.
+  ///
+  /// Sirve para las dos cosas: calcular el pago real de una observación ya
+  /// guardada, y adelantarle al explorador qué va a pasar con la foto que
+  /// todavía tiene encuadrada. Es EL MISMO cálculo a propósito — si la vista
+  /// previa usara su propia cuenta, prometería un bono y pagaría otro.
+  ///
+  /// Todo sale de datos que ya existen: las zonas del mapa (el JSON de
+  /// siempre) y los avistamientos propios.
+  ///
+  /// `especieActual` es el nombre común que la IA ya identificó. Cuando
+  /// todavía no se sabe (vista previa antes de disparar) se cuenta como si
+  /// fuera a ser una especie nueva, que es el caso que le interesa al
+  /// explorador: "si esto es algo que no he registrado hoy, ¿cuánto paga?".
+  Future<ContextoFoto> contextoDeFoto({
+    required String? userId,
+    required DateTime momento,
+    double? latitude,
+    double? longitude,
+    String? tipoEspecie,
+    String? especieActual,
+    String? excluirObservacionId,
+  }) async {
+    try {
+      final mias = await _misObservaciones(userId);
+      final previas = mias
+          .where((o) => o.id != excluirObservacionId)
+          .toList(growable: false);
+
+      return ContextoFoto(
+        momento: momento,
+        tipoEspecie: tipoEspecie,
+        enHumedal: await _enHumedal(latitude, longitude),
+        especiesDistintasHoy: _especiesDistintasHoy(
+          previas,
+          momento,
+          especieActual,
+        ),
+        kmDesdeMisFotos: _kmALaMasCercana(previas, latitude, longitude),
+      );
+    } catch (e) {
+      // Que la mascota no pueda calcular su bono no puede costarle al
+      // explorador la observación que acaba de tomar.
+      debugPrint('No se pudo calcular el contexto de la foto: $e');
+      return ContextoFoto(momento: momento, tipoEspecie: tipoEspecie);
+    }
+  }
+
+  Future<List<Observation>> _misObservaciones(String? userId) async {
+    if (userId == null) return const [];
+    final snapshot = await _collection
+        .where('userId', isEqualTo: userId)
+        .get()
+        .timeout(const Duration(seconds: 10));
+    return snapshot.docs
+        .map((doc) => Observation.fromMap(doc.id, doc.data()))
+        .toList();
+  }
+
+  /// Especies DISTINTAS que el explorador lleva hoy, contando la de ahora.
+  ///
+  /// Compara los nombres normalizados: "Colibrí Chillón" y "colibri chillon"
+  /// son la misma especie y no pueden contar dos veces, o la mejora del
+  /// colibrí se pagaría fotografiando el mismo pájaro con distinta grafía.
+  int _especiesDistintasHoy(
+    List<Observation> previas,
+    DateTime momento,
+    String? especieActual,
+  ) {
+    final nombres = <String>{};
+    for (final anterior in previas) {
+      if (!_mismoDia(anterior.dateTime, momento)) continue;
+      nombres.add(normalizarTexto(anterior.commonName));
+    }
+    if (especieActual != null) {
+      nombres.add(normalizarTexto(especieActual));
+      return nombres.length;
+    }
+    // Sin identificar todavía: se asume que será una especie nueva.
+    return nombres.length + 1;
+  }
+
+  bool _mismoDia(DateTime a, DateTime b) =>
+      a.year == b.year && a.month == b.month && a.day == b.day;
+
+  /// Distancia a la más cercana de sus fotos anteriores, en kilómetros.
+  /// null si no hay coordenadas o si es su primera foto ubicada.
+  double? _kmALaMasCercana(
+    List<Observation> previas,
+    double? latitude,
+    double? longitude,
+  ) {
+    if (latitude == null || longitude == null) return null;
+    const distancia = Distance();
+    final aqui = LatLng(latitude, longitude);
+
+    double? minimo;
+    for (final anterior in previas) {
+      if (!anterior.hasCoordinates) continue;
+      final km = distancia.as(
+        LengthUnit.Kilometer,
+        aqui,
+        LatLng(anterior.latitude!, anterior.longitude!),
+      );
+      if (minimo == null || km < minimo) minimo = km;
+    }
+    return minimo;
+  }
+
+  /// true si el punto cae cerca de una zona de agua del mapa.
+  ///
+  /// "Cerca" es 1,5 km: las zonas del JSON están marcadas por un punto
+  /// central, no por su contorno real, así que exigir que la foto caiga
+  /// exactamente encima dejaría fuera media orilla del humedal.
+  Future<bool> _enHumedal(double? latitude, double? longitude) async {
+    if (latitude == null || longitude == null) return false;
+    final zonas = await loadBirdZones();
+    if (zonas.isEmpty) return false;
+
+    const distancia = Distance();
+    const radioKm = 1.5;
+    final aqui = LatLng(latitude, longitude);
+
+    for (final zona in zonas) {
+      final texto = normalizarTexto(
+        '${zona.name} ${zona.habitat} ${zona.description}',
+      );
+      if (!esZonaDeAguaNormalizada(texto)) continue;
+      final km = distancia.as(
+        LengthUnit.Kilometer,
+        aqui,
+        LatLng(zona.latitude, zona.longitude),
+      );
+      if (km <= radioKm) return true;
+    }
+    return false;
   }
 
   Future<void> updateObservation(Observation observation) async {

@@ -55,12 +55,30 @@ service cloud.firestore {
       // dura de esta regla (que solo deja bajar tokens) está pensada para
       // cuando las Cloud Functions estén desplegadas — ver
       // [[project-veridia-backend]] en la memoria del proyecto.
+      //
+      // `tokensTotales` es el acumulado historico del que salen el nivel y el
+      // ranking: solo puede SUBIR. Si se pudiera bajar, cualquiera se
+      // reescribiria el recorrido; si se pudiera subir sin limite, se
+      // regalaria niveles. Sube acotado igual que el saldo.
+      //
+      // `mascotaActiva` y `accesorios` son cosmeticos y no mueven dinero, asi
+      // que el dueno los escribe libremente. Lo unico que hay que impedir es
+      // que se cuelen en la misma escritura que toca los Veridiums.
       function soloEditaSuPerfil() {
-        return camposTocados().hasOnly(['displayName', 'photoURL', 'tokens']) &&
+        return camposTocados().hasOnly([
+            'displayName', 'photoURL', 'tokens', 'tokensTotales',
+            'mascotaActiva', 'accesorios'
+          ]) &&
           (!camposTocados().hasAny(['tokens']) ||
             (request.resource.data.tokens is int &&
               request.resource.data.tokens >= 0 &&
-              request.resource.data.tokens <= resource.data.tokens + 1000));
+              request.resource.data.tokens <= resource.data.tokens + 1000)) &&
+          (!camposTocados().hasAny(['tokensTotales']) ||
+            (request.resource.data.tokensTotales is int &&
+              request.resource.data.tokensTotales >=
+                resource.data.get('tokensTotales', 0) &&
+              request.resource.data.tokensTotales <=
+                resource.data.get('tokensTotales', 0) + 1000));
       }
 
       // Suspensión temporal cuyo plazo ya pasó.
@@ -109,6 +127,42 @@ service cloud.firestore {
         allow write: if isOwner(userId) &&
           request.resource.data.progreso is int &&
           request.resource.data.progreso >= 0;
+      }
+
+      // Lo comprado en el Refugio: mascotas y accesorios. El id del documento
+      // es el id del catalogo, asi que comprar dos veces lo mismo reescribe
+      // el mismo documento en vez de cobrar dos veces.
+      //
+      // No se puede BORRAR: un cosmetico comprado es del explorador para
+      // siempre, y ademas borrarlo seria la forma de volver a comprarlo (y de
+      // volver a gastarse los Veridiums sin ganar nada, o de romper el
+      // recuento si algun dia hay reembolsos).
+      //
+      // NOTA (2026-08-26): el cliente escribe aqui directamente de forma
+      // temporal, igual que en el resto de la economia (ver la nota en
+      // soloEditaSuPerfil() arriba). Con Blaze activo esto pasa a
+      // `allow write: if false` y solo lo toca el Admin SDK.
+      match /inventario/{itemId} {
+        allow read: if isOwner(userId) || isAdmin();
+        allow create: if isOwner(userId) &&
+          request.resource.data.costo is int &&
+          request.resource.data.costo >= 0;
+        allow update: if false;
+        allow delete: if isAdmin();
+      }
+
+      // Libro de movimientos de Veridiums. Es el registro de POR QUE cambio
+      // el saldo, y su id es la clave de idempotencia del hecho que se pago
+      // (ver claveMovimiento en lib/services/economia.dart).
+      //
+      // Inmutable: si un apunte se pudiera reescribir o borrar, el mismo
+      // hecho podria cobrarse dos veces y el libro dejaria de servir para
+      // auditar nada.
+      match /movimientos/{opId} {
+        allow read: if isOwner(userId) || isAdmin();
+        allow create: if isOwner(userId) &&
+          request.resource.data.delta is int;
+        allow update, delete: if false;
       }
     }
 

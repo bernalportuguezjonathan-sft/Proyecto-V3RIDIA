@@ -5,6 +5,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:google_sign_in/google_sign_in.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../models/user.dart';
+import 'economia.dart';
 
 import '../theme/veridia_theme.dart';
 
@@ -32,6 +33,7 @@ class UserRepository {
         : banExpiresValue is Timestamp
         ? banExpiresValue.toDate()
         : null;
+    final tokens = data['tokens'] as int? ?? 0;
     return UserProfile(
       userId: id,
       email: data['email'] as String? ?? '',
@@ -39,10 +41,13 @@ class UserRepository {
           data['displayName'] as String? ??
           (data['email'] as String? ?? '').split('@').first,
       photoURL: data['photoURL'] as String?,
-      tokens: data['tokens'] as int? ?? 0,
+      tokens: tokens,
+      tokensTotales: leerTokensTotales(data, tokens),
       role: data['role'] as String? ?? 'Explorador',
       createdDate: createdDate ?? DateTime.now(),
       isBanned: data['isBanned'] as bool? ?? false,
+      mascotaActiva: data['mascotaActiva'] as String?,
+      accesorios: leerAccesorios(data),
       banExpires: banExpires,
       banReason: data['banReason'] as String?,
     );
@@ -66,7 +71,11 @@ class UserRepository {
   /// Usuarios en vivo. A diferencia de [fetchAllUsers] no se traga los
   /// errores: el widget recibe el fallo y puede mostrarlo en pantalla.
   ///
-  /// `porVeridiums` ordena de mayor a menor saldo (ranking); si no, alfabético.
+  /// `porVeridiums` ordena el ranking; si no, alfabético.
+  ///
+  /// El ranking usa el ACUMULADO (`tokensTotales`), no el saldo. Ordenar por
+  /// saldo castigaba gastar: quien compraba una mascota de 110 Veridiums caía
+  /// en la tabla y aprendía a no volver a la tienda.
   Stream<List<UserProfile>> streamAllUsers({
     String? role,
     bool porVeridiums = false,
@@ -78,7 +87,7 @@ class UserRepository {
           .toList();
       if (porVeridiums) {
         users.sort((a, b) {
-          final porTokens = b.tokens.compareTo(a.tokens);
+          final porTokens = b.tokensTotales.compareTo(a.tokensTotales);
           return porTokens != 0
               ? porTokens
               : a.displayName.toLowerCase().compareTo(
@@ -236,9 +245,12 @@ class UserRepository {
           displayName: resolvedDisplayName,
           photoURL: refreshedUser.photoURL,
           tokens: currentTokens,
+          tokensTotales: leerTokensTotales(data, currentTokens),
           role: currentRole,
           createdDate: currentCreatedDate,
           isBanned: currentIsBanned,
+          mascotaActiva: data?['mascotaActiva'] as String?,
+          accesorios: leerAccesorios(data),
           banExpires: banExpires,
           banReason: banReason,
         );
@@ -269,6 +281,12 @@ class UserRepository {
       'displayName': displayName,
       'role': role,
       'tokens': 0,
+      'tokensTotales': 0,
+      // Nadie empieza sin compañero: la rana viene con la cuenta y es lo que
+      // hace que la mascota se entienda el primer día, no al llegar a un
+      // nivel. Ver `mascotaInicial` en models/mascota.dart.
+      'mascotaActiva': MascotaId.rana.name,
+      'accesorios': <String, String>{},
       'createdDate': aIsoUtc(now),
       'photoURL': null,
       'isBanned': false,
@@ -370,31 +388,7 @@ class UserRepository {
     final doc = await _firestore.collection('users').doc(userId).get();
     final data = doc.data();
     if (data == null) return null;
-
-    final createdDate = data['createdDate'] is String
-        ? DateTime.tryParse(data['createdDate'] as String)
-        : DateTime.now();
-
-    return UserProfile(
-      userId: doc.id,
-      email: data['email'] as String? ?? '',
-      displayName:
-          data['displayName'] as String? ??
-          (data['email'] as String? ?? '').split('@').first,
-      photoURL: data['photoURL'] as String?,
-      tokens: data['tokens'] as int? ?? 0,
-      role: data['role'] as String? ?? 'Explorador',
-      createdDate: createdDate ?? DateTime.now(),
-      isBanned: data['isBanned'] as bool? ?? false,
-      banExpires: data['banExpires'] != null
-          ? (data['banExpires'] is String
-                ? DateTime.tryParse(data['banExpires'] as String)
-                : data['banExpires'] is Timestamp
-                ? (data['banExpires'] as Timestamp).toDate()
-                : null)
-          : null,
-      banReason: data['banReason'] as String?,
-    );
+    return _perfilDesdeDoc(doc.id, data);
   }
 
   Future<void> addTokens(int amount) => _adjustTokens(amount);
@@ -405,30 +399,95 @@ class UserRepository {
   /// servidor en ese momento (no sobre el caché local), para que dos
   /// ajustes casi simultáneos (p. ej. dos desafíos completados seguidos)
   /// no se pisen entre sí.
+  ///
+  /// Un delta POSITIVO sube también el acumulado histórico; uno negativo solo
+  /// baja el saldo. Esa asimetría es la regla central de la economía: gastar
+  /// no puede quitarte nivel ni bajarte en el ranking.
   Future<void> _adjustTokens(int delta) async {
     final user = currentUser.value;
     if (user == null) return;
 
     try {
-      final newTokens = await _firestore.runTransaction<int>((tx) async {
+      final saldos = await _firestore.runTransaction<List<int>>((tx) async {
         final ref = _firestore.collection('users').doc(user.userId);
         final snapshot = await tx.get(ref);
-        final current = (snapshot.data()?['tokens'] as int?) ?? user.tokens;
-        final updated = current + delta;
-        final clamped = updated < 0 ? 0 : updated;
-        tx.update(ref, {'tokens': clamped});
-        return clamped;
+        final datos = snapshot.data();
+        final current = (datos?['tokens'] as int?) ?? user.tokens;
+        final totalActual = leerTokensTotales(datos, current);
+        final clamped = (current + delta).clamp(0, 1 << 31);
+        final nuevoTotal = delta > 0 ? totalActual + delta : totalActual;
+        tx.update(ref, {'tokens': clamped, 'tokensTotales': nuevoTotal});
+        return [clamped, nuevoTotal];
       });
-      _applyTokensLocally(user.userId, newTokens);
+      _applyTokensLocally(user.userId, saldos[0], saldos[1]);
     } catch (e) {
       debugPrint('Warning: failed to persist tokens: $e');
     }
   }
 
-  void _applyTokensLocally(String userId, int tokens) {
+  /// Paga Veridiums UNA sola vez por hecho.
+  ///
+  /// El apunte en `users/{uid}/movimientos` lleva como id la clave de
+  /// idempotencia del hecho que se está pagando (ver [claveMovimiento]), y se
+  /// escribe en la misma transacción que el saldo. Si el mismo pago se
+  /// reintenta —porque se cayó la red, porque el usuario volvió atrás— la
+  /// transacción encuentra el apunte ya escrito y no vuelve a pagar. Sin esto
+  /// un reintento regala Veridiums, que es la forma más fácil de romper una
+  /// economía.
+  ///
+  /// Devuelve true solo si el pago se hizo AHORA.
+  Future<bool> otorgar({
+    required int cantidad,
+    required String motivo,
+    required String referencia,
+    String? detalle,
+  }) async {
+    final user = currentUser.value;
+    if (user == null || cantidad <= 0) return false;
+
+    final clave = claveMovimiento(motivo: motivo, referencia: referencia);
+    final userRef = _firestore.collection('users').doc(user.userId);
+    final movimientoRef = userRef.collection('movimientos').doc(clave);
+
+    try {
+      final saldos = await _firestore
+          .runTransaction<List<int>?>((tx) async {
+            final yaPagado = await tx.get(movimientoRef);
+            if (yaPagado.exists) return null;
+
+            final snapshot = await tx.get(userRef);
+            final datos = snapshot.data();
+            final saldo = (datos?['tokens'] as int?) ?? user.tokens;
+            final total = leerTokensTotales(datos, saldo);
+
+            tx.update(userRef, {
+              'tokens': saldo + cantidad,
+              'tokensTotales': total + cantidad,
+            });
+            tx.set(movimientoRef, {
+              'delta': cantidad,
+              'motivo': motivo,
+              'referencia': referencia,
+              'detalle': detalle,
+              'fecha': aIsoUtc(DateTime.now()),
+            });
+            return [saldo + cantidad, total + cantidad];
+          })
+          .timeout(const Duration(seconds: 20));
+
+      if (saldos == null) return false;
+      _applyTokensLocally(user.userId, saldos[0], saldos[1]);
+      return true;
+    } catch (e) {
+      debugPrint('UserRepository.otorgar error: $e');
+      return false;
+    }
+  }
+
+  void _applyTokensLocally(String userId, int tokens, int totales) {
     final user = currentUser.value;
     if (user != null && user.userId == userId) {
-      currentUser.value = user.copyWith(tokens: tokens);
+      currentUser.value = user.copyWith(tokens: tokens, tokensTotales: totales);
     }
     _cacheTokens(userId, tokens);
   }
@@ -436,8 +495,8 @@ class UserRepository {
   /// Usado por otros repositorios (p. ej. desafíos) que ya movieron los
   /// tokens del usuario dentro de su propia transacción de Firestore, para
   /// mantener sincronizado el estado en memoria/caché sin volver a escribir.
-  void syncTokensFromServer(String userId, int tokens) =>
-      _applyTokensLocally(userId, tokens);
+  void syncTokensFromServer(String userId, int tokens, int totales) =>
+      _applyTokensLocally(userId, tokens, totales);
 
   int getTokens() {
     return currentUser.value?.tokens ?? 0;

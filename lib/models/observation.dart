@@ -101,3 +101,26 @@ List<Observation> filtrarObservaciones(
     return coincideDifuso(nombres, especie);
   }).toList();
 }
+
+/// Nombre con el que se guarda una especie que la IA no logró identificar.
+/// No cuenta como "especie única": inflaría la cifra sin aportar nada.
+const _especieSinIdentificar = {
+  'especie observada',
+  'sin confirmar',
+  'referencia visual',
+};
+
+/// true si la observación tiene una especie de verdad detrás.
+bool especieIdentificada(Observation observacion) => !_especieSinIdentificar
+    .contains(observacion.commonName.trim().toLowerCase());
+
+/// Cuántas especies DISTINTAS e identificadas hay en una lista.
+///
+/// Vive aquí y no en cada pantalla porque el carnet, los logros y la
+/// analítica tienen que contar exactamente igual: si una dijera 12 especies y
+/// otra 15, la que se ve peor parece rota.
+int especiesDistintasDe(Iterable<Observation> observaciones) => observaciones
+    .where(especieIdentificada)
+    .map((o) => o.commonName.trim().toLowerCase())
+    .toSet()
+    .length;

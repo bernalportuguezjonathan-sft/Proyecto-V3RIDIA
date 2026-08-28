@@ -150,6 +150,158 @@ function distanciaHamming(hexA, hexB) {
 /** Bits de diferencia que aún se consideran "la misma foto". */
 const UMBRAL_PARECIDO = 5;
 
+// ---------- Economia: niveles y mejoras de mascota ----------
+//
+// Espejo EXACTO de lib/services/economia.dart. Si cambian los umbrales, el
+// bono fijo o la condicion de una mejora en el lado Dart, hay que cambiarlos
+// aqui tambien: el dia que esto se despliegue, el servidor va a recalcular lo
+// mismo que la app ya le mostro al explorador, y una diferencia de un solo
+// Veridium se ve como un pago que "no llego".
+
+/** Veridiums GANADOS EN TOTAL que hacen falta para cada nivel. */
+const UMBRALES_NIVEL = [0, 15, 40, 80, 140, 220, 320, 450];
+
+/** Nivel segun el acumulado historico (nunca segun el saldo). */
+function nivelDesde(totalGanado) {
+  let nivel = 1;
+  for (let i = 1; i < UMBRALES_NIVEL.length; i++) {
+    if (totalGanado >= UMBRALES_NIVEL[i]) nivel = i + 1;
+  }
+  return nivel;
+}
+
+/** Bono fijo de las mejoras que son de si/no. */
+const BONO_FIJO_MASCOTA = 2;
+
+/** Kilometros a partir de los cuales una foto cuenta como territorio nuevo. */
+const KM_TERRITORIO_NUEVO = 3;
+
+const COLIBRI_DESDE_ESPECIE = 3;
+const COLIBRI_MAXIMO = 3;
+
+/**
+ * Rareza de cada mascota y por cuanto multiplica su mejora.
+ *
+ * Espejo de `Rareza` y `rarezaDeMascota` en lib/services/economia.dart. Sin
+ * esto, la app pagaria x4 por la tucaneta y el servidor x1: el explorador
+ * veria el bono en pantalla y luego no le llegaria.
+ */
+const MULTIPLICADOR_RAREZA = {
+  comun: 1,
+  rara: 2,
+  epica: 3,
+  legendaria: 4,
+};
+
+const RAREZA_DE_MASCOTA = {
+  rana: 'comun',
+  colibri: 'comun',
+  currucutu: 'rara',
+  mariquita: 'epica',
+  tucaneta: 'legendaria',
+};
+
+/** Veridiums que paga la mejora de esa mascota cuando se cumple. */
+function bonoDeRareza(mascota) {
+  const rareza = RAREZA_DE_MASCOTA[mascota] || 'comun';
+  return BONO_FIJO_MASCOTA * MULTIPLICADOR_RAREZA[rareza];
+}
+
+const PALABRAS_DE_AGUA = [
+  'humedal',
+  'laguna',
+  'pantano',
+  'cienaga',
+  'embalse',
+  'represa',
+  'quebrada',
+  'rio ',
+  'lago',
+  'acuatic',
+];
+
+/** true si el texto de una zona (ya normalizado) la delata como agua. */
+function esZonaDeAguaNormalizada(textoNormalizado) {
+  return PALABRAS_DE_AGUA.some((p) => textoNormalizado.includes(p));
+}
+
+/**
+ * Veridiums extra que aporta la mascota activa a una foto.
+ *
+ * `contexto` = { momento: Date, enHumedal, tipoEspecie, especiesDistintasHoy,
+ * kmDesdeMisFotos }. Devuelve { veridiums, motivo }.
+ */
+function bonoDeMascota(mascota, contexto) {
+  const ninguno = { veridiums: 0, motivo: null };
+  if (!mascota) return ninguno;
+
+  const bono = bonoDeRareza(mascota);
+  const multiplicador =
+    MULTIPLICADOR_RAREZA[RAREZA_DE_MASCOTA[mascota] || 'comun'];
+
+  const hora = contexto.momento.getHours();
+  const esDeNoche = hora >= 18 || hora < 6;
+  const esCultivo =
+    contexto.tipoEspecie === 'planta' || contexto.tipoEspecie === 'hongo';
+  const km = contexto.kmDesdeMisFotos;
+  const esTerritorioNuevo =
+    km === null || km === undefined || km >= KM_TERRITORIO_NUEVO;
+
+  switch (mascota) {
+    case 'rana':
+      return contexto.enHumedal
+        ? { veridiums: bono, motivo: 'Bioindicadora: foto en humedal' }
+        : ninguno;
+
+    case 'currucutu':
+      return esDeNoche
+        ? {
+            veridiums: bono,
+            motivo: 'Ojo nocturno: registro entre 6 p.m. y 6 a.m.',
+          }
+        : ninguno;
+
+    case 'colibri': {
+      const hoy = contexto.especiesDistintasHoy || 0;
+      const extra = hoy - (COLIBRI_DESDE_ESPECIE - 1);
+      if (extra <= 0) return ninguno;
+      return {
+        veridiums:
+          Math.min(COLIBRI_MAXIMO, Math.max(1, extra)) * multiplicador,
+        motivo: `Polinizador: ${hoy} especies distintas hoy`,
+      };
+    }
+
+    case 'tucaneta':
+      return esTerritorioNuevo
+        ? {
+            veridiums: bono,
+            motivo: 'Dispersora: territorio nuevo para ti',
+          }
+        : ninguno;
+
+    case 'mariquita':
+      return esCultivo
+        ? {
+            veridiums: bono,
+            motivo: 'Control biologico: diagnostico de cultivo',
+          }
+        : ninguno;
+
+    default:
+      return ninguno;
+  }
+}
+
+/**
+ * Clave de idempotencia de un movimiento de Veridiums: el id del documento en
+ * users/{uid}/movimientos. No lleva la hora a proposito — tiene que ser la
+ * misma para el mismo hecho, se reintente cuando se reintente.
+ */
+function claveMovimiento(motivo, referencia) {
+  return `${motivo}_${referencia}`;
+}
+
 module.exports = {
   normalizar,
   palabrasDe,
@@ -159,4 +311,14 @@ module.exports = {
   ahashDesdeRgba,
   distanciaHamming,
   UMBRAL_PARECIDO,
+  UMBRALES_NIVEL,
+  nivelDesde,
+  BONO_FIJO_MASCOTA,
+  KM_TERRITORIO_NUEVO,
+  esZonaDeAguaNormalizada,
+  bonoDeMascota,
+  bonoDeRareza,
+  MULTIPLICADOR_RAREZA,
+  RAREZA_DE_MASCOTA,
+  claveMovimiento,
 };

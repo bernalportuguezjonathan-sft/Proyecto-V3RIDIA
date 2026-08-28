@@ -120,16 +120,14 @@ const List<Recompensa> catalogoRecompensas = [
     color: VeridiaColors.veridium,
     valor: 'dorado',
   ),
-  Recompensa(
-    id: 'certificado_aporte',
-    nombre: 'Certificado de contribución',
-    descripcion:
-        'Se genera al instante con tus avistamientos aportados al monitoreo.',
-    costo: 120,
-    tipo: TipoRecompensa.fisica,
-    icono: Icons.workspace_premium_outlined,
-    color: VeridiaColors.tertiary,
-  ),
+  // El 'certificado_aporte' vivía aquí, a 120 Veridiums. Se movió a
+  // `models/logro.dart`: un certificado que se compra no acredita nada —
+  // cualquiera con saldo lo tenía sin haber aportado una sola especie al
+  // monitoreo. Ahora se gana registrando 20 especies distintas.
+  //
+  // Los canjes viejos siguen leyéndose: `Canje` guarda el nombre y el costo
+  // en su propio documento, así que el historial no se rompe aunque
+  // `recompensaPorId` ya no lo encuentre.
   Recompensa(
     id: 'salida_guiada',
     nombre: 'Salida de campo guiada',

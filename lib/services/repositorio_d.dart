@@ -5,6 +5,9 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/foundation.dart';
 
 import '../models/desafio.dart';
+import '../models/user.dart';
+import '../theme/veridia_theme.dart';
+import 'economia.dart';
 import 'repositorio_u.dart';
 
 /// Resultado de sumar una foto a un desafío.
@@ -171,6 +174,7 @@ class ChallengeRepository {
     final challengeRef = _collection.doc(challenge.id);
 
     int? saldoFinal;
+    int? totalFinal;
     try {
       final avance = await FirebaseFirestore.instance
           .runTransaction<AvanceDesafio?>((tx) async {
@@ -200,9 +204,39 @@ class ChallengeRepository {
               ).toMap(),
             );
 
-            final saldo = (userSnap.data()?['tokens'] as num?)?.toInt() ?? 0;
+            final datosUsuario = userSnap.data();
+            final saldo = (datosUsuario?['tokens'] as num?)?.toInt() ?? 0;
+            final total = leerTokensTotales(datosUsuario, saldo);
             saldoFinal = saldo + ganados;
-            tx.update(userRef, {'tokens': saldoFinal});
+            totalFinal = total + ganados;
+            tx.update(userRef, {
+              'tokens': saldoFinal,
+              'tokensTotales': totalFinal,
+            });
+
+            // Apunte en el libro. El id es determinista —el desafío y el
+            // peldaño de progreso que se acaba de pagar—, así que un
+            // reintento reescribe el mismo documento en vez de crear un
+            // segundo pago.
+            tx.set(
+              userRef
+                  .collection('movimientos')
+                  .doc(
+                    claveMovimiento(
+                      motivo: 'desafio',
+                      referencia: '${challenge.id}_$nuevoProgreso',
+                    ),
+                  ),
+              {
+                'delta': ganados,
+                'motivo': 'desafio',
+                'referencia': challenge.id,
+                'detalle': pagarBono
+                    ? 'Desafío completado: ${challenge.title}'
+                    : 'Foto para ${challenge.title}',
+                'fecha': aIsoUtc(DateTime.now()),
+              },
+            );
 
             // Contador para el panel del administrador: es lo único que se
             // escribe en el desafío compartido.
@@ -222,8 +256,12 @@ class ChallengeRepository {
           })
           .timeout(const Duration(seconds: 20));
 
-      if (avance != null && saldoFinal != null) {
-        UserRepository.instance.syncTokensFromServer(uid, saldoFinal!);
+      if (avance != null && saldoFinal != null && totalFinal != null) {
+        UserRepository.instance.syncTokensFromServer(
+          uid,
+          saldoFinal!,
+          totalFinal!,
+        );
       }
       return avance;
     } catch (e) {

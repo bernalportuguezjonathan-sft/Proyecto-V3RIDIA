@@ -9,9 +9,13 @@ import 'models/observation.dart';
 import 'models/user.dart';
 import 'navegacion.dart';
 import 'recompensas.dart';
+import 'refugio.dart';
+import 'services/economia.dart';
+import 'services/repositorio_m.dart';
 import 'services/repositorio_o.dart';
 import 'services/repositorio_u.dart';
 import 'theme/veridia_theme.dart';
+import 'widgets/mascota_vista.dart';
 import 'widgets/veridia_logo.dart';
 import 'widgets/veridia_ui.dart';
 
@@ -84,15 +88,22 @@ class _HomeScreenState extends State<HomeScreen> {
                       : (perfil.displayName.isNotEmpty
                             ? perfil.displayName
                             : perfil.email.split('@').first);
-                  return Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
+                  return Row(
                     children: [
-                      Text('Hola, $nombre', style: text.headlineSmall),
-                      const SizedBox(height: 4),
-                      Text(
-                        '¿Qué especie vas a descubrir hoy?',
-                        style: text.bodySmall,
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text('Hola, $nombre', style: text.headlineSmall),
+                            const SizedBox(height: 4),
+                            Text(
+                              '¿Qué especie vas a descubrir hoy?',
+                              style: text.bodySmall,
+                            ),
+                          ],
+                        ),
                       ),
+                      _MascotaSaludo(perfil: perfil),
                     ],
                   );
                 },
@@ -135,6 +146,13 @@ class _HomeScreenState extends State<HomeScreen> {
                       context,
                       const IdentifySpeciesScreen(),
                     ),
+                  ),
+                  _AccesoRapido(
+                    icon: Icons.pets_rounded,
+                    titulo: 'El Refugio',
+                    descripcion: 'Tu mascota y su mejora',
+                    destacado: true,
+                    onTap: () => abrirRefugio(context),
                   ),
                   _AccesoRapido(
                     icon: Icons.map_rounded,
@@ -379,6 +397,57 @@ class _CapturasVacias extends StatelessWidget {
           ),
         ],
       ),
+    );
+  }
+}
+
+/// La mascota saludando desde la cabecera de Inicio, con su nivel.
+///
+/// Es la puerta más visible al Refugio: en Perfil quedaba a tres toques de
+/// distancia y casi nadie la habría encontrado. Aquí es lo primero que se ve
+/// al abrir la app, que es lo que hace que la mascota se sienta parte de
+/// Veridia y no una pantalla escondida.
+class _MascotaSaludo extends StatelessWidget {
+  const _MascotaSaludo({required this.perfil});
+
+  final UserProfile? perfil;
+
+  @override
+  Widget build(BuildContext context) {
+    return ValueListenableBuilder<Set<String>>(
+      valueListenable: MascotaRepository.instance.inventario,
+      builder: (context, _, _) {
+        final mascota = MascotaRepository.instance.mascotaActiva(perfil);
+        if (mascota == null) return const SizedBox.shrink();
+
+        return Semantics(
+          button: true,
+          label: 'Abrir el Refugio de ${mascota.nombre}',
+          child: InkWell(
+            onTap: () => abrirRefugio(context),
+            borderRadius: BorderRadius.circular(VeridiaRadii.lg),
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 4),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  MascotaVista(
+                    mascota: mascota,
+                    equipado: MascotaRepository.instance.equipados(perfil),
+                    tamano: 52,
+                  ),
+                  const SizedBox(height: 4),
+                  VeridiaTag(
+                    label: 'Nv ${nivelDesde(perfil?.tokensTotales ?? 0)}',
+                    color: VeridiaColors.veridium,
+                    dense: true,
+                  ),
+                ],
+              ),
+            ),
+          ),
+        );
+      },
     );
   }
 }

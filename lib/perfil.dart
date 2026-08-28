@@ -7,19 +7,24 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'acerca_de.dart';
+import 'carnet.dart';
 import 'actividad.dart';
 import 'ajustes.dart';
+import 'models/logro.dart';
 import 'models/observation.dart';
 import 'models/recompensa.dart';
 import 'models/user.dart';
+import 'refugio.dart';
 import 'publicaciones.dart';
 import 'recompensas.dart';
 import 'services/foto_service.dart';
+import 'services/economia.dart';
 import 'services/repositorio_o.dart';
 import 'services/repositorio_r.dart';
 import 'services/repositorio_u.dart';
 import 'theme/veridia_theme.dart';
 import 'navegacion.dart';
+import 'widgets/logros_vista.dart';
 import 'widgets/veridia_ui.dart';
 
 class ProfileScreen extends StatefulWidget {
@@ -538,22 +543,30 @@ class _ProfileScreenState extends State<ProfileScreen> {
                             color: VeridiaColors.onSurface,
                           ),
                         ),
-                        if (_titulo != null) ...[
-                          const SizedBox(height: 6),
-                          VeridiaTag(
-                            label: _titulo!,
-                            icon: Icons.workspace_premium_rounded,
-                            color: VeridiaColors.veridium,
-                            dense: true,
-                          ),
-                        ],
-                        const SizedBox(height: 4),
-                        Text(
-                          _currentUser?.email ?? 'email@example.com',
-                          style: const TextStyle(
-                            fontSize: 14,
-                            color: VeridiaColors.onSurfaceVariant,
-                          ),
+                        // Logros e insignias van pegados al nombre: son
+                        // parte de cómo se presenta el explorador, no un dato
+                        // más de la cuenta. Debajo del nivel quedaban tan
+                        // abajo que en un celular había que bajar para verlos.
+                        //
+                        // Primero los LOGROS, que se ganan, y después las
+                        // insignias compradas: lo que acredita algo va antes
+                        // que lo que solo costó Veridiums.
+                        ConEstadisticas(
+                          builder: (context, stats) {
+                            final ganados = logrosConseguidos(stats);
+                            if (ganados.isEmpty) return const SizedBox.shrink();
+                            return Padding(
+                              padding: const EdgeInsets.only(top: 10),
+                              child: Wrap(
+                                spacing: 8,
+                                runSpacing: 8,
+                                alignment: WrapAlignment.center,
+                                children: ganados
+                                    .map((l) => LogroInsignia(logro: l))
+                                    .toList(),
+                              ),
+                            );
+                          },
                         ),
                         if (_insignias.isNotEmpty) ...[
                           const SizedBox(height: 10),
@@ -574,6 +587,25 @@ class _ProfileScreenState extends State<ProfileScreen> {
                                 .toList(),
                           ),
                         ],
+                        if (_titulo != null) ...[
+                          const SizedBox(height: 6),
+                          VeridiaTag(
+                            label: _titulo!,
+                            icon: Icons.workspace_premium_rounded,
+                            color: VeridiaColors.veridium,
+                            dense: true,
+                          ),
+                        ],
+                        const SizedBox(height: 4),
+                        Text(
+                          _currentUser?.email ?? 'email@example.com',
+                          style: const TextStyle(
+                            fontSize: 14,
+                            color: VeridiaColors.onSurfaceVariant,
+                          ),
+                        ),
+                        const SizedBox(height: 12),
+                        const _FilaNivel(),
                         const SizedBox(height: 16),
                         if (_isEditingProfile) ...[
                           TextField(
@@ -706,6 +738,13 @@ class _ProfileScreenState extends State<ProfileScreen> {
                   ),
 
                   // Estadísticas
+                  ConEstadisticas(
+                    builder: (context, stats) => Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 16),
+                      child: PanelLogros(stats: stats),
+                    ),
+                  ),
+                  const SizedBox(height: 24),
                   Padding(
                     padding: const EdgeInsets.symmetric(horizontal: 16),
                     child: Column(
@@ -800,6 +839,16 @@ class _ProfileScreenState extends State<ProfileScreen> {
                               ),
                             );
                           },
+                        ),
+                        _crearOpcionPerfil(
+                          icon: Icons.badge_outlined,
+                          titulo: 'Mi carnet de explorador',
+                          onTap: () => abrirCarnet(context),
+                        ),
+                        _crearOpcionPerfil(
+                          icon: Icons.pets_outlined,
+                          titulo: 'El Refugio',
+                          onTap: () => abrirRefugio(context),
                         ),
                         _crearOpcionPerfil(
                           icon: Icons.card_giftcard_outlined,
@@ -969,6 +1018,59 @@ class _ProfileScreenState extends State<ProfileScreen> {
           ),
         ),
       ),
+    );
+  }
+}
+
+/// Nivel y Veridiums ganados, en la cabecera del perfil.
+///
+/// Sin la mascota a propósito: aquí compite con la foto de perfil y las
+/// insignias por el mismo espacio, y el perfil es donde alguien se mira a sí
+/// mismo, no a su compañero. La mascota tiene su sitio en Inicio, en el mapa
+/// y en el Refugio, que es de donde no debería salir.
+class _FilaNivel extends StatelessWidget {
+  const _FilaNivel();
+
+  @override
+  Widget build(BuildContext context) {
+    return ValueListenableBuilder<UserProfile?>(
+      valueListenable: UserRepository.instance.currentUser,
+      builder: (context, perfil, _) {
+        final total = perfil?.tokensTotales ?? 0;
+        final siguiente = umbralSiguienteNivel(total);
+
+        return Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+          child: Column(
+            children: [
+              VeridiaTag(
+                label: 'Nivel ${nivelDesde(total)}',
+                icon: Icons.military_tech_rounded,
+                color: VeridiaColors.veridium,
+                dense: true,
+              ),
+              const SizedBox(height: 10),
+              SizedBox(
+                width: 200,
+                child: VeridiaProgressBar(
+                  value: progresoHaciaSiguienteNivel(total),
+                  height: 6,
+                ),
+              ),
+              const SizedBox(height: 6),
+              Text(
+                siguiente == null
+                    ? '$total Veridiums ganados · nivel máximo'
+                    : '$total / $siguiente Veridiums ganados',
+                style: const TextStyle(
+                  fontSize: 11,
+                  color: VeridiaColors.onSurfaceVariant,
+                ),
+              ),
+            ],
+          ),
+        );
+      },
     );
   }
 }

@@ -5,6 +5,8 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/foundation.dart';
 
 import '../models/recompensa.dart';
+import '../theme/veridia_theme.dart';
+import 'economia.dart';
 import 'repositorio_u.dart';
 
 /// Resultado de intentar canjear una recompensa.
@@ -83,20 +85,50 @@ class RewardRepository {
     if (yaCanjeada(recompensa.id)) return ResultadoCanje.yaLaTienes;
 
     final userRef = FirebaseFirestore.instance.collection('users').doc(uid);
-    final canjeRef = _canjes.doc(
-      '${uid}_${recompensa.id}_${DateTime.now().millisecondsSinceEpoch}',
-    );
+    // Lo que solo se puede canjear una vez lleva id determinista, así que un
+    // segundo intento choca contra el documento que ya existe en vez de
+    // cobrar dos veces. Lo repetible (una salida de campo, otro kit) sí pide
+    // un id nuevo, y lo genera Firestore: `millisecondsSinceEpoch` hacía que
+    // dos canjes en el mismo milisegundo se pisaran.
+    final canjeRef = recompensa.tipo.repetible
+        ? _canjes.doc()
+        : _canjes.doc('${uid}_${recompensa.id}');
 
     int? saldoFinal;
     try {
       final resultado = await FirebaseFirestore.instance
           .runTransaction<ResultadoCanje>((tx) async {
+            // Con id determinista, que el documento ya exista ES la prueba de
+            // que esta recompensa ya se canjeó. Comprobarlo aquí dentro y no
+            // solo con `yaCanjeada` (que mira una copia local que puede estar
+            // vieja) evita cobrar dos veces desde dos dispositivos a la vez.
+            if (!recompensa.tipo.repetible) {
+              final anterior = await tx.get(canjeRef);
+              if (anterior.exists) return ResultadoCanje.yaLaTienes;
+            }
+
             final snapshot = await tx.get(userRef);
             final saldo = (snapshot.data()?['tokens'] as num?)?.toInt() ?? 0;
             if (saldo < recompensa.costo) return ResultadoCanje.sinSaldo;
 
             final nuevoSaldo = saldo - recompensa.costo;
+            // Solo baja el SALDO. `tokensTotales` no se toca nunca al gastar:
+            // es el acumulado histórico del que salen el nivel y el ranking.
             tx.update(userRef, {'tokens': nuevoSaldo});
+            tx.set(
+              userRef
+                  .collection('movimientos')
+                  .doc(
+                    claveMovimiento(motivo: 'canje', referencia: canjeRef.id),
+                  ),
+              {
+                'delta': -recompensa.costo,
+                'motivo': 'canje',
+                'referencia': recompensa.id,
+                'detalle': recompensa.nombre,
+                'fecha': aIsoUtc(DateTime.now()),
+              },
+            );
             tx.set(
               canjeRef,
               Canje(
@@ -116,7 +148,11 @@ class RewardRepository {
           .timeout(const Duration(seconds: 20));
 
       if (resultado == ResultadoCanje.exito && saldoFinal != null) {
-        UserRepository.instance.syncTokensFromServer(uid, saldoFinal!);
+        UserRepository.instance.syncTokensFromServer(
+          uid,
+          saldoFinal!,
+          perfil.tokensTotales,
+        );
       }
       return resultado;
     } catch (e) {

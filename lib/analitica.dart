@@ -28,17 +28,6 @@ enum RangoAnalitica {
   final String etiqueta;
 }
 
-/// Nombre con el que se guarda una especie que la IA no logró identificar.
-/// No cuenta como "especie única": inflaría la cifra sin aportar nada.
-const _especieSinIdentificar = {
-  'especie observada',
-  'sin confirmar',
-  'referencia visual',
-};
-
-bool especieIdentificada(Observation observacion) => !_especieSinIdentificar
-    .contains(observacion.commonName.trim().toLowerCase());
-
 /// Observaciones registradas dentro de los últimos [dias] días.
 List<Observation> enRango(List<Observation> observaciones, int dias) {
   final desde = DateTime.now().subtract(Duration(days: dias));

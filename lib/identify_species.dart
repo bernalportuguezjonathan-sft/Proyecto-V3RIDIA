@@ -7,13 +7,19 @@ import 'package:geolocator/geolocator.dart';
 import 'dart:io';
 import 'historial.dart';
 import 'models/observation.dart';
+import 'models/user.dart';
+import 'refugio.dart';
+import 'services/consejo_mascota.dart';
+import 'services/economia.dart';
 import 'services/especie_ia_service.dart';
 import 'services/foto_service.dart';
+import 'services/repositorio_m.dart';
 import 'services/repositorio_o.dart';
 import 'services/repositorio_u.dart';
 import 'services/ubicacion_foto.dart';
 import 'theme/veridia_theme.dart';
 import 'navegacion.dart';
+import 'widgets/mascota_vista.dart';
 import 'widgets/veridia_ui.dart';
 
 class IdentifySpeciesScreen extends StatefulWidget {
@@ -42,6 +48,12 @@ class _IdentifySpeciesScreenState extends State<IdentifySpeciesScreen> {
   SpeciesIdentification? _aiResult;
   String? _aiError;
 
+  /// Lo que valdría la foto que se está encuadrando ahora mismo.
+  ///
+  /// Se recalcula al abrir la pantalla, al ubicar la foto y al identificarla:
+  /// son los tres momentos en los que cambia algo que la mascota mire.
+  ContextoFoto? _contextoMascota;
+
   @override
   void initState() {
     super.initState();
@@ -49,6 +61,29 @@ class _IdentifySpeciesScreenState extends State<IdentifySpeciesScreen> {
     // aparezca en mitad del flujo de la foto, pero la ubicación que se
     // guarda NO se decide aquí: se decide en _resolverUbicacion().
     Geolocator.requestPermission().ignore();
+    unawaited(_recalcularPreviaMascota());
+  }
+
+  /// Le pregunta al repositorio cuánto pagaría esta foto, con el MISMO
+  /// cálculo que se usará al guardarla.
+  ///
+  /// Adelantarlo es el punto de toda la mecánica: enterarte de que estabas
+  /// sobre un humedal cuando la foto ya está guardada no cambia nada, pero
+  /// saberlo con la cámara en la mano sí te mueve cien metros.
+  Future<void> _recalcularPreviaMascota() async {
+    final perfil = UserRepository.instance.currentUser.value;
+    if (perfil == null) return;
+
+    final contexto = await ObservationRepository.instance.contextoDeFoto(
+      userId: perfil.userId,
+      momento: DateTime.now(),
+      latitude: _ubicacion.latitude,
+      longitude: _ubicacion.longitude,
+      tipoEspecie: _aiResult?.type,
+      especieActual: _aiResult?.commonName,
+    );
+    if (!mounted) return;
+    setState(() => _contextoMascota = contexto);
   }
 
   Future<void> _takePhotoFromCamera() async {
@@ -124,6 +159,7 @@ class _IdentifySpeciesScreenState extends State<IdentifySpeciesScreen> {
               'Se guardará sin punto en el mapa.',
       };
     });
+    unawaited(_recalcularPreviaMascota());
   }
 
   Future<void> _analizarConIA() async {
@@ -154,6 +190,9 @@ class _IdentifySpeciesScreenState extends State<IdentifySpeciesScreen> {
           _selectedSpecies = result.commonName;
         }
       });
+      // Ya se sabe QUÉ es: la mariquita puede confirmar si era un cultivo y
+      // el colibrí si la especie cuenta como nueva del día.
+      unawaited(_recalcularPreviaMascota());
     } on FotoDuplicadaException catch (e) {
       if (!mounted) return;
       setState(() => _aiError = e.message);
@@ -232,6 +271,22 @@ class _IdentifySpeciesScreenState extends State<IdentifySpeciesScreen> {
                     '${avance.progreso}/${avance.meta} '
                     '(+${avance.veridiumsGanados} $palabra)';
         }).toList();
+
+        // Lo que pagó la foto en sí, aparte de los desafíos: el Veridium base
+        // y, si la mascota que lleva puesta aportó algo, por qué. Decirlo es
+        // la mitad de la mecánica: una mejora que suma en silencio no enseña
+        // a nadie que salir de noche o acercarse al humedal vale más.
+        if (resultado.veridiumsPorLaFoto > 0) {
+          final palabra = resultado.veridiumsPorLaFoto == 1
+              ? 'Veridium'
+              : 'Veridiums';
+          final bono = resultado.bonoMascota;
+          mensajesDesafios = [
+            '📷 Foto verificada: +${resultado.veridiumsPorLaFoto} $palabra',
+            if (bono != null) '🐾 ${bono.motivo} (+${bono.veridiums})',
+            ...mensajesDesafios,
+          ];
+        }
       } on GuardarObservacionException catch (e) {
         if (mounted) setState(() => _isSaving = false);
         _mostrarError(e.message);
@@ -285,10 +340,15 @@ class _IdentifySpeciesScreenState extends State<IdentifySpeciesScreen> {
     }
 
     if (mensajesDesafios.isNotEmpty) {
+      final avances = mensajesDesafios.any(
+        (m) => m.startsWith('🎯') || m.startsWith('🏆'),
+      );
       await showDialog(
         context: context,
         builder: (dialogContext) => AlertDialog(
-          title: const Text('¡Desafío actualizado!'),
+          title: Text(
+            avances ? '¡Desafío actualizado!' : '¡Veridiums ganados!',
+          ),
           content: Text(mensajesDesafios.join('\n\n')),
           actions: [
             TextButton(
@@ -389,6 +449,13 @@ class _IdentifySpeciesScreenState extends State<IdentifySpeciesScreen> {
                       ),
                     ),
                   ),
+                  if (_contextoMascota != null) ...[
+                    const SizedBox(height: 12),
+                    Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 16),
+                      child: _PreviaMascota(contexto: _contextoMascota!),
+                    ),
+                  ],
                   const SizedBox(height: 8),
                   Padding(
                     padding: const EdgeInsets.symmetric(horizontal: 16),
@@ -883,6 +950,88 @@ class _SinFoto extends StatelessWidget {
         Icons.eco_outlined,
         color: VeridiaColors.primary,
         size: 24,
+      ),
+    );
+  }
+}
+
+/// Lo que la mascota adelanta sobre la foto que se va a tomar.
+///
+/// Verde cuando la mejora va a pagar, apagada cuando no — y en ese caso dice
+/// qué faltaría. Un "+0" mudo no le enseña a nadie que su rana rinde en los
+/// humedales; "no hay humedal cerca" sí.
+class _PreviaMascota extends StatelessWidget {
+  const _PreviaMascota({required this.contexto});
+
+  final ContextoFoto contexto;
+
+  @override
+  Widget build(BuildContext context) {
+    return ValueListenableBuilder<UserProfile?>(
+      valueListenable: UserRepository.instance.currentUser,
+      builder: (context, perfil, _) => ValueListenableBuilder<Set<String>>(
+        valueListenable: MascotaRepository.instance.inventario,
+        builder: (context, _, _) {
+          final repo = MascotaRepository.instance;
+          final mascota = repo.mascotaActiva(perfil);
+          if (mascota == null) return const SizedBox.shrink();
+
+          final previa = previaDeMascota(mascota.id, contexto);
+          final acento = previa.suma
+              ? VeridiaColors.secondary
+              : VeridiaColors.outline;
+
+          return VeridiaCard(
+            padding: const EdgeInsets.all(12),
+            borderColor: acento.withValues(alpha: 0.45),
+            onTap: () => abrirRefugio(context),
+            child: Row(
+              children: [
+                MascotaVista(
+                  mascota: mascota,
+                  equipado: repo.equipados(perfil),
+                  tamano: 44,
+                  animar: previa.suma,
+                  opacidad: previa.suma ? 1 : 0.55,
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        children: [
+                          Text(
+                            mascota.mejora,
+                            style: TextStyle(
+                              fontFamily: VeridiaFonts.body,
+                              fontSize: 11,
+                              fontWeight: FontWeight.w700,
+                              color: mascota.color,
+                            ),
+                          ),
+                          const SizedBox(width: 8),
+                          if (previa.suma)
+                            VeridiaTag(
+                              label: '+${previa.veridiums}',
+                              icon: Icons.bolt_rounded,
+                              color: VeridiaColors.secondary,
+                              dense: true,
+                            ),
+                        ],
+                      ),
+                      const SizedBox(height: 3),
+                      Text(
+                        previa.mensaje,
+                        style: Theme.of(context).textTheme.bodySmall,
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          );
+        },
       ),
     );
   }

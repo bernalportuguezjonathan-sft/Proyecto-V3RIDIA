@@ -6,13 +6,22 @@ import 'package:geolocator/geolocator.dart';
 import 'package:latlong2/latlong.dart';
 import 'detallemapa.dart';
 import 'models/bird_zone.dart';
+import 'models/mascota.dart';
+import 'mis_fotos.dart';
 import 'models/observation.dart';
+import 'refugio.dart';
+import 'services/consejo_mascota.dart';
+import 'services/economia.dart';
 import 'services/geocodificacion.dart';
+import 'services/repositorio_m.dart';
 import 'services/repositorio_o.dart';
 import 'services/repositorio_u.dart';
 import 'theme/veridia_theme.dart';
+import 'utils/texto_busqueda.dart';
 import 'identify_species.dart';
 import 'navegacion.dart';
+import 'widgets/mascota_mapa.dart';
+import 'widgets/mascota_vista.dart';
 import 'widgets/veridia_ui.dart';
 
 class MapScreen extends StatefulWidget {
@@ -69,6 +78,19 @@ class _MapScreenState extends State<MapScreen> {
   String? _locationMessage;
   static const Distance _distance = Distance();
 
+  /// Lo que la mascota tiene que decir ahora mismo, o null si no tiene nada.
+  String? _consejoMascota;
+
+  /// Consejo que el explorador ya cerró a mano. Mientras el consejo siga
+  /// siendo ese, la tarjeta no vuelve a aparecer: si volviera sola sería un
+  /// aviso que no se puede quitar.
+  String? _consejoDescartado;
+
+  /// Relee el consejo cada tanto para que el cambio de hora (que nadie
+  /// dispara con un gesto) llegue a notarse: a las 6 p.m. el currucutú tiene
+  /// algo nuevo que decir aunque el explorador no haya tocado nada.
+  Timer? _timerConsejo;
+
   @override
   void initState() {
     super.initState();
@@ -84,8 +106,13 @@ class _MapScreenState extends State<MapScreen> {
         _sightings = sightings.where((s) => s.hasCoordinates).toList();
         _filteredSightings = _filtrarAvistamientos();
         _indexarFotosPorZona();
+        _recalcularConsejo();
       });
     }, onError: (_) {});
+    _timerConsejo = Timer.periodic(
+      const Duration(minutes: 5),
+      (_) => setState(_recalcularConsejo),
+    );
   }
 
   /// Avistamientos que responden a la búsqueda actual.
@@ -114,29 +141,6 @@ class _MapScreenState extends State<MapScreen> {
       indice.putIfAbsent(zona?.id ?? _sinZona, () => []).add(avistamiento);
     }
     _fotosPorZonaId = indice;
-  }
-
-  /// Agrupa por NOMBRE de zona las fotos que pasan el filtro actual. Las que
-  /// caen lejos de toda zona van a un grupo aparte en vez de desaparecer.
-  Map<String, List<Observation>> _avistamientosPorZona() {
-    final visibles = _filteredSightings.toSet();
-    final nombrePorId = {for (final z in _birdZones) z.id: z.name};
-
-    final grupos = <String, List<Observation>>{};
-    _fotosPorZonaId.forEach((zonaId, fotos) {
-      final coinciden = fotos.where(visibles.contains).toList();
-      if (coinciden.isEmpty) return;
-      grupos[nombrePorId[zonaId] ?? _sinZona] = coinciden;
-    });
-
-    final ordenadas = grupos.entries.toList()
-      ..sort((a, b) {
-        // El grupo "fuera de zonas" siempre va al final.
-        if (a.key == _sinZona) return 1;
-        if (b.key == _sinZona) return -1;
-        return b.value.length.compareTo(a.value.length);
-      });
-    return Map.fromEntries(ordenadas);
   }
 
   /// Fotos tomadas dentro de una zona concreta (sin filtrar por búsqueda).
@@ -178,6 +182,7 @@ class _MapScreenState extends State<MapScreen> {
       setState(() {
         _userLocation = location;
         _locationMessage = null;
+        _recalcularConsejo();
       });
       if (moveCamera) {
         _mapController.move(location, 14.0);
@@ -212,6 +217,107 @@ class _MapScreenState extends State<MapScreen> {
     return zones;
   }
 
+  // -------------------------------------------------------------------------
+  // Mascota
+  // -------------------------------------------------------------------------
+
+  Mascota? get _mascota => MascotaRepository.instance.mascotaActiva(
+    UserRepository.instance.currentUser.value,
+  );
+
+  Map<RanuraAccesorio, Accesorio> get _accesoriosMascota => MascotaRepository
+      .instance
+      .equipados(UserRepository.instance.currentUser.value);
+
+  /// Mis propias fotos, sacadas de las que el mapa ya tiene cargadas.
+  ///
+  /// Es una aproximación a propósito: el stream trae las últimas 300 de
+  /// todos. Sirve de sobra para un consejo ("llevas 3 especies hoy"), y el
+  /// pago de verdad no se calcula aquí sino al guardar la observación, con
+  /// una consulta completa (ver ObservationRepository._contextoDe).
+  List<Observation> get _misFotos {
+    final uid = UserRepository.instance.currentUser.value?.userId;
+    if (uid == null) return const [];
+    return _sightings.where((foto) => foto.userId == uid).toList();
+  }
+
+  /// Vuelve a preguntarle a la mascota si tiene algo que decir.
+  ///
+  /// Se llama SIEMPRE dentro de un setState de quien la invoca: no llama a
+  /// setState por su cuenta para no encadenar dos reconstrucciones seguidas
+  /// cada vez que llegan fotos nuevas.
+  void _recalcularConsejo() {
+    final mascota = _mascota;
+    if (mascota == null) {
+      _consejoMascota = null;
+      return;
+    }
+
+    final ahora = DateTime.now();
+    final mias = _misFotos;
+
+    _consejoMascota = consejoDeMascota(
+      DatosConsejo(
+        mascota: mascota.id,
+        momento: ahora,
+        humedalCercano: _humedalCercano(),
+        kmAMiFotoMasCercana: _kmAMiFotoMasCercana(),
+        especiesMiasHoy: _especiesMiasHoy(mias, ahora),
+      ),
+    );
+  }
+
+  /// Nombre de la zona de agua más cercana, si el explorador está dentro del
+  /// radio en el que la mejora de la rana ya cuenta.
+  String? _humedalCercano() {
+    if (_userLocation == null) return null;
+    const radioKm = 1.5;
+
+    String? masCercana;
+    var minima = double.infinity;
+    for (final zona in _birdZones) {
+      final texto = normalizarTexto(
+        '${zona.name} ${zona.habitat} ${zona.description}',
+      );
+      if (!esZonaDeAguaNormalizada(texto)) continue;
+      final km = _distanciaKm(zona.latitude, zona.longitude);
+      if (km == null || km > radioKm || km >= minima) continue;
+      minima = km;
+      masCercana = zona.name;
+    }
+    return masCercana;
+  }
+
+  double? _kmAMiFotoMasCercana() {
+    final user = _userLocation;
+    if (user == null) return null;
+
+    double? minima;
+    for (final foto in _misFotos) {
+      final km = _distance.as(
+        LengthUnit.Kilometer,
+        user,
+        LatLng(foto.latitude!, foto.longitude!),
+      );
+      if (minima == null || km < minima) minima = km;
+    }
+    return minima;
+  }
+
+  int _especiesMiasHoy(List<Observation> mias, DateTime ahora) {
+    final nombres = <String>{};
+    for (final foto in mias) {
+      final f = foto.dateTime;
+      if (f.year != ahora.year ||
+          f.month != ahora.month ||
+          f.day != ahora.day) {
+        continue;
+      }
+      nombres.add(normalizarTexto(foto.commonName));
+    }
+    return nombres.length;
+  }
+
   Future<void> _loadBirdZones() async {
     final zones = await loadBirdZones();
     if (!mounted) return;
@@ -225,6 +331,7 @@ class _MapScreenState extends State<MapScreen> {
       _filteredSightings = _filtrarAvistamientos();
       _indexarFotosPorZona();
       _isLoadingZones = false;
+      _recalcularConsejo();
     });
 
     if (zones.isNotEmpty) {
@@ -241,6 +348,7 @@ class _MapScreenState extends State<MapScreen> {
   @override
   void dispose() {
     _sightingsSub?.cancel();
+    _timerConsejo?.cancel();
     _searchController.dispose();
     _mapController.dispose();
     super.dispose();
@@ -345,14 +453,9 @@ class _MapScreenState extends State<MapScreen> {
         selectedSpecies: _selectedSpecies,
       );
       _filteredSightings = _filtrarAvistamientos();
-      // Si la búsqueda no da zonas pero sí fotos, mostramos las fotos: es lo
-      // que el explorador está buscando.
-      if (_searchController.text.trim().isNotEmpty &&
-          _filteredZones.isEmpty &&
-          _filteredSightings.isNotEmpty) {
-        _panel = _PanelMapa.fotos;
-        _panelAbierto = true;
-      }
+      // Ya no se salta a una pestaña de fotos: las que coinciden con la
+      // búsqueda siguen resaltadas como marcadores sobre el mapa, que es
+      // donde importa verlas.
     });
   }
 
@@ -735,48 +838,239 @@ class _MapScreenState extends State<MapScreen> {
 
   /// Controles del mapa en una sola fila: ocupan una franja de 40 px en vez
   /// de la columna de tres botones que antes tapaba media pantalla.
+  /// Tarjeta del consejo de la mascota, encima de los controles del mapa.
+  ///
+  /// Solo aparece cuando la mascota tiene algo que decir Y el explorador no
+  /// ha cerrado ya ese mismo consejo. Va aquí abajo y no en una burbuja
+  /// pegada al sprite porque a 34 píxeles no cabe una frase legible, y
+  /// porque el panel de zonas ya ocupa la parte de abajo: encajarla en la
+  /// misma columna evita que se monten.
+  Widget _tarjetaConsejo() {
+    final mascota = _mascota;
+    final mensaje = _consejoMascota;
+    if (mascota == null || mensaje == null || mensaje == _consejoDescartado) {
+      return const SizedBox.shrink();
+    }
+    if (_panelAbierto) return const SizedBox.shrink();
+
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 8),
+      child: ConsejoMascota(
+        mascota: mascota,
+        mensaje: mensaje,
+        equipado: _accesoriosMascota,
+        onCerrar: () => setState(() => _consejoDescartado = mensaje),
+        onAbrirRefugio: () async {
+          await abrirRefugio(context);
+          if (mounted) setState(_recalcularConsejo);
+        },
+      ),
+    );
+  }
+
+  /// La mascota posada justo encima del botón de registrar especie.
+  ///
+  /// Antes iba pegada al punto azul del mapa. Ahí se perdía entre las teselas,
+  /// tapaba media calle y encima encogía con el zoom hasta ser ilegible. Aquí
+  /// mantiene siempre el mismo tamaño y está donde se mira un segundo antes
+  /// de tomar la foto, que es justo cuando su mejora importa.
+  ///
+  /// Se alinea con el botón de la cámara: 42 px de botón contra 44 de sprite,
+  /// centrado por los 21 px de mitad de botón menos la mitad del sprite.
+  Widget _mascotaFlotante() {
+    final mascota = _mascota;
+    if (mascota == null) return const SizedBox.shrink();
+
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 2),
+      child: Semantics(
+        button: true,
+        label: 'Ver la mejora de ${mascota.nombre}',
+        child: GestureDetector(
+          onTap: () => _mostrarMejoraMascota(mascota),
+          behavior: HitTestBehavior.opaque,
+          child: MascotaEnMapa(
+            mascota: mascota,
+            equipado: _accesoriosMascota,
+            // 38 de sprite dentro de una placa de ~51: ocupa casi lo mismo
+            // que el botón de 42 que tiene debajo, así que la columna queda
+            // alineada y no se come la esquina del mapa.
+            tamano: 38,
+          ),
+        ),
+      ),
+    );
+  }
+
+  /// Hoja con la mejora activa de la mascota y qué está pasando con ella
+  /// AQUÍ, en el punto donde está parado el explorador.
+  ///
+  /// Es una hoja y no un Tooltip a propósito: el consejo cambia según el
+  /// sitio y la hora, así que hay texto que leer, y un tooltip de dos líneas
+  /// que se va solo al soltar no da tiempo.
+  void _mostrarMejoraMascota(Mascota mascota) {
+    final consejo = _consejoMascota;
+
+    showModalBottomSheet<void>(
+      context: context,
+      backgroundColor: VeridiaColors.surfaceContainer,
+      showDragHandle: true,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+      ),
+      builder: (hoja) => SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(20, 4, 20, 20),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  MascotaVista(
+                    mascota: mascota,
+                    equipado: _accesoriosMascota,
+                    tamano: 64,
+                  ),
+                  const SizedBox(width: 14),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          mascota.nombre,
+                          style: Theme.of(hoja).textTheme.titleMedium,
+                        ),
+                        const SizedBox(height: 6),
+                        Wrap(
+                          spacing: 6,
+                          runSpacing: 6,
+                          children: [
+                            VeridiaTag(
+                              label: mascota.mejora,
+                              icon: Icons.auto_awesome_rounded,
+                              color: mascota.color,
+                              dense: true,
+                            ),
+                            VeridiaTag(
+                              label: 'x${mascota.rareza.multiplicador}',
+                              icon: Icons.workspace_premium_rounded,
+                              color: VeridiaColors.veridium,
+                              dense: true,
+                            ),
+                          ],
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 16),
+              Text(
+                mascota.descripcionMejora,
+                style: Theme.of(hoja).textTheme.bodyMedium,
+              ),
+              if (consejo != null) ...[
+                const SizedBox(height: 14),
+                Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: VeridiaColors.surfaceContainerLow,
+                    borderRadius: BorderRadius.circular(VeridiaRadii.md),
+                    border: Border.all(
+                      color: mascota.color.withValues(alpha: 0.35),
+                    ),
+                  ),
+                  child: Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Icon(Icons.place_rounded, size: 16, color: mascota.color),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: Text(
+                          consejo,
+                          style: Theme.of(hoja).textTheme.bodySmall,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+              const SizedBox(height: 18),
+              SizedBox(
+                width: double.infinity,
+                child: FilledButton.icon(
+                  onPressed: () async {
+                    Navigator.pop(hoja);
+                    await abrirRefugio(context);
+                    if (mounted) setState(_recalcularConsejo);
+                  },
+                  icon: const Icon(Icons.pets_rounded, size: 18),
+                  label: const Text('Cambiar de compañero'),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
   Widget _controlesMapa() {
     final esAdmin =
         UserRepository.instance.currentUser.value?.role == 'Administrador';
 
-    return Row(
+    return Column(
       mainAxisSize: MainAxisSize.min,
+      crossAxisAlignment: CrossAxisAlignment.end,
       children: [
-        _BotonMapa(
-          icono: _showSightings ? Icons.visibility : Icons.visibility_off,
-          tooltip: _showSightings
-              ? 'Ocultar fotos en el mapa'
-              : 'Mostrar fotos en el mapa',
-          activo: _showSightings,
-          onTap: () => setState(() => _showSightings = !_showSightings),
+        // La columna se alinea a la derecha y el botón de la cámara es el
+        // último de la fila, así que la mascota cae justo encima de él.
+        if (!esAdmin) _mascotaFlotante(),
+        Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            _BotonMapa(
+              icono: _showSightings ? Icons.visibility : Icons.visibility_off,
+              tooltip: _showSightings
+                  ? 'Ocultar fotos en el mapa'
+                  : 'Mostrar fotos en el mapa',
+              activo: _showSightings,
+              onTap: () => setState(() => _showSightings = !_showSightings),
+            ),
+            const SizedBox(width: 8),
+            _BotonMapa(
+              icono: Icons.my_location_rounded,
+              tooltip: 'Ir a mi ubicación',
+              onTap: () {
+                final user = _userLocation;
+                if (user != null) {
+                  _mapController.move(user, 14.0);
+                } else {
+                  _locateUser(moveCamera: true);
+                }
+              },
+            ),
+            if (!esAdmin) ...[
+              const SizedBox(width: 8),
+              // Sin botón de huella: la mascota flota justo encima de este botón
+              // y tocarla hace lo mismo, así que el icono sobraba y dejaba la
+              // fila con cuatro círculos casi iguales.
+              _BotonMapa(
+                icono: Icons.add_a_photo_rounded,
+                tooltip: 'Registrar especie',
+                // Mismo tamaño y diseño que el resto de la fila; el único
+                // acento es el color verde, prestado del botón "ver fotos"
+                // cuando está activo, para que siga siendo el más visible sin
+                // desentonar del conjunto.
+                activo: true,
+                onTap: () =>
+                    VeridiaNav.abrir(context, const IdentifySpeciesScreen()),
+              ),
+            ],
+          ],
         ),
-        const SizedBox(width: 8),
-        _BotonMapa(
-          icono: Icons.my_location_rounded,
-          tooltip: 'Ir a mi ubicación',
-          onTap: () {
-            final user = _userLocation;
-            if (user != null) {
-              _mapController.move(user, 14.0);
-            } else {
-              _locateUser(moveCamera: true);
-            }
-          },
-        ),
-        if (!esAdmin) ...[
-          const SizedBox(width: 8),
-          _BotonMapa(
-            icono: Icons.add_a_photo_rounded,
-            tooltip: 'Registrar especie',
-            // Mismo tamaño y diseño que el resto de la fila; el único
-            // acento es el color verde, prestado del botón "ver fotos"
-            // cuando está activo, para que siga siendo el más visible sin
-            // desentonar del conjunto.
-            activo: true,
-            onTap: () =>
-                VeridiaNav.abrir(context, const IdentifySpeciesScreen()),
-          ),
-        ],
       ],
     );
   }
@@ -889,12 +1183,16 @@ class _MapScreenState extends State<MapScreen> {
                     onTap: () => _abrirPanel(_PanelMapa.zonas),
                   ),
                   const SizedBox(width: 6),
+                  // No despliega el panel: abre la galería propia a
+                  // pantalla completa. En la franja de 200 px las miniaturas
+                  // eran ilegibles y encima se mezclaban con las fotos de
+                  // todos los demás.
                   _ChipPanel(
-                    etiqueta: 'Fotos',
-                    cantidad: _filteredSightings.length,
+                    etiqueta: 'Mis fotos',
+                    cantidad: _misFotos.length,
                     icono: Icons.photo_camera_rounded,
-                    activo: _panelAbierto && _panel == _PanelMapa.fotos,
-                    onTap: () => _abrirPanel(_PanelMapa.fotos),
+                    activo: false,
+                    onTap: () => abrirMisFotos(context, _birdZones),
                   ),
                   const SizedBox(width: 6),
                   _ChipPanel(
@@ -950,9 +1248,6 @@ class _MapScreenState extends State<MapScreen> {
                         padding: const EdgeInsets.only(top: 8),
                         child: switch (_panel) {
                           _PanelMapa.zonas => _listaZonas(zonas),
-                          _PanelMapa.fotos => _listaFotos(
-                            _avistamientosPorZona(),
-                          ),
                           _PanelMapa.lugares => _listaLugares(),
                         },
                       ),
@@ -1060,40 +1355,6 @@ class _MapScreenState extends State<MapScreen> {
                 ],
               ),
             ),
-          );
-        },
-      ),
-    );
-  }
-
-  /// Fotos agrupadas por zona: una columna por zona con sus miniaturas.
-  Widget _listaFotos(Map<String, List<Observation>> grupos) {
-    if (grupos.isEmpty) {
-      return _PanelVacio(
-        mensaje: _sightings.isEmpty
-            ? 'Todavía nadie ha registrado fotos en el mapa.'
-            : 'Ninguna foto coincide con esta búsqueda.',
-      );
-    }
-
-    return SizedBox(
-      height: 104,
-      child: ListView.separated(
-        scrollDirection: Axis.horizontal,
-        itemCount: grupos.length,
-        separatorBuilder: (_, _) => const SizedBox(width: 8),
-        itemBuilder: (context, index) {
-          final entrada = grupos.entries.elementAt(index);
-          return _GrupoZonaFotos(
-            zona: entrada.key,
-            avistamientos: entrada.value,
-            onSeleccionar: (avistamiento) {
-              _mapController.move(
-                LatLng(avistamiento.latitude!, avistamiento.longitude!),
-                15.0,
-              );
-              _showSightingSheet(avistamiento);
-            },
           );
         },
       ),
@@ -1357,6 +1618,11 @@ class _MapScreenState extends State<MapScreen> {
         point: user,
         width: 90,
         height: 60,
+        // Solo el punto y la etiqueta: la mascota se movió a la fila de
+        // controles. Encima del mapa se perdía entre las teselas, tapaba
+        // media calle y encima se alejaba al hacer zoom out hasta quedar
+        // ilegible. Sobre el botón de capturar está siempre del mismo tamaño
+        // y justo donde se mira antes de tomar la foto.
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
@@ -1570,6 +1836,7 @@ class _MapScreenState extends State<MapScreen> {
               mainAxisSize: MainAxisSize.min,
               crossAxisAlignment: CrossAxisAlignment.end,
               children: [
+                _tarjetaConsejo(),
                 _controlesMapa(),
                 const SizedBox(height: 8),
                 _atribucion(),
@@ -1597,7 +1864,11 @@ class _MapScreenState extends State<MapScreen> {
 const _sinZona = 'Fuera de zonas registradas';
 
 /// Las dos vistas del panel inferior del mapa.
-enum _PanelMapa { zonas, fotos, lugares }
+///
+/// Las fotos ya no son una pestaña: viven en su propia hoja a pantalla
+/// completa (ver `mis_fotos.dart`), porque son las TUYAS y no caben en una
+/// franja de doscientos píxeles.
+enum _PanelMapa { zonas, lugares }
 
 /// Chip de filtro por especie, flotando sobre el mapa.
 class _ChipEspecie extends StatelessWidget {
@@ -1756,120 +2027,6 @@ class _ChipPanel extends StatelessWidget {
             ),
           ],
         ),
-      ),
-    );
-  }
-}
-
-/// Columna con el nombre de una zona y las miniaturas de lo fotografiado ahí.
-class _GrupoZonaFotos extends StatelessWidget {
-  const _GrupoZonaFotos({
-    required this.zona,
-    required this.avistamientos,
-    required this.onSeleccionar,
-  });
-
-  final String zona;
-  final List<Observation> avistamientos;
-  final ValueChanged<Observation> onSeleccionar;
-
-  @override
-  Widget build(BuildContext context) {
-    // Se muestran hasta 6: el panel es una vista rápida, el detalle completo
-    // está en la ficha de cada zona.
-    final visibles = avistamientos.take(6).toList();
-
-    return Container(
-      width: 186,
-      padding: const EdgeInsets.all(8),
-      decoration: BoxDecoration(
-        color: VeridiaColors.background,
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(
-          color: VeridiaColors.secondary.withValues(alpha: 0.25),
-        ),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              const Icon(
-                Icons.place_rounded,
-                size: 12,
-                color: VeridiaColors.secondary,
-              ),
-              const SizedBox(width: 4),
-              Expanded(
-                child: Text(
-                  zona,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: const TextStyle(
-                    fontSize: 11,
-                    fontWeight: FontWeight.w700,
-                  ),
-                ),
-              ),
-              Text(
-                '${avistamientos.length}',
-                style: const TextStyle(
-                  fontSize: 11,
-                  fontWeight: FontWeight.w700,
-                  color: VeridiaColors.secondary,
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 8),
-          Expanded(
-            child: ListView.separated(
-              scrollDirection: Axis.horizontal,
-              itemCount: visibles.length,
-              separatorBuilder: (_, _) => const SizedBox(width: 6),
-              itemBuilder: (context, i) {
-                final avistamiento = visibles[i];
-                return GestureDetector(
-                  onTap: () => onSeleccionar(avistamiento),
-                  child: SizedBox(
-                    width: 54,
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        ClipRRect(
-                          borderRadius: BorderRadius.circular(8),
-                          child: SizedBox(
-                            height: 40,
-                            width: 54,
-                            child: avistamiento.hasPhoto
-                                ? Image.network(
-                                    avistamiento.imagePath!,
-                                    fit: BoxFit.cover,
-                                    cacheWidth: 160,
-                                    errorBuilder: (_, _, _) =>
-                                        const VeridiaFotoVacia(tamanoIcono: 16),
-                                  )
-                                : const VeridiaFotoVacia(tamanoIcono: 16),
-                          ),
-                        ),
-                        const SizedBox(height: 4),
-                        Text(
-                          avistamiento.commonName,
-                          maxLines: 2,
-                          overflow: TextOverflow.ellipsis,
-                          style: const TextStyle(
-                            fontSize: 9,
-                            fontWeight: FontWeight.w600,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                );
-              },
-            ),
-          ),
-        ],
       ),
     );
   }
