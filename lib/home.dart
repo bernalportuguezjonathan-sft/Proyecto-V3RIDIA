@@ -136,57 +136,69 @@ class _HomeScreenState extends State<HomeScreen> {
                 shrinkWrap: true,
                 physics: const NeverScrollableScrollPhysics(),
                 childAspectRatio: 1.35,
-                children: [
-                  _AccesoRapido(
-                    icon: Icons.camera_alt_rounded,
-                    titulo: 'Cámara IA',
-                    descripcion: 'Identifica especies',
-                    destacado: true,
-                    onTap: () => VeridiaNav.abrir(
-                      context,
-                      const IdentifySpeciesScreen(),
-                    ),
-                  ),
-                  _AccesoRapido(
-                    icon: Icons.pets_rounded,
-                    titulo: 'El Refugio',
-                    descripcion: 'Tu mascota y su mejora',
-                    destacado: true,
-                    onTap: () => abrirRefugio(context),
-                  ),
-                  _AccesoRapido(
-                    icon: Icons.map_rounded,
-                    titulo: 'Mapa',
-                    descripcion: 'Explora la zona',
-                    onTap: () => VeridiaNav.abrir(context, const MapScreen()),
-                  ),
-                  _AccesoRapido(
-                    icon: Icons.menu_book_rounded,
-                    titulo: 'Diario',
-                    descripcion: 'Tus avistamientos',
-                    onTap: () =>
-                        VeridiaNav.abrir(context, const HistoryScreen()),
-                  ),
-                  _AccesoRapido(
-                    icon: Icons.emoji_events_rounded,
-                    titulo: 'Desafíos',
-                    descripcion: 'Gana Veridiums',
-                    onTap: () =>
-                        VeridiaNav.abrir(context, const ChallengesScreen()),
-                  ),
-                  _AccesoRapido(
-                    icon: Icons.card_giftcard_rounded,
-                    titulo: 'Recompensas',
-                    descripcion: 'Canjea tus Veridiums',
-                    onTap: () => abrirRecompensas(context),
-                  ),
-                  _AccesoRapido(
-                    icon: Icons.travel_explore_rounded,
-                    titulo: 'Fotos por zona',
-                    descripcion: 'Qué se ha visto cerca',
-                    onTap: () => VeridiaNav.abrir(context, const MapScreen()),
-                  ),
-                ],
+                children:
+                    [
+                          _AccesoRapido(
+                            icon: Icons.camera_alt_rounded,
+                            titulo: 'Cámara IA',
+                            descripcion: 'Identifica especies',
+                            destacado: true,
+                            chispa: true,
+                            onTap: () => VeridiaNav.abrir(
+                              context,
+                              const IdentifySpeciesScreen(),
+                            ),
+                          ),
+                          _AccesoRapido(
+                            icon: Icons.pets_rounded,
+                            titulo: 'El Refugio',
+                            descripcion: 'Tu mascota y su mejora',
+                            destacado: true,
+                            onTap: () => abrirRefugio(context),
+                          ),
+                          _AccesoRapido(
+                            icon: Icons.map_rounded,
+                            titulo: 'Mapa',
+                            descripcion: 'Explora la zona',
+                            onTap: () =>
+                                VeridiaNav.abrir(context, const MapScreen()),
+                          ),
+                          _AccesoRapido(
+                            icon: Icons.menu_book_rounded,
+                            titulo: 'Diario',
+                            descripcion: 'Tus avistamientos',
+                            onTap: () => VeridiaNav.abrir(
+                              context,
+                              const HistoryScreen(),
+                            ),
+                          ),
+                          _AccesoRapido(
+                            icon: Icons.emoji_events_rounded,
+                            titulo: 'Desafíos',
+                            descripcion: 'Gana Veridiums',
+                            onTap: () => VeridiaNav.abrir(
+                              context,
+                              const ChallengesScreen(),
+                            ),
+                          ),
+                          _AccesoRapido(
+                            icon: Icons.card_giftcard_rounded,
+                            titulo: 'Recompensas',
+                            descripcion: 'Canjea tus Veridiums',
+                            onTap: () => abrirRecompensas(context),
+                          ),
+                          _AccesoRapido(
+                            icon: Icons.travel_explore_rounded,
+                            titulo: 'Fotos por zona',
+                            descripcion: 'Qué se ha visto cerca',
+                            onTap: () =>
+                                VeridiaNav.abrir(context, const MapScreen()),
+                          ),
+                          // La cuadrícula se arma en cascada al abrir Inicio, en vez
+                          // de aparecer entera de golpe.
+                        ].indexed
+                        .map((e) => VeridiaAparece(indice: e.$1, child: e.$2))
+                        .toList(),
               ),
               const SizedBox(height: 26),
               VeridiaSectionTitle(
@@ -243,6 +255,7 @@ class _AccesoRapido extends StatelessWidget {
     required this.descripcion,
     required this.onTap,
     this.destacado = false,
+    this.chispa = false,
   });
 
   final IconData icon;
@@ -251,10 +264,16 @@ class _AccesoRapido extends StatelessWidget {
   final VoidCallback onTap;
   final bool destacado;
 
+  /// Solo el acceso a la Cámara IA lo enciende: el ícono pulsa suave, el
+  /// mismo acento puntual que ya tiene el botón "Analizar con IA" (ver
+  /// VeridiaChispaIA) -no algo que tenga sentido en un acceso que no es de IA.
+  final bool chispa;
+
   @override
   Widget build(BuildContext context) {
     final text = Theme.of(context).textTheme;
     final accent = destacado ? VeridiaColors.secondary : VeridiaColors.primary;
+    final icono = Icon(icon, size: 20, color: accent);
 
     return VeridiaCard(
       onTap: onTap,
@@ -273,7 +292,7 @@ class _AccesoRapido extends StatelessWidget {
               color: accent.withValues(alpha: 0.16),
               borderRadius: BorderRadius.circular(VeridiaRadii.md),
             ),
-            child: Icon(icon, size: 20, color: accent),
+            child: chispa ? VeridiaChispaIA(child: icono) : icono,
           ),
           Column(
             crossAxisAlignment: CrossAxisAlignment.start,

@@ -9,6 +9,15 @@ import 'economia.dart';
 
 import '../theme/veridia_theme.dart';
 
+/// El rol de administrador, escrito UNA vez.
+///
+/// Estaba repetido como el literal 'Administrador' en una decena de sitios
+/// (navegación, mapa, desafíos, moderación...). Con la cadena suelta, olvidar
+/// la comprobación en un sitio nuevo no da ningún error: simplemente esa
+/// pantalla trata al administrador como explorador, que es exactamente lo que
+/// pasó con la barra inferior del mapa.
+const String rolAdministrador = 'Administrador';
+
 class UserRepository {
   UserRepository._();
 
@@ -19,6 +28,13 @@ class UserRepository {
   late ValueNotifier<UserProfile?> currentUser = ValueNotifier<UserProfile?>(
     null,
   );
+
+  /// Si quien tiene la sesión abierta es administrador.
+  ///
+  /// Es solo para decidir QUÉ SE MUESTRA. Lo que de verdad protege los datos
+  /// son las reglas de Firestore (`isAdmin()`), que se evalúan en el servidor
+  /// y no dependen de lo que diga el cliente.
+  bool get esAdmin => currentUser.value?.role == rolAdministrador;
 
   UserProfile _perfilDesdeDoc(String id, Map<String, dynamic> data) {
     final createdDate = data['createdDate'] is String

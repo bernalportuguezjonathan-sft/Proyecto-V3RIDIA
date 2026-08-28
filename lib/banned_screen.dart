@@ -83,12 +83,14 @@ class BannedScreen extends StatelessWidget {
                   ),
                 ),
                 const Spacer(),
-                FilledButton.icon(
-                  onPressed: () => _signOut(context),
-                  icon: const Icon(Icons.logout_rounded, size: 18),
-                  label: const Text('Cerrar sesión y volver al inicio'),
-                  style: FilledButton.styleFrom(
-                    minimumSize: const Size(double.infinity, 52),
+                VeridiaBotonTactil(
+                  child: FilledButton.icon(
+                    onPressed: () => _signOut(context),
+                    icon: const Icon(Icons.logout_rounded, size: 18),
+                    label: const Text('Cerrar sesión y volver al inicio'),
+                    style: FilledButton.styleFrom(
+                      minimumSize: const Size(double.infinity, 52),
+                    ),
                   ),
                 ),
               ],

@@ -232,9 +232,11 @@ class _TarjetaRecompensaState extends State<_TarjetaRecompensa> {
             onPressed: () => Navigator.pop(dialogContext, false),
             child: const Text('Cancelar'),
           ),
-          FilledButton(
-            onPressed: () => Navigator.pop(dialogContext, true),
-            child: const Text('Canjear'),
+          VeridiaBotonTactil(
+            child: FilledButton(
+              onPressed: () => Navigator.pop(dialogContext, true),
+              child: const Text('Canjear'),
+            ),
           ),
         ],
       ),
@@ -346,19 +348,21 @@ class _TarjetaRecompensaState extends State<_TarjetaRecompensa> {
                   dense: true,
                 )
               else
-                FilledButton(
-                  onPressed: alcanza && !_procesando ? _confirmarCanje : null,
-                  child: _procesando
-                      ? const SizedBox(
-                          width: 16,
-                          height: 16,
-                          child: CircularProgressIndicator(strokeWidth: 2),
-                        )
-                      : Text(
-                          alcanza
-                              ? 'Canjear'
-                              : 'Faltan ${recompensa.costo - widget.saldo}',
-                        ),
+                VeridiaBotonTactil(
+                  child: FilledButton(
+                    onPressed: alcanza && !_procesando ? _confirmarCanje : null,
+                    child: _procesando
+                        ? const SizedBox(
+                            width: 16,
+                            height: 16,
+                            child: CircularProgressIndicator(strokeWidth: 2),
+                          )
+                        : Text(
+                            alcanza
+                                ? 'Canjear'
+                                : 'Faltan ${recompensa.costo - widget.saldo}',
+                          ),
+                  ),
                 ),
             ],
           ),

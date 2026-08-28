@@ -634,101 +634,107 @@ class _ProfileScreenState extends State<ProfileScreen> {
                           Row(
                             children: [
                               Expanded(
-                                child: ElevatedButton(
-                                  onPressed: _isSaving
-                                      ? null
-                                      : _saveProfileChanges,
-                                  style: ElevatedButton.styleFrom(
-                                    backgroundColor:
-                                        VeridiaColors.surfaceContainer,
-                                    foregroundColor: VeridiaColors.primary,
-                                    shape: RoundedRectangleBorder(
-                                      borderRadius: BorderRadius.circular(12),
+                                child: VeridiaBotonTactil(
+                                  child: ElevatedButton(
+                                    onPressed: _isSaving
+                                        ? null
+                                        : _saveProfileChanges,
+                                    style: ElevatedButton.styleFrom(
+                                      backgroundColor:
+                                          VeridiaColors.surfaceContainer,
+                                      foregroundColor: VeridiaColors.primary,
+                                      shape: RoundedRectangleBorder(
+                                        borderRadius: BorderRadius.circular(12),
+                                      ),
                                     ),
-                                  ),
-                                  child: Padding(
-                                    padding: const EdgeInsets.symmetric(
-                                      vertical: 12,
-                                      horizontal: 24,
+                                    child: Padding(
+                                      padding: const EdgeInsets.symmetric(
+                                        vertical: 12,
+                                        horizontal: 24,
+                                      ),
+                                      child: _isSaving
+                                          ? const SizedBox(
+                                              width: 18,
+                                              height: 18,
+                                              child: CircularProgressIndicator(
+                                                color: VeridiaColors.primary,
+                                                strokeWidth: 2,
+                                              ),
+                                            )
+                                          : const Text(
+                                              'Guardar cambios',
+                                              style: TextStyle(
+                                                fontWeight: FontWeight.bold,
+                                              ),
+                                            ),
                                     ),
-                                    child: _isSaving
-                                        ? const SizedBox(
-                                            width: 18,
-                                            height: 18,
-                                            child: CircularProgressIndicator(
-                                              color: VeridiaColors.primary,
-                                              strokeWidth: 2,
-                                            ),
-                                          )
-                                        : const Text(
-                                            'Guardar cambios',
-                                            style: TextStyle(
-                                              fontWeight: FontWeight.bold,
-                                            ),
-                                          ),
                                   ),
                                 ),
                               ),
                               const SizedBox(width: 12),
                               Expanded(
-                                child: OutlinedButton(
-                                  onPressed: _isSaving
-                                      ? null
-                                      : () {
-                                          setState(() {
-                                            _isEditingProfile = false;
-                                            _selectedProfileImageBytes = null;
-                                            _selectedProfileImageName = null;
-                                            _nameController.text = _userName;
-                                          });
-                                        },
-                                  style: OutlinedButton.styleFrom(
-                                    foregroundColor: VeridiaColors.onSurface,
-                                    side: const BorderSide(
-                                      color: VeridiaColors.outlineVariant,
+                                child: VeridiaBotonTactil(
+                                  child: OutlinedButton(
+                                    onPressed: _isSaving
+                                        ? null
+                                        : () {
+                                            setState(() {
+                                              _isEditingProfile = false;
+                                              _selectedProfileImageBytes = null;
+                                              _selectedProfileImageName = null;
+                                              _nameController.text = _userName;
+                                            });
+                                          },
+                                    style: OutlinedButton.styleFrom(
+                                      foregroundColor: VeridiaColors.onSurface,
+                                      side: const BorderSide(
+                                        color: VeridiaColors.outlineVariant,
+                                      ),
+                                      shape: RoundedRectangleBorder(
+                                        borderRadius: BorderRadius.circular(12),
+                                      ),
                                     ),
-                                    shape: RoundedRectangleBorder(
-                                      borderRadius: BorderRadius.circular(12),
+                                    child: const Padding(
+                                      padding: EdgeInsets.symmetric(
+                                        vertical: 12,
+                                        horizontal: 24,
+                                      ),
+                                      child: Text('Cancelar'),
                                     ),
-                                  ),
-                                  child: const Padding(
-                                    padding: EdgeInsets.symmetric(
-                                      vertical: 12,
-                                      horizontal: 24,
-                                    ),
-                                    child: Text('Cancelar'),
                                   ),
                                 ),
                               ),
                             ],
                           ),
                         ] else ...[
-                          ElevatedButton(
-                            onPressed: () {
-                              setState(() {
-                                _isEditingProfile = true;
-                              });
-                            },
-                            style: ElevatedButton.styleFrom(
-                              backgroundColor: VeridiaColors.surfaceContainer,
-                              foregroundColor: VeridiaColors.primary,
-                              shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(16),
+                          VeridiaBotonTactil(
+                            child: ElevatedButton(
+                              onPressed: () {
+                                setState(() {
+                                  _isEditingProfile = true;
+                                });
+                              },
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: VeridiaColors.surfaceContainer,
+                                foregroundColor: VeridiaColors.primary,
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(16),
+                                ),
+                                elevation: 0,
+                                padding: const EdgeInsets.symmetric(
+                                  vertical: 14,
+                                  horizontal: 24,
+                                ),
                               ),
-                              elevation: 0,
-                              padding: const EdgeInsets.symmetric(
-                                vertical: 14,
-                                horizontal: 24,
-                              ),
-                            ),
-                            child: const Padding(
-                              padding: EdgeInsets.symmetric(
-                                vertical: 12,
-                                horizontal: 24,
-                              ),
-                              child: Text(
-                                'Modificar perfil',
-                                style: TextStyle(fontWeight: FontWeight.bold),
+                              child: const Padding(
+                                padding: EdgeInsets.symmetric(
+                                  vertical: 12,
+                                  horizontal: 24,
+                                ),
+                                child: Text(
+                                  'Modificar perfil',
+                                  style: TextStyle(fontWeight: FontWeight.bold),
+                                ),
                               ),
                             ),
                           ),

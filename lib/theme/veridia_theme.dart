@@ -302,7 +302,10 @@ ThemeData buildVeridiaTheme() {
       style: OutlinedButton.styleFrom(
         foregroundColor: VeridiaColors.primary,
         minimumSize: const Size(0, 48),
-        side: const BorderSide(color: VeridiaColors.outline),
+        // Verde y de 1.6 en vez del gris `outline` de 1: el contorno es lo
+        // único que dibuja a un botón sin relleno, y en gris se perdía contra
+        // el fondo oscuro en vez de leerse como algo que se puede pulsar.
+        side: const BorderSide(color: VeridiaColors.primary, width: 1.6),
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(VeridiaRadii.md),
         ),

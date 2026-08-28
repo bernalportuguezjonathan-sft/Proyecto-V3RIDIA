@@ -607,18 +607,23 @@ class _LoginScreenState extends State<LoginScreen>
                                 ),
                               ),
                               const SizedBox(height: 20),
-                              FilledButton(
-                                onPressed: _segundosRestantesBloqueo > 0
-                                    ? null
-                                    : _iniciarSesion,
-                                style: FilledButton.styleFrom(
-                                  minimumSize: const Size(double.infinity, 52),
-                                ),
-                                child: Text(
-                                  _segundosRestantesBloqueo > 0
-                                      ? 'Intenta de nuevo en '
-                                            '${_segundosRestantesBloqueo}s'
-                                      : 'Entrar',
+                              VeridiaBotonTactil(
+                                child: FilledButton(
+                                  onPressed: _segundosRestantesBloqueo > 0
+                                      ? null
+                                      : _iniciarSesion,
+                                  style: FilledButton.styleFrom(
+                                    minimumSize: const Size(
+                                      double.infinity,
+                                      52,
+                                    ),
+                                  ),
+                                  child: Text(
+                                    _segundosRestantesBloqueo > 0
+                                        ? 'Intenta de nuevo en '
+                                              '${_segundosRestantesBloqueo}s'
+                                        : 'Entrar',
+                                  ),
                                 ),
                               ),
                               AnimatedVisibility(
@@ -644,19 +649,21 @@ class _LoginScreenState extends State<LoginScreen>
                                       ],
                                     ),
                                     const SizedBox(height: 16),
-                                    OutlinedButton.icon(
-                                      onPressed: _signInWithGoogle,
-                                      icon: const GoogleLogoIcon(size: 20),
-                                      label: const Text(
-                                        'Iniciar sesión con Google',
-                                      ),
-                                      style: OutlinedButton.styleFrom(
-                                        minimumSize: const Size(
-                                          double.infinity,
-                                          52,
+                                    VeridiaBotonTactil(
+                                      child: OutlinedButton.icon(
+                                        onPressed: _signInWithGoogle,
+                                        icon: const GoogleLogoIcon(size: 20),
+                                        label: const Text(
+                                          'Iniciar sesión con Google',
                                         ),
-                                        foregroundColor:
-                                            VeridiaColors.onSurface,
+                                        style: OutlinedButton.styleFrom(
+                                          minimumSize: const Size(
+                                            double.infinity,
+                                            52,
+                                          ),
+                                          foregroundColor:
+                                              VeridiaColors.onSurface,
+                                        ),
                                       ),
                                     ),
                                   ],

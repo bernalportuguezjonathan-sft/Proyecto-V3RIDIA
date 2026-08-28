@@ -105,31 +105,33 @@ class _HistoryScreenState extends State<HistoryScreen>
             onPressed: () => Navigator.pop(context),
             child: const Text('Cancelar'),
           ),
-          ElevatedButton(
-            onPressed: () async {
-              if (formKey.currentState?.validate() ?? false) {
-                final navigator = Navigator.of(context);
-                await ObservationRepository.instance.updateObservation(
-                  Observation(
-                    id: captura.id,
-                    commonName: commonNameController.text.trim(),
-                    scientificName: scientificNameController.text.trim(),
-                    location: locationController.text.trim(),
-                    notes: notesController.text.trim(),
-                    dateTime: captura.dateTime,
-                    imagePath: captura.imagePath,
-                    latitude: captura.latitude,
-                    longitude: captura.longitude,
-                    type: captura.type,
-                    userId: captura.userId,
-                    userDisplayName: captura.userDisplayName,
-                  ),
-                );
-                navigator.pop();
-              }
-            },
-            style: ElevatedButton.styleFrom(),
-            child: const Text('Guardar'),
+          VeridiaBotonTactil(
+            child: ElevatedButton(
+              onPressed: () async {
+                if (formKey.currentState?.validate() ?? false) {
+                  final navigator = Navigator.of(context);
+                  await ObservationRepository.instance.updateObservation(
+                    Observation(
+                      id: captura.id,
+                      commonName: commonNameController.text.trim(),
+                      scientificName: scientificNameController.text.trim(),
+                      location: locationController.text.trim(),
+                      notes: notesController.text.trim(),
+                      dateTime: captura.dateTime,
+                      imagePath: captura.imagePath,
+                      latitude: captura.latitude,
+                      longitude: captura.longitude,
+                      type: captura.type,
+                      userId: captura.userId,
+                      userDisplayName: captura.userDisplayName,
+                    ),
+                  );
+                  navigator.pop();
+                }
+              },
+              style: ElevatedButton.styleFrom(),
+              child: const Text('Guardar'),
+            ),
           ),
         ],
       ),

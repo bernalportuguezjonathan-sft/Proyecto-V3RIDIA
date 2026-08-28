@@ -125,58 +125,60 @@ class _ChallengesScreenState extends State<ChallengesScreen> {
               onPressed: () => Navigator.pop(context),
               child: const Text('Cancelar'),
             ),
-            ElevatedButton(
-              onPressed: () async {
-                if (formKey.currentState?.validate() ?? false) {
-                  final navigator = Navigator.of(context);
-                  final messenger = ScaffoldMessenger.of(context);
-                  try {
-                    if (challenge == null) {
-                      await ChallengeRepository.instance.addChallenge(
-                        Challenge(
-                          id: ChallengeRepository.instance.nuevoId(),
-                          title: titleController.text.trim(),
-                          description: descriptionController.text.trim(),
-                          targetSpecies: speciesController.text.trim(),
-                          targetGoal: int.parse(goalController.text),
-                          dueDate: selectedDate,
-                          createdDate: DateTime.now(),
-                        ),
+            VeridiaBotonTactil(
+              child: ElevatedButton(
+                onPressed: () async {
+                  if (formKey.currentState?.validate() ?? false) {
+                    final navigator = Navigator.of(context);
+                    final messenger = ScaffoldMessenger.of(context);
+                    try {
+                      if (challenge == null) {
+                        await ChallengeRepository.instance.addChallenge(
+                          Challenge(
+                            id: ChallengeRepository.instance.nuevoId(),
+                            title: titleController.text.trim(),
+                            description: descriptionController.text.trim(),
+                            targetSpecies: speciesController.text.trim(),
+                            targetGoal: int.parse(goalController.text),
+                            dueDate: selectedDate,
+                            createdDate: DateTime.now(),
+                          ),
+                        );
+                      } else {
+                        // copyWith y no un Challenge nuevo: construirlo a
+                        // mano perdía a quién estaba asignado y si el bono ya
+                        // se había pagado, y el desafío se volvía global y
+                        // volvía a pagar bono al cerrarse.
+                        await ChallengeRepository.instance.updateChallenge(
+                          challenge.copyWith(
+                            title: titleController.text.trim(),
+                            description: descriptionController.text.trim(),
+                            targetSpecies: speciesController.text.trim(),
+                            targetGoal: int.parse(goalController.text),
+                            dueDate: selectedDate,
+                          ),
+                        );
+                      }
+                    } catch (e) {
+                      messenger.showSnackBar(
+                        SnackBar(content: Text('No se pudo guardar: $e')),
                       );
-                    } else {
-                      // copyWith y no un Challenge nuevo: construirlo a
-                      // mano perdía a quién estaba asignado y si el bono ya
-                      // se había pagado, y el desafío se volvía global y
-                      // volvía a pagar bono al cerrarse.
-                      await ChallengeRepository.instance.updateChallenge(
-                        challenge.copyWith(
-                          title: titleController.text.trim(),
-                          description: descriptionController.text.trim(),
-                          targetSpecies: speciesController.text.trim(),
-                          targetGoal: int.parse(goalController.text),
-                          dueDate: selectedDate,
-                        ),
-                      );
+                      return;
                     }
-                  } catch (e) {
-                    messenger.showSnackBar(
-                      SnackBar(content: Text('No se pudo guardar: $e')),
-                    );
-                    return;
+                    navigator.pop();
                   }
-                  navigator.pop();
-                }
-              },
-              style: ElevatedButton.styleFrom(
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(16),
+                },
+                style: ElevatedButton.styleFrom(
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(16),
+                  ),
+                  padding: const EdgeInsets.symmetric(
+                    vertical: 14,
+                    horizontal: 24,
+                  ),
                 ),
-                padding: const EdgeInsets.symmetric(
-                  vertical: 14,
-                  horizontal: 24,
-                ),
+                child: const Text('Guardar'),
               ),
-              child: const Text('Guardar'),
             ),
           ],
         ),
@@ -611,94 +613,96 @@ class _ChallengesScreenState extends State<ChallengesScreen> {
                                                 ?.role !=
                                             'Administrador')
                                           Expanded(
-                                            child: completado
-                                                ? OutlinedButton.icon(
-                                                    onPressed: () =>
-                                                        abrirRecompensas(
-                                                          context,
-                                                        ),
-                                                    icon: const Icon(
-                                                      Icons
-                                                          .card_giftcard_rounded,
-                                                      size: 18,
-                                                    ),
-                                                    label: const Text(
-                                                      'Canjear Veridiums',
-                                                    ),
-                                                    style: OutlinedButton.styleFrom(
-                                                      foregroundColor:
-                                                          VeridiaColors
+                                            child: VeridiaBotonTactil(
+                                              child: completado
+                                                  ? OutlinedButton.icon(
+                                                      onPressed: () =>
+                                                          abrirRecompensas(
+                                                            context,
+                                                          ),
+                                                      icon: const Icon(
+                                                        Icons
+                                                            .card_giftcard_rounded,
+                                                        size: 18,
+                                                      ),
+                                                      label: const Text(
+                                                        'Canjear Veridiums',
+                                                      ),
+                                                      style: OutlinedButton.styleFrom(
+                                                        foregroundColor:
+                                                            VeridiaColors
+                                                                .veridium,
+                                                        side: const BorderSide(
+                                                          color: VeridiaColors
                                                               .veridium,
-                                                      side: const BorderSide(
-                                                        color: VeridiaColors
-                                                            .veridium,
-                                                      ),
-                                                      shape: RoundedRectangleBorder(
-                                                        borderRadius:
-                                                            BorderRadius.circular(
-                                                              16,
-                                                            ),
-                                                      ),
-                                                      padding:
-                                                          const EdgeInsets.symmetric(
-                                                            vertical: 14,
-                                                          ),
-                                                    ),
-                                                  )
-                                                : ElevatedButton.icon(
-                                                    onPressed:
-                                                        _analizando.contains(
-                                                          challenge.id,
-                                                        )
-                                                        ? null
-                                                        : () =>
-                                                              _capturarParaDesafio(
-                                                                challenge,
+                                                        ),
+                                                        shape: RoundedRectangleBorder(
+                                                          borderRadius:
+                                                              BorderRadius.circular(
+                                                                16,
                                                               ),
-                                                    icon:
-                                                        _analizando.contains(
-                                                          challenge.id,
-                                                        )
-                                                        ? const SizedBox(
-                                                            width: 16,
-                                                            height: 16,
-                                                            child: CircularProgressIndicator(
-                                                              strokeWidth: 2,
-                                                              color:
-                                                                  VeridiaColors
-                                                                      .onSurface,
+                                                        ),
+                                                        padding:
+                                                            const EdgeInsets.symmetric(
+                                                              vertical: 14,
                                                             ),
-                                                          )
-                                                        : const Icon(
-                                                            Icons
-                                                                .add_a_photo_outlined,
-                                                            size: 18,
-                                                          ),
-                                                    label: Text(
-                                                      _analizando.contains(
+                                                      ),
+                                                    )
+                                                  : ElevatedButton.icon(
+                                                      onPressed:
+                                                          _analizando.contains(
                                                             challenge.id,
                                                           )
-                                                          ? 'Analizando...'
-                                                          : 'Registrar foto',
-                                                    ),
-                                                    style: ElevatedButton.styleFrom(
-                                                      backgroundColor:
-                                                          VeridiaColors.primary,
-                                                      foregroundColor:
-                                                          VeridiaColors
-                                                              .onPrimary,
-                                                      shape: RoundedRectangleBorder(
-                                                        borderRadius:
-                                                            BorderRadius.circular(
-                                                              16,
+                                                          ? null
+                                                          : () =>
+                                                                _capturarParaDesafio(
+                                                                  challenge,
+                                                                ),
+                                                      icon:
+                                                          _analizando.contains(
+                                                            challenge.id,
+                                                          )
+                                                          ? const SizedBox(
+                                                              width: 16,
+                                                              height: 16,
+                                                              child: CircularProgressIndicator(
+                                                                strokeWidth: 2,
+                                                                color: VeridiaColors
+                                                                    .onSurface,
+                                                              ),
+                                                            )
+                                                          : const Icon(
+                                                              Icons
+                                                                  .add_a_photo_outlined,
+                                                              size: 18,
+                                                            ),
+                                                      label: Text(
+                                                        _analizando.contains(
+                                                              challenge.id,
+                                                            )
+                                                            ? 'Analizando...'
+                                                            : 'Registrar foto',
+                                                      ),
+                                                      style: ElevatedButton.styleFrom(
+                                                        backgroundColor:
+                                                            VeridiaColors
+                                                                .primary,
+                                                        foregroundColor:
+                                                            VeridiaColors
+                                                                .onPrimary,
+                                                        shape: RoundedRectangleBorder(
+                                                          borderRadius:
+                                                              BorderRadius.circular(
+                                                                16,
+                                                              ),
+                                                        ),
+                                                        padding:
+                                                            const EdgeInsets.symmetric(
+                                                              vertical: 14,
                                                             ),
                                                       ),
-                                                      padding:
-                                                          const EdgeInsets.symmetric(
-                                                            vertical: 14,
-                                                          ),
                                                     ),
-                                                  ),
+                                            ),
                                           ),
                                         if (UserRepository
                                                 .instance

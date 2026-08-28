@@ -697,23 +697,25 @@ class _MapScreenState extends State<MapScreen> {
               const SizedBox(height: 12),
               SizedBox(
                 width: double.infinity,
-                child: ElevatedButton.icon(
-                  onPressed: () {
-                    Navigator.pop(sheetContext);
-                    Navigator.push(
-                      context,
-                      MaterialPageRoute(
-                        builder: (context) => MapDetailScreen(
-                          zone: zone,
-                          avistamientos: fotosZona,
+                child: VeridiaBotonTactil(
+                  child: ElevatedButton.icon(
+                    onPressed: () {
+                      Navigator.pop(sheetContext);
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (context) => MapDetailScreen(
+                            zone: zone,
+                            avistamientos: fotosZona,
+                          ),
                         ),
-                      ),
-                    );
-                  },
-                  icon: const Icon(Icons.camera_alt),
-                  label: const Text('Ver misión y especies'),
-                  style: ElevatedButton.styleFrom(
-                    padding: const EdgeInsets.symmetric(vertical: 14),
+                      );
+                    },
+                    icon: const Icon(Icons.camera_alt),
+                    label: const Text('Ver misión y especies'),
+                    style: ElevatedButton.styleFrom(
+                      padding: const EdgeInsets.symmetric(vertical: 14),
+                    ),
                   ),
                 ),
               ),
@@ -1000,14 +1002,16 @@ class _MapScreenState extends State<MapScreen> {
               const SizedBox(height: 18),
               SizedBox(
                 width: double.infinity,
-                child: FilledButton.icon(
-                  onPressed: () async {
-                    Navigator.pop(hoja);
-                    await abrirRefugio(context);
-                    if (mounted) setState(_recalcularConsejo);
-                  },
-                  icon: const Icon(Icons.pets_rounded, size: 18),
-                  label: const Text('Cambiar de compañero'),
+                child: VeridiaBotonTactil(
+                  child: FilledButton.icon(
+                    onPressed: () async {
+                      Navigator.pop(hoja);
+                      await abrirRefugio(context);
+                      if (mounted) setState(_recalcularConsejo);
+                    },
+                    icon: const Icon(Icons.pets_rounded, size: 18),
+                    label: const Text('Cambiar de compañero'),
+                  ),
                 ),
               ),
             ],
@@ -1018,8 +1022,7 @@ class _MapScreenState extends State<MapScreen> {
   }
 
   Widget _controlesMapa() {
-    final esAdmin =
-        UserRepository.instance.currentUser.value?.role == 'Administrador';
+    final esAdmin = UserRepository.instance.esAdmin;
 
     return Column(
       mainAxisSize: MainAxisSize.min,
@@ -1756,13 +1759,18 @@ class _MapScreenState extends State<MapScreen> {
   @override
   Widget build(BuildContext context) {
     final speciesList = getAvailableSpecies(_birdZones);
+    // El explorador llega aquí por la barra inferior (una pestaña más, sin
+    // "salir" de nada); el administrador llega con Navigator.push desde su
+    // panel y SÍ necesita cómo volver -si no, queda encerrado en el mapa sin
+    // la barra inferior (se la quitamos) ni flecha de regreso.
+    final esAdmin = UserRepository.instance.esAdmin;
 
     if (_isLoadingZones) {
       return Scaffold(
         appBar: AppBar(
           title: const Text('Mapa de especies - Cundinamarca'),
           centerTitle: true,
-          automaticallyImplyLeading: false,
+          automaticallyImplyLeading: esAdmin,
         ),
         body: const Center(child: CircularProgressIndicator()),
       );
@@ -1770,9 +1778,7 @@ class _MapScreenState extends State<MapScreen> {
 
     return Scaffold(
       appBar: AppBar(
-        // Sin flecha de retroceso: el mapa es una sección de la barra
-        // inferior, no una pantalla apilada de la que haya que "salir".
-        automaticallyImplyLeading: false,
+        automaticallyImplyLeading: esAdmin,
         title: const Text(
           'Mapa De Especies - Cundinamarca',
           style: TextStyle(

@@ -99,23 +99,25 @@ class _PrivacySecurityScreenState extends State<PrivacySecurityScreen> {
                     const SizedBox(height: 16),
                     SizedBox(
                       width: double.infinity,
-                      child: OutlinedButton.icon(
-                        onPressed: _email == null || _enviandoCorreo
-                            ? null
-                            : _enviarCorreoDeCambioClave,
-                        icon: _enviandoCorreo
-                            ? const SizedBox(
-                                width: 16,
-                                height: 16,
-                                child: CircularProgressIndicator(
-                                  strokeWidth: 2,
-                                ),
-                              )
-                            : const Icon(Icons.lock_reset, size: 18),
-                        label: Text(
-                          _enviandoCorreo
-                              ? 'Enviando...'
-                              : 'Cambiar contraseña por correo',
+                      child: VeridiaBotonTactil(
+                        child: OutlinedButton.icon(
+                          onPressed: _email == null || _enviandoCorreo
+                              ? null
+                              : _enviarCorreoDeCambioClave,
+                          icon: _enviandoCorreo
+                              ? const SizedBox(
+                                  width: 16,
+                                  height: 16,
+                                  child: CircularProgressIndicator(
+                                    strokeWidth: 2,
+                                  ),
+                                )
+                              : const Icon(Icons.lock_reset, size: 18),
+                          label: Text(
+                            _enviandoCorreo
+                                ? 'Enviando...'
+                                : 'Cambiar contraseña por correo',
+                          ),
                         ),
                       ),
                     ),

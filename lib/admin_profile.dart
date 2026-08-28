@@ -543,49 +543,53 @@ class _AdminProfileScreenState extends State<AdminProfileScreen> {
                     Row(
                       children: [
                         Expanded(
-                          child: ElevatedButton(
-                            onPressed: _isSaving ? null : _saveProfileChanges,
-                            style: ElevatedButton.styleFrom(
-                              shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(12),
+                          child: VeridiaBotonTactil(
+                            child: ElevatedButton(
+                              onPressed: _isSaving ? null : _saveProfileChanges,
+                              style: ElevatedButton.styleFrom(
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(12),
+                                ),
                               ),
+                              child: _isSaving
+                                  ? const SizedBox(
+                                      width: 18,
+                                      height: 18,
+                                      child: CircularProgressIndicator(
+                                        color: VeridiaColors.onSurface,
+                                        strokeWidth: 2,
+                                      ),
+                                    )
+                                  : const Text(
+                                      'Guardar',
+                                      style: TextStyle(
+                                        fontWeight: FontWeight.bold,
+                                      ),
+                                    ),
                             ),
-                            child: _isSaving
-                                ? const SizedBox(
-                                    width: 18,
-                                    height: 18,
-                                    child: CircularProgressIndicator(
-                                      color: VeridiaColors.onSurface,
-                                      strokeWidth: 2,
-                                    ),
-                                  )
-                                : const Text(
-                                    'Guardar',
-                                    style: TextStyle(
-                                      fontWeight: FontWeight.bold,
-                                    ),
-                                  ),
                           ),
                         ),
                         const SizedBox(width: 12),
                         Expanded(
-                          child: OutlinedButton(
-                            onPressed: () {
-                              setState(() {
-                                _isEditingProfile = false;
-                                _selectedProfileImageBytes = null;
-                                _nameController.text = _userName;
-                              });
-                            },
-                            style: OutlinedButton.styleFrom(
-                              side: const BorderSide(
-                                color: VeridiaColors.primary,
+                          child: VeridiaBotonTactil(
+                            child: OutlinedButton(
+                              onPressed: () {
+                                setState(() {
+                                  _isEditingProfile = false;
+                                  _selectedProfileImageBytes = null;
+                                  _nameController.text = _userName;
+                                });
+                              },
+                              style: OutlinedButton.styleFrom(
+                                side: const BorderSide(
+                                  color: VeridiaColors.primary,
+                                ),
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(12),
+                                ),
                               ),
-                              shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(12),
-                              ),
+                              child: const Text('Cancelar'),
                             ),
-                            child: const Text('Cancelar'),
                           ),
                         ),
                       ],
@@ -593,24 +597,26 @@ class _AdminProfileScreenState extends State<AdminProfileScreen> {
                   else
                     SizedBox(
                       width: double.infinity,
-                      child: ElevatedButton.icon(
-                        onPressed: () =>
-                            setState(() => _isEditingProfile = true),
-                        icon: const Icon(
-                          Icons.edit,
-                          color: VeridiaColors.onSurface,
-                        ),
-                        label: const Text(
-                          'Editar Perfil',
-                          style: TextStyle(
-                            fontWeight: FontWeight.bold,
+                      child: VeridiaBotonTactil(
+                        child: ElevatedButton.icon(
+                          onPressed: () =>
+                              setState(() => _isEditingProfile = true),
+                          icon: const Icon(
+                            Icons.edit,
                             color: VeridiaColors.onSurface,
                           ),
-                        ),
-                        style: ElevatedButton.styleFrom(
-                          padding: const EdgeInsets.symmetric(vertical: 14),
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(12),
+                          label: const Text(
+                            'Editar Perfil',
+                            style: TextStyle(
+                              fontWeight: FontWeight.bold,
+                              color: VeridiaColors.onSurface,
+                            ),
+                          ),
+                          style: ElevatedButton.styleFrom(
+                            padding: const EdgeInsets.symmetric(vertical: 14),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(12),
+                            ),
                           ),
                         ),
                       ),

@@ -594,38 +594,42 @@ class _IdentifySpeciesScreenState extends State<IdentifySpeciesScreen> {
                           const SizedBox(height: 16),
                           SizedBox(
                             width: double.infinity,
-                            child: OutlinedButton.icon(
-                              onPressed: _isAnalyzing ? null : _analizarConIA,
-                              icon: _isAnalyzing
-                                  ? const SizedBox(
-                                      width: 16,
-                                      height: 16,
-                                      child: CircularProgressIndicator(
-                                        strokeWidth: 2,
-                                        color: VeridiaColors.primary,
+                            child: VeridiaBotonTactil(
+                              child: OutlinedButton.icon(
+                                onPressed: _isAnalyzing ? null : _analizarConIA,
+                                icon: _isAnalyzing
+                                    ? const SizedBox(
+                                        width: 16,
+                                        height: 16,
+                                        child: CircularProgressIndicator(
+                                          strokeWidth: 2,
+                                          color: VeridiaColors.primary,
+                                        ),
+                                      )
+                                    : const VeridiaChispaIA(
+                                        child: Icon(
+                                          Icons.auto_awesome,
+                                          color: VeridiaColors.primary,
+                                        ),
                                       ),
-                                    )
-                                  : const Icon(
-                                      Icons.auto_awesome,
-                                      color: VeridiaColors.primary,
-                                    ),
-                              label: Text(
-                                _isAnalyzing
-                                    ? 'Analizando foto...'
-                                    : _aiResult == null
-                                    ? 'Analizar con IA'
-                                    : 'Analizar de nuevo',
-                              ),
-                              style: OutlinedButton.styleFrom(
-                                foregroundColor: VeridiaColors.primary,
-                                side: const BorderSide(
-                                  color: VeridiaColors.primary,
+                                label: Text(
+                                  _isAnalyzing
+                                      ? 'Analizando foto...'
+                                      : _aiResult == null
+                                      ? 'Analizar con IA'
+                                      : 'Analizar de nuevo',
                                 ),
-                                padding: const EdgeInsets.symmetric(
-                                  vertical: 12,
-                                ),
-                                shape: RoundedRectangleBorder(
-                                  borderRadius: BorderRadius.circular(10),
+                                style: OutlinedButton.styleFrom(
+                                  foregroundColor: VeridiaColors.primary,
+                                  side: const BorderSide(
+                                    color: VeridiaColors.primary,
+                                  ),
+                                  padding: const EdgeInsets.symmetric(
+                                    vertical: 12,
+                                  ),
+                                  shape: RoundedRectangleBorder(
+                                    borderRadius: BorderRadius.circular(10),
+                                  ),
                                 ),
                               ),
                             ),
@@ -735,32 +739,36 @@ class _IdentifySpeciesScreenState extends State<IdentifySpeciesScreen> {
                           const SizedBox(height: 16),
                           SizedBox(
                             width: double.infinity,
-                            child: ElevatedButton(
-                              onPressed: _isSaving ? null : _guardarObservacion,
-                              style: ElevatedButton.styleFrom(
-                                padding: const EdgeInsets.symmetric(
-                                  vertical: 14,
+                            child: VeridiaBotonTactil(
+                              child: ElevatedButton(
+                                onPressed: _isSaving
+                                    ? null
+                                    : _guardarObservacion,
+                                style: ElevatedButton.styleFrom(
+                                  padding: const EdgeInsets.symmetric(
+                                    vertical: 14,
+                                  ),
+                                  shape: RoundedRectangleBorder(
+                                    borderRadius: BorderRadius.circular(10),
+                                  ),
                                 ),
-                                shape: RoundedRectangleBorder(
-                                  borderRadius: BorderRadius.circular(10),
-                                ),
+                                child: _isSaving
+                                    ? const SizedBox(
+                                        width: 20,
+                                        height: 20,
+                                        child: CircularProgressIndicator(
+                                          strokeWidth: 2,
+                                          color: VeridiaColors.onSurface,
+                                        ),
+                                      )
+                                    : const Text(
+                                        'Guardar observación',
+                                        style: TextStyle(
+                                          color: VeridiaColors.onSurface,
+                                          fontWeight: FontWeight.w600,
+                                        ),
+                                      ),
                               ),
-                              child: _isSaving
-                                  ? const SizedBox(
-                                      width: 20,
-                                      height: 20,
-                                      child: CircularProgressIndicator(
-                                        strokeWidth: 2,
-                                        color: VeridiaColors.onSurface,
-                                      ),
-                                    )
-                                  : const Text(
-                                      'Guardar observación',
-                                      style: TextStyle(
-                                        color: VeridiaColors.onSurface,
-                                        fontWeight: FontWeight.w600,
-                                      ),
-                                    ),
                             ),
                           ),
                         ],
@@ -985,6 +993,9 @@ class _PreviaMascota extends StatelessWidget {
             padding: const EdgeInsets.all(12),
             borderColor: acento.withValues(alpha: 0.45),
             onTap: () => abrirRefugio(context),
+            // Su propio contenido YA es la mascota: no se le suma la
+            // animación de prensado encima.
+            animarPresion: false,
             child: Row(
               children: [
                 MascotaVista(

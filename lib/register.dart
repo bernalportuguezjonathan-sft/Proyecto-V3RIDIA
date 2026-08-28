@@ -615,12 +615,17 @@ class _RegisterScreenState extends State<RegisterScreen>
                                 ),
                               ),
                               const SizedBox(height: 22),
-                              FilledButton(
-                                onPressed: _registrarUsuario,
-                                style: FilledButton.styleFrom(
-                                  minimumSize: const Size(double.infinity, 52),
+                              VeridiaBotonTactil(
+                                child: FilledButton(
+                                  onPressed: _registrarUsuario,
+                                  style: FilledButton.styleFrom(
+                                    minimumSize: const Size(
+                                      double.infinity,
+                                      52,
+                                    ),
+                                  ),
+                                  child: const Text('Registrarse'),
                                 ),
-                                child: const Text('Registrarse'),
                               ),
                               AnimatedVisibility(
                                 visible: _selectedRole != 'Administrador',
@@ -645,19 +650,21 @@ class _RegisterScreenState extends State<RegisterScreen>
                                       ],
                                     ),
                                     const SizedBox(height: 16),
-                                    OutlinedButton.icon(
-                                      onPressed: _registrarseConGoogle,
-                                      icon: const GoogleLogoIcon(size: 20),
-                                      label: const Text(
-                                        'Registrarse con Google',
-                                      ),
-                                      style: OutlinedButton.styleFrom(
-                                        minimumSize: const Size(
-                                          double.infinity,
-                                          52,
+                                    VeridiaBotonTactil(
+                                      child: OutlinedButton.icon(
+                                        onPressed: _registrarseConGoogle,
+                                        icon: const GoogleLogoIcon(size: 20),
+                                        label: const Text(
+                                          'Registrarse con Google',
                                         ),
-                                        foregroundColor:
-                                            VeridiaColors.onSurface,
+                                        style: OutlinedButton.styleFrom(
+                                          minimumSize: const Size(
+                                            double.infinity,
+                                            52,
+                                          ),
+                                          foregroundColor:
+                                              VeridiaColors.onSurface,
+                                        ),
                                       ),
                                     ),
                                   ],

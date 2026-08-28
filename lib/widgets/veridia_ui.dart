@@ -1,5 +1,38 @@
 import 'package:flutter/material.dart';
+import '../models/user.dart';
+import '../services/repositorio_u.dart';
 import '../theme/veridia_theme.dart';
+
+/// Alto del canto sólido que llevan botones y tarjetas: el "grosor" de la
+/// pieza. Cabe de sobra en los 12px de separación que ya usan las cuadrículas
+/// de Inicio y del panel de administración.
+const double _altoCanto = 5;
+
+/// Sombra ambiental suave: separa la pieza del fondo sin dibujar el canto.
+/// `Colors.black` no es un color nuevo -es el mismo `shadow` que ya declara
+/// `_colorScheme` en veridia_theme.dart.
+List<BoxShadow> _sombraAmbiente({double intensidad = 1}) => [
+  BoxShadow(
+    color: Colors.black.withValues(alpha: 0.38 * intensidad),
+    offset: Offset(0, 4 * intensidad),
+    blurRadius: 11 * intensidad,
+    spreadRadius: -3,
+  ),
+];
+
+/// Canto inferior SÓLIDO -sin desenfoque- que convierte una superficie plana
+/// en una pieza con grosor: es la marca de los botones tipo Duolingo.
+///
+/// Al presionar, la cara de arriba baja [_altoCanto] píxeles y el canto se
+/// encoge lo mismo, así que el borde de ABAJO no se mueve nunca: se lee como
+/// que la pieza se hunde contra una base fija, no como que todo se desplaza.
+///
+/// Solo funciona sobre fondos OPACOS. En un botón transparente
+/// (`OutlinedButton`) este bloque se vería a través del centro y parecería
+/// relleno, por eso quien lo usa decide si aplicarlo (ver `_cantoSolido` en
+/// [VeridiaBotonTactil]).
+BoxShadow _canto(Color color, double alto) =>
+    BoxShadow(color: color, offset: Offset(0, alto), blurRadius: 0);
 
 /// Fondo de la app: negro verdoso con dos halos de verde neón muy difusos.
 class VeridiaBackground extends StatelessWidget {
@@ -34,6 +67,7 @@ class VeridiaCard extends StatelessWidget {
     this.color,
     this.radius = VeridiaRadii.lg,
     this.glow = false,
+    this.animarPresion = true,
   });
 
   final Widget child;
@@ -44,39 +78,493 @@ class VeridiaCard extends StatelessWidget {
   final double radius;
   final bool glow;
 
+  /// Apaga la animación de "prensado" en tarjetas tocables cuyo contenido YA
+  /// es una mascota o un accesorio (ver identify_species.dart y
+  /// refugio.dart): siguen siendo tocables, solo sin este efecto encima.
+  final bool animarPresion;
+
+  /// Verde de contorno por defecto. Antes era `outlineVariant` (un gris
+  /// verdoso apagado); el verde hace que cada superficie se lea como una
+  /// pieza propia y no como un rectángulo más oscuro sobre el fondo.
+  static const bordePorDefecto = Color(0x59A1D494); // primary al 35%
+
   @override
   Widget build(BuildContext context) {
+    // Sin sombras cuando la tarjeta es tocable: en ese caso las dibuja
+    // _VeridiaCardTocable, que necesita animar el canto al presionar.
+    final animada = onTap != null && animarPresion;
+
     final content = Container(
       padding: padding,
       decoration: BoxDecoration(
         color: color ?? VeridiaColors.surfaceContainer,
         borderRadius: BorderRadius.circular(radius),
-        border: Border.all(color: borderColor ?? VeridiaColors.outlineVariant),
-        boxShadow: glow
-            ? [
-                BoxShadow(
-                  color: VeridiaColors.secondary.withValues(alpha: 0.12),
-                  blurRadius: 24,
-                  spreadRadius: -4,
-                ),
-              ]
-            : null,
+        border: Border.all(color: borderColor ?? bordePorDefecto),
+        boxShadow: animada
+            ? null
+            : [
+                _canto(VeridiaColors.surfaceContainerLowest, _altoCanto),
+                ..._sombraAmbiente(),
+                if (glow)
+                  BoxShadow(
+                    color: VeridiaColors.secondary.withValues(alpha: 0.12),
+                    blurRadius: 24,
+                    spreadRadius: -4,
+                  ),
+              ],
       ),
       child: child,
     );
 
     if (onTap == null) return content;
 
-    return Material(
-      color: Colors.transparent,
-      borderRadius: BorderRadius.circular(radius),
-      child: InkWell(
-        onTap: onTap,
+    if (!animarPresion) {
+      return Material(
+        color: Colors.transparent,
         borderRadius: BorderRadius.circular(radius),
-        splashColor: VeridiaColors.primary.withValues(alpha: 0.10),
-        highlightColor: VeridiaColors.primary.withValues(alpha: 0.06),
-        child: content,
+        child: InkWell(
+          onTap: onTap,
+          borderRadius: BorderRadius.circular(radius),
+          splashColor: VeridiaColors.primary.withValues(alpha: 0.10),
+          highlightColor: VeridiaColors.primary.withValues(alpha: 0.06),
+          child: content,
+        ),
+      );
+    }
+
+    return _VeridiaCardTocable(
+      onTap: onTap!,
+      radius: radius,
+      glow: glow,
+      content: content,
+    );
+  }
+}
+
+/// Rama animada de [VeridiaCard]: la tarjeta se HUNDE contra su propio canto
+/// al presionar, en vez de solo cambiar de sombra. Aislada en su propio widget
+/// con estado para que las tarjetas estáticas -la inmensa mayoría- no carguen
+/// con ningún estado ni reconstrucción de más.
+class _VeridiaCardTocable extends StatefulWidget {
+  const _VeridiaCardTocable({
+    required this.onTap,
+    required this.radius,
+    required this.glow,
+    required this.content,
+  });
+
+  final VoidCallback onTap;
+  final double radius;
+  final bool glow;
+  final Widget content;
+
+  @override
+  State<_VeridiaCardTocable> createState() => _VeridiaCardTocableState();
+}
+
+class _VeridiaCardTocableState extends State<_VeridiaCardTocable> {
+  bool _presionado = false;
+
+  /// Solo lo pone `true` un mouse real; en touch nunca se dispara. Mejora
+  /// progresiva para quien usa la web con mouse, igual que en
+  /// [VeridiaBotonTactil].
+  bool _hover = false;
+
+  void _fijar(bool valor) {
+    if (_presionado != valor) setState(() => _presionado = valor);
+  }
+
+  void _alPasarMouse(bool entrando) {
+    if (_hover != entrando) setState(() => _hover = entrando);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final radius = BorderRadius.circular(widget.radius);
+
+    return MouseRegion(
+      onEnter: (_) => _alPasarMouse(true),
+      onExit: (_) => _alPasarMouse(false),
+      child: Listener(
+        onPointerDown: (_) => _fijar(true),
+        onPointerUp: (_) => _fijar(false),
+        onPointerCancel: (_) => _fijar(false),
+        child: _Hundible(
+          presionado: _presionado,
+          hover: _hover,
+          radius: radius,
+          colorCanto: VeridiaColors.surfaceContainerLowest,
+          glow: widget.glow,
+          child: Material(
+            color: Colors.transparent,
+            borderRadius: radius,
+            child: InkWell(
+              onTap: widget.onTap,
+              borderRadius: radius,
+              splashColor: VeridiaColors.primary.withValues(alpha: 0.10),
+              highlightColor: VeridiaColors.primary.withValues(alpha: 0.06),
+              child: widget.content,
+            ),
+          ),
+        ),
       ),
+    );
+  }
+}
+
+/// El mecanismo de "pieza con grosor que se hunde", compartido por las
+/// tarjetas y los botones para que ambos se sientan exactamente igual.
+///
+/// Todo lo que anima es PINTADO (`Transform.translate` + sombras): no toca el
+/// tamaño ni la posición que el padre asignó, así que no puede descuadrar una
+/// cuadrícula -que es justo lo que pasó cuando esto se intentó con un `Stack`
+/// de ajuste flojo-.
+class _Hundible extends StatelessWidget {
+  const _Hundible({
+    required this.presionado,
+    required this.hover,
+    required this.radius,
+    required this.colorCanto,
+    required this.child,
+    this.glow = false,
+    this.conCanto = true,
+  });
+
+  final bool presionado;
+  final bool hover;
+  final BorderRadius radius;
+  final Color colorCanto;
+  final Widget child;
+  final bool glow;
+
+  /// `false` en superficies transparentes (`OutlinedButton`): ahí el canto se
+  /// vería a través del centro y el botón parecería relleno.
+  final bool conCanto;
+
+  @override
+  Widget build(BuildContext context) {
+    return TweenAnimationBuilder<double>(
+      tween: Tween(begin: 0, end: presionado ? 1 : 0),
+      // Bajar es inmediato -responde al dedo-; subir rebota un poco, que es
+      // lo que da la sensación "jugosa" de Duolingo.
+      duration: Duration(milliseconds: presionado ? 90 : 320),
+      curve: presionado ? Curves.easeOut : Curves.easeOutBack,
+      builder: (context, t, hijo) {
+        final hundido = _altoCanto * t;
+        return Transform.translate(
+          offset: Offset(0, hundido),
+          child: DecoratedBox(
+            decoration: BoxDecoration(
+              borderRadius: radius,
+              boxShadow: [
+                // El canto se encoge exactamente lo que la cara baja, así el
+                // borde inferior queda clavado en el mismo sitio.
+                if (conCanto) _canto(colorCanto, _altoCanto - hundido),
+                ..._sombraAmbiente(intensidad: 1 - t * 0.7),
+                if (glow || hover)
+                  BoxShadow(
+                    color: VeridiaColors.secondary.withValues(
+                      alpha: hover ? 0.26 : 0.12,
+                    ),
+                    blurRadius: hover ? 30 : 24,
+                    spreadRadius: -4,
+                  ),
+              ],
+            ),
+            child: hijo,
+          ),
+        );
+      },
+      child: child,
+    );
+  }
+}
+
+/// Envuelve un botón de Material (Filled/Outlined/Elevated) con la misma
+/// profundidad que [_VeridiaCardTocable]: encoge levemente al tocar y hace
+/// *cross-fade* hacia un halo de sombra ya pre-pintado -no anima `boxShadow`
+/// cuadro a cuadro-, y vuelve a su estado normal al soltar.
+///
+/// [radius] es solo una aproximación para dibujar ese halo: no necesita
+/// calzar exacto con el `shape` real del botón envuelto -con un desenfoque
+/// tan grande, un par de píxeles de diferencia en la esquina no se nota-, así
+/// que por defecto usa el radio que ya define el tema para los botones
+/// (`VeridiaRadii.md`) en vez de pedir el dato en cada sitio de uso.
+///
+/// [profundidad] apaga el halo (deja solo el encogido) en espacios chicos y
+/// densos -como los íconos de la barra inferior-, donde se vería amontonado
+/// y esa barra ya trae su propia animación de selección de Material 3.
+///
+/// Usa [Listener] y no [GestureDetector] a propósito: un GestureDetector de
+/// afuera competiría por el mismo gesto con el reconocedor de tap que el
+/// botón YA tiene adentro (su InkWell interno), y esa disputa de gestos a
+/// veces se traga el onPressed real. Listener solo observa el puntero sin
+/// entrar en esa disputa, así que el tap de verdad sigue llegando intacto.
+///
+/// Usa `Stack(fit: StackFit.passthrough)` y no el `loose` por defecto por la
+/// misma razón que [_VeridiaCardTocable]: `loose` deja que el contenido se
+/// encoja a su tamaño natural en vez de llenar el espacio que le dieron -el
+/// mismo bug que rompió el ancho de los Accesos rápidos-, evitado aquí desde
+/// el principio.
+///
+/// Por eso mismo es puramente cosmético: no lee si el botón está habilitado,
+/// así que uno deshabilitado también hace el gesto al tocarlo. Se deja así a
+/// propósito -el color ya apagado del tema comunica que no hace nada- en vez
+/// de duplicar en cada sitio de uso la condición de si está habilitado.
+class VeridiaBotonTactil extends StatefulWidget {
+  const VeridiaBotonTactil({
+    super.key,
+    required this.child,
+    this.radius = VeridiaRadii.md,
+    this.profundidad = true,
+  });
+
+  final Widget child;
+  final double radius;
+  final bool profundidad;
+
+  @override
+  State<VeridiaBotonTactil> createState() => _VeridiaBotonTactilState();
+}
+
+class _VeridiaBotonTactilState extends State<VeridiaBotonTactil>
+    with SingleTickerProviderStateMixin {
+  bool _presionado = false;
+
+  /// Solo lo pone `true` un mouse real (`MouseRegion.onEnter`); en touch
+  /// nunca llega a dispararse -no hay puntero que "entre" sin tocar-, así
+  /// que esto es pura mejora progresiva para quien usa la web con mouse.
+  bool _hover = false;
+
+  /// Destello diagonal que cruza el botón una vez al entrar el mouse, o al
+  /// tocar en touch (así ambos mundos reciben el mismo gesto de bienvenida,
+  /// no solo el mouse). 550ms porque es lo que dura el `sh02` de referencia.
+  late final AnimationController _destello = AnimationController(
+    vsync: this,
+    duration: const Duration(milliseconds: 550),
+  );
+
+  @override
+  void dispose() {
+    _destello.dispose();
+    super.dispose();
+  }
+
+  void _fijar(bool valor) {
+    if (_presionado == valor) return;
+    setState(() => _presionado = valor);
+    if (valor) _destello.forward(from: 0);
+  }
+
+  void _alPasarMouse(bool entrando) {
+    if (_hover == entrando) return;
+    setState(() => _hover = entrando);
+    if (entrando) _destello.forward(from: 0);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final radius = BorderRadius.circular(widget.radius);
+
+    // Un OutlinedButton es transparente por dentro: el canto sólido se vería
+    // a través del centro y parecería relleno. La comprobación es sobre la
+    // instancia real, así que un botón que cambia de tipo según su estado
+    // (los hay en desafíos y en moderación) recibe el trato correcto en cada
+    // caso sin tener que declararlo en el sitio de uso.
+    final transparente = widget.child is OutlinedButton;
+
+    final contenido = Stack(
+      clipBehavior: Clip.none,
+      fit: StackFit.passthrough,
+      children: [
+        widget.child,
+        // El destello, recortado a la forma del botón (ClipRRect) para que no
+        // se salga del contorno, y medido en píxeles reales del propio botón
+        // (LayoutBuilder) en vez de un ancho fijo: así se ve igual de bien en
+        // uno angosto de 34px que en uno de ancho completo.
+        Positioned.fill(
+          child: IgnorePointer(
+            child: ClipRRect(
+              borderRadius: radius,
+              child: LayoutBuilder(
+                builder: (context, constraints) {
+                  final ancho = constraints.maxWidth.isFinite
+                      ? constraints.maxWidth
+                      : 120.0;
+                  return AnimatedBuilder(
+                    animation: _destello,
+                    builder: (context, _) => Transform.translate(
+                      offset: Offset(
+                        -ancho * 0.6 + _destello.value * ancho * 1.8,
+                        0,
+                      ),
+                      child: Transform.rotate(
+                        angle: -0.5,
+                        child: Container(
+                          width: ancho * 0.28,
+                          height: ancho * 2,
+                          decoration: BoxDecoration(
+                            gradient: LinearGradient(
+                              colors: [
+                                Colors.transparent,
+                                VeridiaColors.onSurface.withValues(alpha: 0.16),
+                                Colors.transparent,
+                              ],
+                            ),
+                          ),
+                        ),
+                      ),
+                    ),
+                  );
+                },
+              ),
+            ),
+          ),
+        ),
+      ],
+    );
+
+    return MouseRegion(
+      onEnter: (_) => _alPasarMouse(true),
+      onExit: (_) => _alPasarMouse(false),
+      child: Listener(
+        onPointerDown: (_) => _fijar(true),
+        onPointerUp: (_) => _fijar(false),
+        onPointerCancel: (_) => _fijar(false),
+        child: !widget.profundidad
+            // Sin profundidad (los íconos de la barra inferior): solo el
+            // encogido, que en ese espacio tan chico es lo único que cabe.
+            ? AnimatedScale(
+                scale: _presionado ? 0.9 : 1.0,
+                duration: const Duration(milliseconds: 110),
+                curve: Curves.easeOut,
+                child: contenido,
+              )
+            : AnimatedScale(
+                // Solo el mouse agranda; al presionar ya no encoge, porque
+                // ahora el gesto es hundirse contra el canto (ver _Hundible)
+                // y las dos cosas juntas se peleaban.
+                scale: _hover ? 1.03 : 1.0,
+                duration: const Duration(milliseconds: 130),
+                curve: Curves.easeOut,
+                child: _Hundible(
+                  presionado: _presionado,
+                  hover: _hover,
+                  radius: radius,
+                  colorCanto: VeridiaColors.primaryContainer,
+                  conCanto: !transparente,
+                  child: contenido,
+                ),
+              ),
+      ),
+    );
+  }
+}
+
+/// Entrada escalonada: el elemento aparece subiendo y creciendo con un
+/// rebote corto. [indice] retrasa el arranque para que una cuadrícula o una
+/// lista se arme en cascada en vez de aparecer toda de golpe.
+///
+/// El retraso se topa a 8 posiciones a propósito: en una lista larga, un
+/// escalón por elemento haría esperar segundos al último. Después de ese
+/// tope todos entran juntos, que a esa altura ya no se nota.
+///
+/// Anima UNA vez, al montarse. Como el estado sobrevive a las
+/// reconstrucciones del padre, no se vuelve a disparar cada vez que cambia
+/// algo de la pantalla -que sería mareante-.
+class VeridiaAparece extends StatefulWidget {
+  const VeridiaAparece({super.key, required this.child, this.indice = 0});
+
+  final Widget child;
+  final int indice;
+
+  @override
+  State<VeridiaAparece> createState() => _VeridiaApareceState();
+}
+
+class _VeridiaApareceState extends State<VeridiaAparece>
+    with SingleTickerProviderStateMixin {
+  late final AnimationController _c = AnimationController(
+    vsync: this,
+    duration: const Duration(milliseconds: 420),
+  );
+
+  @override
+  void initState() {
+    super.initState();
+    final retraso = 55 * widget.indice.clamp(0, 8);
+    Future<void>.delayed(Duration(milliseconds: retraso), () {
+      if (mounted) _c.forward();
+    });
+  }
+
+  @override
+  void dispose() {
+    _c.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AnimatedBuilder(
+      animation: _c,
+      builder: (context, child) {
+        final t = Curves.easeOutBack.transform(_c.value);
+        return Opacity(
+          // La opacidad se recorta a [0,1]: easeOutBack se pasa de 1 al
+          // rebotar y Opacity no acepta valores fuera de ese rango.
+          opacity: _c.value.clamp(0.0, 1.0),
+          child: Transform.translate(
+            offset: Offset(0, 18 * (1 - t)),
+            child: Transform.scale(scale: 0.92 + 0.08 * t, child: child),
+          ),
+        );
+      },
+      child: widget.child,
+    );
+  }
+}
+
+/// Chispa animada para acentos de IA: el ícono "respira" en un pulso suave y
+/// continuo -escala y opacidad, nada de partículas ni colores nuevos-, la
+/// misma idea del `Icons.auto_awesome` que ya usa la app para identificar
+/// especies. Pensado para UN acento puntual (el botón "Analizar con IA"), no
+/// para aplicarse a los botones comunes: un ícono pulsando todo el tiempo en
+/// cada botón de la app sería ruido, no un acento.
+class VeridiaChispaIA extends StatefulWidget {
+  const VeridiaChispaIA({super.key, required this.child});
+
+  final Widget child;
+
+  @override
+  State<VeridiaChispaIA> createState() => _VeridiaChispaIAState();
+}
+
+class _VeridiaChispaIAState extends State<VeridiaChispaIA>
+    with SingleTickerProviderStateMixin {
+  late final AnimationController _pulso = AnimationController(
+    vsync: this,
+    duration: const Duration(milliseconds: 1400),
+  )..repeat(reverse: true);
+
+  @override
+  void dispose() {
+    _pulso.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AnimatedBuilder(
+      animation: _pulso,
+      builder: (context, child) {
+        final t = Curves.easeInOut.transform(_pulso.value);
+        return Transform.scale(
+          scale: 1 + t * 0.14,
+          child: Opacity(opacity: 0.7 + t * 0.3, child: child),
+        );
+      },
+      child: widget.child,
     );
   }
 }
@@ -275,7 +763,12 @@ class VeridiaEmptyState extends StatelessWidget {
             Text(message, textAlign: TextAlign.center, style: text.bodySmall),
             if (actionLabel != null && onAction != null) ...[
               const SizedBox(height: 20),
-              FilledButton(onPressed: onAction, child: Text(actionLabel!)),
+              VeridiaBotonTactil(
+                child: FilledButton(
+                  onPressed: onAction,
+                  child: Text(actionLabel!),
+                ),
+              ),
             ],
           ],
         ),
@@ -390,7 +883,14 @@ class VeridiaAppBarAction extends StatelessWidget {
   }
 }
 
-/// Barra inferior de las 5 secciones del explorador.
+/// Barra inferior de las 5 secciones del EXPLORADOR.
+///
+/// No se le muestra al administrador. Pantallas como el mapa las usan los dos
+/// roles, y al administrador esta barra lo sacaba de su propia sesión: tocar
+/// cualquier pestaña lo llevaba a Inicio/Cámara/Diario del explorador y, de
+/// paso, borraba el Panel de Administración de la pila de navegación (ver
+/// [VeridiaNav.ir], que conserva solo la primera ruta). El administrador llega
+/// a estas pantallas desde su panel y vuelve con el botón de atrás.
 class VeridiaBottomNav extends StatelessWidget {
   const VeridiaBottomNav({
     super.key,
@@ -403,6 +903,14 @@ class VeridiaBottomNav extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    return ValueListenableBuilder<UserProfile?>(
+      valueListenable: UserRepository.instance.currentUser,
+      builder: (context, perfil, _) =>
+          perfil?.role == rolAdministrador ? const SizedBox.shrink() : _barra(),
+    );
+  }
+
+  Widget _barra() {
     return Container(
       decoration: const BoxDecoration(
         color: VeridiaColors.surfaceContainerLow,
@@ -417,30 +925,60 @@ class VeridiaBottomNav extends StatelessWidget {
           backgroundColor: Colors.transparent,
           surfaceTintColor: Colors.transparent,
           labelBehavior: NavigationDestinationLabelBehavior.alwaysShow,
-          destinations: const [
+          destinations: [
             NavigationDestination(
-              icon: Icon(Icons.home_outlined),
-              selectedIcon: Icon(Icons.home_rounded),
+              icon: const VeridiaBotonTactil(
+                profundidad: false,
+                child: Icon(Icons.home_outlined),
+              ),
+              selectedIcon: const VeridiaBotonTactil(
+                profundidad: false,
+                child: Icon(Icons.home_rounded),
+              ),
               label: 'Inicio',
             ),
             NavigationDestination(
-              icon: Icon(Icons.camera_alt_outlined),
-              selectedIcon: Icon(Icons.camera_alt_rounded),
+              icon: const VeridiaBotonTactil(
+                profundidad: false,
+                child: Icon(Icons.camera_alt_outlined),
+              ),
+              selectedIcon: const VeridiaBotonTactil(
+                profundidad: false,
+                child: Icon(Icons.camera_alt_rounded),
+              ),
               label: 'Cámara',
             ),
             NavigationDestination(
-              icon: Icon(Icons.map_outlined),
-              selectedIcon: Icon(Icons.map_rounded),
+              icon: const VeridiaBotonTactil(
+                profundidad: false,
+                child: Icon(Icons.map_outlined),
+              ),
+              selectedIcon: const VeridiaBotonTactil(
+                profundidad: false,
+                child: Icon(Icons.map_rounded),
+              ),
               label: 'Mapa',
             ),
             NavigationDestination(
-              icon: Icon(Icons.menu_book_outlined),
-              selectedIcon: Icon(Icons.menu_book_rounded),
+              icon: const VeridiaBotonTactil(
+                profundidad: false,
+                child: Icon(Icons.menu_book_outlined),
+              ),
+              selectedIcon: const VeridiaBotonTactil(
+                profundidad: false,
+                child: Icon(Icons.menu_book_rounded),
+              ),
               label: 'Diario',
             ),
             NavigationDestination(
-              icon: Icon(Icons.person_outline),
-              selectedIcon: Icon(Icons.person_rounded),
+              icon: const VeridiaBotonTactil(
+                profundidad: false,
+                child: Icon(Icons.person_outline),
+              ),
+              selectedIcon: const VeridiaBotonTactil(
+                profundidad: false,
+                child: Icon(Icons.person_rounded),
+              ),
               label: 'Perfil',
             ),
           ],

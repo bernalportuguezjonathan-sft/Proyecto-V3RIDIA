@@ -233,73 +233,79 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
               onPressed: () => Navigator.pop(context),
               child: const Text('Cancelar'),
             ),
-            FilledButton(
-              onPressed: () async {
-                if (formKey.currentState?.validate() ?? false) {
-                  final bool isGlobal = selectedTarget == 'global';
-                  final selectedPlayer = isGlobal
-                      ? null
-                      : _players.firstWhere(
-                          (e) => e.userId == selectedTarget,
-                          orElse: () => _players.first,
-                        );
-                  final now = DateTime.now();
-                  final challenge = Challenge(
-                    id: ChallengeRepository.instance.nuevoId(),
-                    title: titleController.text.trim(),
-                    description: descriptionController.text.trim(),
-                    targetSpecies: speciesController.text.trim(),
-                    targetGoal: int.parse(goalController.text),
-                    dueDate: selectedDate,
-                    createdDate: now,
-                    assignedToUserId: selectedPlayer?.userId,
-                    assignedToDisplayName: selectedPlayer?.displayName,
-                    assignedToEmail: selectedPlayer?.email,
-                    assignedByAdmin:
-                        UserRepository.instance.currentUser.value?.email,
-                  );
-
-                  final navigator = Navigator.of(context);
-                  final messenger = ScaffoldMessenger.of(context);
-
-                  try {
-                    await ChallengeRepository.instance.addChallenge(challenge);
-                    await AssignmentRepository.instance.addRecord(
-                      AssignmentRecord(
-                        id: AssignmentRepository.instance.nuevoId(),
-                        challengeId: challenge.id,
-                        challengeTitle: challenge.title,
-                        eventType: isGlobal ? 'Creación global' : 'Asignación',
-                        note: isGlobal
-                            ? 'Disponible para todos los jugadores.'
-                            : 'Asignado a ${selectedPlayer?.displayName}',
-                        targetUserId: selectedPlayer?.userId,
-                        targetUserDisplayName: selectedPlayer?.displayName,
-                        targetUserEmail: selectedPlayer?.email,
-                        assignedByAdmin: challenge.assignedByAdmin,
-                        dateTime: now,
-                      ),
+            VeridiaBotonTactil(
+              child: FilledButton(
+                onPressed: () async {
+                  if (formKey.currentState?.validate() ?? false) {
+                    final bool isGlobal = selectedTarget == 'global';
+                    final selectedPlayer = isGlobal
+                        ? null
+                        : _players.firstWhere(
+                            (e) => e.userId == selectedTarget,
+                            orElse: () => _players.first,
+                          );
+                    final now = DateTime.now();
+                    final challenge = Challenge(
+                      id: ChallengeRepository.instance.nuevoId(),
+                      title: titleController.text.trim(),
+                      description: descriptionController.text.trim(),
+                      targetSpecies: speciesController.text.trim(),
+                      targetGoal: int.parse(goalController.text),
+                      dueDate: selectedDate,
+                      createdDate: now,
+                      assignedToUserId: selectedPlayer?.userId,
+                      assignedToDisplayName: selectedPlayer?.displayName,
+                      assignedToEmail: selectedPlayer?.email,
+                      assignedByAdmin:
+                          UserRepository.instance.currentUser.value?.email,
                     );
-                  } catch (e) {
+
+                    final navigator = Navigator.of(context);
+                    final messenger = ScaffoldMessenger.of(context);
+
+                    try {
+                      await ChallengeRepository.instance.addChallenge(
+                        challenge,
+                      );
+                      await AssignmentRepository.instance.addRecord(
+                        AssignmentRecord(
+                          id: AssignmentRepository.instance.nuevoId(),
+                          challengeId: challenge.id,
+                          challengeTitle: challenge.title,
+                          eventType: isGlobal
+                              ? 'Creación global'
+                              : 'Asignación',
+                          note: isGlobal
+                              ? 'Disponible para todos los jugadores.'
+                              : 'Asignado a ${selectedPlayer?.displayName}',
+                          targetUserId: selectedPlayer?.userId,
+                          targetUserDisplayName: selectedPlayer?.displayName,
+                          targetUserEmail: selectedPlayer?.email,
+                          assignedByAdmin: challenge.assignedByAdmin,
+                          dateTime: now,
+                        ),
+                      );
+                    } catch (e) {
+                      messenger.showSnackBar(
+                        SnackBar(content: Text('No se pudo guardar: $e')),
+                      );
+                      return;
+                    }
+
+                    navigator.pop();
                     messenger.showSnackBar(
-                      SnackBar(content: Text('No se pudo guardar: $e')),
-                    );
-                    return;
-                  }
-
-                  navigator.pop();
-                  messenger.showSnackBar(
-                    SnackBar(
-                      content: Text(
-                        isGlobal
-                            ? 'Desafío global creado'
-                            : 'Asignado a ${selectedPlayer?.displayName}',
+                      SnackBar(
+                        content: Text(
+                          isGlobal
+                              ? 'Desafío global creado'
+                              : 'Asignado a ${selectedPlayer?.displayName}',
+                        ),
                       ),
-                    ),
-                  );
-                }
-              },
-              child: const Text('Guardar'),
+                    );
+                  }
+                },
+                child: const Text('Guardar'),
+              ),
             ),
           ],
         ),
@@ -310,7 +316,6 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
   @override
   Widget build(BuildContext context) {
     final text = Theme.of(context).textTheme;
-    final userProfile = UserRepository.instance.currentUser.value;
 
     return Scaffold(
       appBar: AppBar(
@@ -366,11 +371,20 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
                         const SizedBox(height: 14),
                         Text('Centro de control', style: text.headlineSmall),
                         const SizedBox(height: 6),
-                        Text(
-                          userProfile?.email ?? '',
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          style: text.bodySmall,
+                        // Escucha el perfil en vivo en vez de leerlo una sola
+                        // vez al construir: leyéndolo suelto, esta cabecera se
+                        // quedaba mostrando el correo que hubiera cuando se
+                        // dibujó la pantalla, aunque la sesión ya fuera otra.
+                        // Es exactamente lo que hace que un panel "aparezca"
+                        // con una cuenta que no es la de quien lo está usando.
+                        ValueListenableBuilder<UserProfile?>(
+                          valueListenable: UserRepository.instance.currentUser,
+                          builder: (context, perfil, _) => Text(
+                            perfil?.email ?? '',
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: text.bodySmall,
+                          ),
                         ),
                         const SizedBox(height: 16),
                         Row(
@@ -491,7 +505,9 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
                           const CanjesAdminScreen(),
                         ),
                       ),
-                    ],
+                      // Misma cascada que en Inicio: el panel se arma por
+                      // partes en vez de aparecer entero de golpe.
+                    ].indexed.map((e) => VeridiaAparece(indice: e.$1, child: e.$2)).toList(),
                   ),
                   const SizedBox(height: 26),
                   const VeridiaSectionTitle(

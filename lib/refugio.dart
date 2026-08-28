@@ -474,6 +474,9 @@ class _FichaAccesorioState extends State<_FichaAccesorio> {
               : null,
           glow: widget.equipado,
           onTap: (_ocupado || bloqueado) ? null : _actuar,
+          // Su propio contenido YA es el sprite del accesorio: no se le
+          // suma la animación de prensado encima.
+          animarPresion: false,
           child: Column(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
@@ -650,9 +653,11 @@ class _AccionArticuloState extends State<_AccionArticulo> {
     if (widget.tiene) {
       return SizedBox(
         height: 34,
-        child: OutlinedButton(
-          onPressed: _ocupado ? null : _equipar,
-          child: Text(widget.etiquetaEquipar),
+        child: VeridiaBotonTactil(
+          child: OutlinedButton(
+            onPressed: _ocupado ? null : _equipar,
+            child: Text(widget.etiquetaEquipar),
+          ),
         ),
       );
     }
@@ -666,14 +671,16 @@ class _AccionArticuloState extends State<_AccionArticulo> {
     if (widget.costo == 0) {
       return SizedBox(
         height: 34,
-        child: FilledButton.icon(
-          onPressed: (_ocupado || faltaNivel) ? null : _comprar,
-          icon: Icon(
-            faltaNivel ? Icons.lock_rounded : Icons.favorite_rounded,
-            size: 16,
-          ),
-          label: Text(
-            faltaNivel ? 'Nivel ${widget.nivelRequerido}' : 'Adoptar',
+        child: VeridiaBotonTactil(
+          child: FilledButton.icon(
+            onPressed: (_ocupado || faltaNivel) ? null : _comprar,
+            icon: Icon(
+              faltaNivel ? Icons.lock_rounded : Icons.favorite_rounded,
+              size: 16,
+            ),
+            label: Text(
+              faltaNivel ? 'Nivel ${widget.nivelRequerido}' : 'Adoptar',
+            ),
           ),
         ),
       );
@@ -683,15 +690,19 @@ class _AccionArticuloState extends State<_AccionArticulo> {
       children: [
         SizedBox(
           height: 34,
-          child: FilledButton.icon(
-            onPressed: (_ocupado || faltaNivel || faltaSaldo) ? null : _comprar,
-            // El candado dice POR QUÉ no se puede pulsar. Un botón gris sin
-            // más se lee como algo roto.
-            icon: Icon(
-              faltaNivel ? Icons.lock_rounded : Icons.shopping_bag_outlined,
-              size: 16,
+          child: VeridiaBotonTactil(
+            child: FilledButton.icon(
+              onPressed: (_ocupado || faltaNivel || faltaSaldo)
+                  ? null
+                  : _comprar,
+              // El candado dice POR QUÉ no se puede pulsar. Un botón gris sin
+              // más se lee como algo roto.
+              icon: Icon(
+                faltaNivel ? Icons.lock_rounded : Icons.shopping_bag_outlined,
+                size: 16,
+              ),
+              label: Text('${widget.costo}'),
             ),
-            label: Text('${widget.costo}'),
           ),
         ),
         const SizedBox(width: 10),

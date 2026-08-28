@@ -105,37 +105,39 @@ class _BanManagementScreenState extends State<BanManagementScreen> {
               onPressed: () => Navigator.pop(dialogContext),
               child: const Text('Cancelar'),
             ),
-            FilledButton(
-              style: FilledButton.styleFrom(
-                backgroundColor: VeridiaColors.errorContainer,
-                foregroundColor: VeridiaColors.onErrorContainer,
-              ),
-              onPressed: () async {
-                if (!(formKey.currentState?.validate() ?? false)) return;
-                Navigator.pop(dialogContext);
+            VeridiaBotonTactil(
+              child: FilledButton(
+                style: FilledButton.styleFrom(
+                  backgroundColor: VeridiaColors.errorContainer,
+                  foregroundColor: VeridiaColors.onErrorContainer,
+                ),
+                onPressed: () async {
+                  if (!(formKey.currentState?.validate() ?? false)) return;
+                  Navigator.pop(dialogContext);
 
-                try {
-                  await UserRepository.instance.banUser(
-                    userId: user.userId,
-                    isPermanent: permanentBan,
-                    days: selectedDays,
-                    reason: reasonController.text.trim(),
-                  );
-                  if (!mounted) return;
-                  mostrarMensajeVeridia(
-                    context,
-                    '${user.displayName} fue suspendido.',
-                  );
-                } catch (e) {
-                  if (!mounted) return;
-                  mostrarMensajeVeridia(
-                    context,
-                    'No se pudo suspender: $e',
-                    esError: true,
-                  );
-                }
-              },
-              child: const Text('Confirmar'),
+                  try {
+                    await UserRepository.instance.banUser(
+                      userId: user.userId,
+                      isPermanent: permanentBan,
+                      days: selectedDays,
+                      reason: reasonController.text.trim(),
+                    );
+                    if (!mounted) return;
+                    mostrarMensajeVeridia(
+                      context,
+                      '${user.displayName} fue suspendido.',
+                    );
+                  } catch (e) {
+                    if (!mounted) return;
+                    mostrarMensajeVeridia(
+                      context,
+                      'No se pudo suspender: $e',
+                      esError: true,
+                    );
+                  }
+                },
+                child: const Text('Confirmar'),
+              ),
             ),
           ],
         ),
@@ -188,13 +190,15 @@ class _BanManagementScreenState extends State<BanManagementScreen> {
             onPressed: () => Navigator.pop(dialogContext, false),
             child: const Text('Cancelar'),
           ),
-          FilledButton(
-            onPressed: () => Navigator.pop(dialogContext, true),
-            style: FilledButton.styleFrom(
-              backgroundColor: VeridiaColors.errorContainer,
-              foregroundColor: VeridiaColors.onErrorContainer,
+          VeridiaBotonTactil(
+            child: FilledButton(
+              onPressed: () => Navigator.pop(dialogContext, true),
+              style: FilledButton.styleFrom(
+                backgroundColor: VeridiaColors.errorContainer,
+                foregroundColor: VeridiaColors.onErrorContainer,
+              ),
+              child: const Text('Eliminar'),
             ),
-            child: const Text('Eliminar'),
           ),
         ],
       ),
@@ -454,21 +458,23 @@ class _FilaUsuario extends StatelessWidget {
             Row(
               children: [
                 Expanded(
-                  child: user.isBanned
-                      ? OutlinedButton.icon(
-                          onPressed: onUnban,
-                          icon: const Icon(Icons.lock_open_rounded, size: 18),
-                          label: const Text('Levantar'),
-                        )
-                      : FilledButton.icon(
-                          onPressed: onBan,
-                          icon: const Icon(Icons.gavel_rounded, size: 18),
-                          label: const Text('Suspender'),
-                          style: FilledButton.styleFrom(
-                            backgroundColor: VeridiaColors.errorContainer,
-                            foregroundColor: VeridiaColors.onErrorContainer,
+                  child: VeridiaBotonTactil(
+                    child: user.isBanned
+                        ? OutlinedButton.icon(
+                            onPressed: onUnban,
+                            icon: const Icon(Icons.lock_open_rounded, size: 18),
+                            label: const Text('Levantar'),
+                          )
+                        : FilledButton.icon(
+                            onPressed: onBan,
+                            icon: const Icon(Icons.gavel_rounded, size: 18),
+                            label: const Text('Suspender'),
+                            style: FilledButton.styleFrom(
+                              backgroundColor: VeridiaColors.errorContainer,
+                              foregroundColor: VeridiaColors.onErrorContainer,
+                            ),
                           ),
-                        ),
+                  ),
                 ),
                 const SizedBox(width: 8),
                 IconButton(

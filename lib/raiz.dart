@@ -185,22 +185,26 @@ class _VerificacionPendienteState extends State<_VerificacionPendiente> {
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.stretch,
                         children: [
-                          FilledButton(
-                            onPressed: _cargando ? null : _yaVerifique,
-                            style: FilledButton.styleFrom(
-                              minimumSize: const Size(double.infinity, 52),
+                          VeridiaBotonTactil(
+                            child: FilledButton(
+                              onPressed: _cargando ? null : _yaVerifique,
+                              style: FilledButton.styleFrom(
+                                minimumSize: const Size(double.infinity, 52),
+                              ),
+                              child: _cargando
+                                  ? const VeridiaLoader()
+                                  : const Text('Ya verifiqué mi correo'),
                             ),
-                            child: _cargando
-                                ? const VeridiaLoader()
-                                : const Text('Ya verifiqué mi correo'),
                           ),
                           const SizedBox(height: 12),
-                          OutlinedButton(
-                            onPressed: _cargando ? null : _reenviarCorreo,
-                            style: OutlinedButton.styleFrom(
-                              minimumSize: const Size(double.infinity, 52),
+                          VeridiaBotonTactil(
+                            child: OutlinedButton(
+                              onPressed: _cargando ? null : _reenviarCorreo,
+                              style: OutlinedButton.styleFrom(
+                                minimumSize: const Size(double.infinity, 52),
+                              ),
+                              child: const Text('Reenviar correo'),
                             ),
-                            child: const Text('Reenviar correo'),
                           ),
                         ],
                       ),
@@ -286,17 +290,19 @@ class WelcomeScreen extends StatelessWidget {
                       const SizedBox(height: 44),
                       SizedBox(
                         width: double.infinity,
-                        child: FilledButton.icon(
-                          onPressed: () => Navigator.push(
-                            context,
-                            MaterialPageRoute(
-                              builder: (_) => const LoginScreen(),
+                        child: VeridiaBotonTactil(
+                          child: FilledButton.icon(
+                            onPressed: () => Navigator.push(
+                              context,
+                              MaterialPageRoute(
+                                builder: (_) => const LoginScreen(),
+                              ),
                             ),
-                          ),
-                          icon: const Icon(Icons.explore_outlined, size: 20),
-                          label: const Text('Conocer Veridia'),
-                          style: FilledButton.styleFrom(
-                            minimumSize: const Size(double.infinity, 54),
+                            icon: const Icon(Icons.explore_outlined, size: 20),
+                            label: const Text('Conocer Veridia'),
+                            style: FilledButton.styleFrom(
+                              minimumSize: const Size(double.infinity, 54),
+                            ),
                           ),
                         ),
                       ),

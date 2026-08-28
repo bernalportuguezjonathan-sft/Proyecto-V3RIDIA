@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
 
+import 'admin_home.dart';
 import 'desafios.dart';
 import 'historial.dart';
 import 'home.dart';
@@ -10,6 +11,7 @@ import 'perfil.dart';
 import 'raiz.dart';
 import 'services/repositorio_u.dart';
 import 'theme/veridia_theme.dart';
+import 'widgets/veridia_ui.dart';
 
 /// Secciones del explorador, en el mismo orden que [VeridiaBottomNav].
 enum VeridiaSeccion { inicio, camara, mapa, diario, perfil }
@@ -30,8 +32,27 @@ abstract final class VeridiaNav {
   ///
   /// Conservando la primera ruta la pila nunca pasa de dos niveles y la raíz
   /// sobrevive a cualquier recorrido por la app.
+  /// Las secciones de esta barra son del EXPLORADOR. Si quien navega es
+  /// administrador se le devuelve a SU panel en vez de meterlo en la app del
+  /// explorador.
+  ///
+  /// La barra ya no se le dibuja al administrador (ver [VeridiaBottomNav]),
+  /// así que en condiciones normales esto no llega a dispararse. Está igual
+  /// porque el daño de que se colara era grave: `pushAndRemoveUntil` conserva
+  /// solo la primera ruta, así que un administrador que tocara una pestaña
+  /// perdía el Panel de Administración de la pila y terminaba dentro de la
+  /// sesión del explorador sin manera evidente de volver.
   static void ir(BuildContext context, VeridiaSeccion destino, int actual) {
     if (destino.index == actual) return;
+
+    if (UserRepository.instance.esAdmin) {
+      Navigator.pushAndRemoveUntil(
+        context,
+        MaterialPageRoute(builder: (_) => const AdminHomeScreen()),
+        (route) => route.isFirst,
+      );
+      return;
+    }
 
     final Widget pantalla = switch (destino) {
       VeridiaSeccion.inicio => const HomeScreen(),
@@ -114,13 +135,15 @@ abstract final class VeridiaNav {
             onPressed: () => Navigator.pop(dialogContext, false),
             child: const Text('Cancelar'),
           ),
-          FilledButton(
-            onPressed: () => Navigator.pop(dialogContext, true),
-            style: FilledButton.styleFrom(
-              backgroundColor: VeridiaColors.errorContainer,
-              foregroundColor: VeridiaColors.onErrorContainer,
+          VeridiaBotonTactil(
+            child: FilledButton(
+              onPressed: () => Navigator.pop(dialogContext, true),
+              style: FilledButton.styleFrom(
+                backgroundColor: VeridiaColors.errorContainer,
+                foregroundColor: VeridiaColors.onErrorContainer,
+              ),
+              child: const Text('Cerrar sesión'),
             ),
-            child: const Text('Cerrar sesión'),
           ),
         ],
       ),

@@ -279,16 +279,18 @@ class _MapDetailScreenState extends State<MapDetailScreen> {
                     SizedBox(
                       width: double.infinity,
                       height: 50,
-                      child: ElevatedButton.icon(
-                        onPressed: () => VeridiaNav.abrir(
-                          context,
-                          const IdentifySpeciesScreen(),
-                        ),
-                        icon: const Icon(Icons.add_a_photo_outlined),
-                        label: const Text('Capturar observación aquí'),
-                        style: ElevatedButton.styleFrom(
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(10),
+                      child: VeridiaBotonTactil(
+                        child: ElevatedButton.icon(
+                          onPressed: () => VeridiaNav.abrir(
+                            context,
+                            const IdentifySpeciesScreen(),
+                          ),
+                          icon: const Icon(Icons.add_a_photo_outlined),
+                          label: const Text('Capturar observación aquí'),
+                          style: ElevatedButton.styleFrom(
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(10),
+                            ),
                           ),
                         ),
                       ),
