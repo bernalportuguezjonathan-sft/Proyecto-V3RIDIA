@@ -29,7 +29,23 @@
     {
       "source": "functions",
       "codebase": "default",
-      "ignore": ["node_modules", ".git", "test", "*.log"]
+      "ignore": [
+        "node_modules",
+        ".git",
+        "test",
+        "*.log"
+      ]
     }
-  ]
+  ],
+  "emulators": {
+    "firestore": {
+      "port": 8085
+    },
+    "functions": {
+      "port": 5001
+    },
+    "ui": {
+      "enabled": false
+    }
+  }
 }

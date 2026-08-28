@@ -12,8 +12,12 @@
     "deploy": "firebase deploy --only functions"
   },
   "dependencies": {
-    "firebase-admin": "^12.7.0",
-    "firebase-functions": "^6.3.1",
-    "sharp": "^0.33.5"
+    "firebase-admin": "^14.3.0",
+    "firebase-functions": "^7.3.2",
+    "sharp": "^0.35.4",
+    "zod": "^3.24.1"
+  },
+  "overrides": {
+    "uuid": "^11.1.1"
   }
 }
