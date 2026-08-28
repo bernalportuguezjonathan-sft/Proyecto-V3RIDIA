@@ -31,8 +31,12 @@ dependencies:
   # aprovisionado en el proyecto y exigiría plan Blaze.
 
   image_picker: ^1.1.2
+  # Solo para Android/iOS: el login con Google en web va por
+  # FirebaseAuth.signInWithPopup (ver lib/services/auth_google.dart), asi que
+  # google_sign_in_web ya no se declara aqui -- su boton de Google Identity
+  # Services exigia registrar el origen con puerto exacto y rompia
+  # `flutter run` en cualquier puerto que no fuera el fijado a mano.
   google_sign_in: ^6.1.0
-  google_sign_in_web: ^0.12.4
   flutter_svg: ^2.0.10
 
   supabase_flutter: ^2.3.1
@@ -45,7 +49,10 @@ dependencies:
   exif: ^3.3.0
   flutter_image_compress: ^2.0.2
   shared_preferences: ^2.0.0
-  app_settings: ^4.1.1
+  # 4.x nunca declaraba "namespace" en su build.gradle: con el AGP 9 de este
+  # proyecto (ver android/settings.gradle.kts) el build fallaba pidiendo un
+  # namespace que esa version no tiene forma de dar. 5.0.0 lo agrego.
+  app_settings: ^9.0.0
   flutter_map: ^7.0.0
   latlong2: ^0.9.1
   geolocator: 14.0.3

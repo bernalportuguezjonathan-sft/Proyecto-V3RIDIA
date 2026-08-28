@@ -50,9 +50,20 @@
 -- PARTE A -- aplicable ahora mismo, no rompe nada
 -- ============================================================================
 
--- 1) Activar RLS en la tabla que respalda Storage. Si ya estaba activo, esto
---    no hace nada (Postgres lo ignora sin error).
-alter table storage.objects enable row level security;
+-- 1) NO hace falta activar RLS: `storage.objects` ya viene con RLS activo en
+--    Supabase alojado.
+--
+--    La linea de abajo estaba activa y decia que "si ya estaba activo, Postgres
+--    lo ignora sin error". Es FALSO y rompia la corrida entera en el primer
+--    paso (comprobado el 2026-08-28):
+--
+--      ERROR: 42501: must be owner of table objects
+--
+--    `storage.objects` la posee el rol `supabase_storage_admin`, no el usuario
+--    del SQL Editor, y ALTER TABLE exige ser el dueño. Crear POLITICAS si esta
+--    permitido -- por eso el resto del archivo si corre.
+--
+-- alter table storage.objects enable row level security;
 
 -- 2) Limpieza: si ya existen políticas con estos nombres de una corrida
 --    anterior de este mismo script, se reemplazan en vez de duplicarse.

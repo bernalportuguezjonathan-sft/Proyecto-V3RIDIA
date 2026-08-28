@@ -78,7 +78,11 @@ class LogroInsignia extends StatelessWidget {
 /// una meta cercana empuja, cinco lejanas desaniman. En cuanto se consigue,
 /// aparece la siguiente.
 class PanelLogros extends StatelessWidget {
-  const PanelLogros({super.key, required this.stats, this.mostrarSiguiente = true});
+  const PanelLogros({
+    super.key,
+    required this.stats,
+    this.mostrarSiguiente = true,
+  });
 
   final EstadisticasExplorador stats;
   final bool mostrarSiguiente;

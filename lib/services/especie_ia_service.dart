@@ -3,7 +3,7 @@ import 'dart:convert';
 import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
 
-import '../config/gemini_config.dart';
+import '../config/gemini_key.dart';
 import 'huella_foto.dart';
 import 'repositorio_u.dart';
 
@@ -18,6 +18,11 @@ import 'repositorio_u.dart';
 /// proyecto): cuando se active Blaze, hay que volver a apuntar esta clase a
 /// `identificarEspecie`/`guardarObservacion` en vez de llamar a Gemini y a
 /// Firestore directo.
+///
+/// AMPLIADO (2026-08-28): eso vale para el APK, que no se publica. En WEB la
+/// clave ya no se compila: el sitio está publicado y un bundle público la
+/// deja a la vista de cualquiera. Ver `lib/config/gemini_key.dart`, que
+/// resuelve la clave y explica por qué en web queda vacía.
 class SpeciesIdentification {
   const SpeciesIdentification({
     required this.identified,
@@ -185,9 +190,17 @@ class EspecieIAService {
     String mimeType, {
     String? origen,
   }) async {
-    if (geminiApiKey.isEmpty || geminiApiKey.startsWith('PON_AQUI')) {
+    if (faltaClaveGemini) {
+      // Dos mensajes distintos a propósito: en web es una decisión de
+      // seguridad (la clave no se compila ahí, ver config/gemini_key.dart) y
+      // quien lo lee es un explorador, no quien programa; en móvil sí es algo
+      // que hay que configurar.
       throw SpeciesIdentificationException(
-        'Falta configurar la clave de Gemini en lib/config/gemini_config.dart',
+        kIsWeb
+            ? 'La identificación con IA no está disponible en la versión web. '
+                  'Usa la app de Android para identificar especies.'
+            : 'Falta configurar la clave de Gemini en '
+                  'lib/config/gemini_config.dart',
       );
     }
 

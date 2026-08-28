@@ -26,6 +26,14 @@ class _RaizVeridiaState extends State<RaizVeridia> {
   String? _uidCargado;
   Future<void>? _cargaPerfil;
 
+  /// Se pone en true cuando el propio usuario confirma "ya verifiqué" y el
+  /// reload() de Firebase Auth lo confirma. authStateChanges() no vuelve a
+  /// emitir solo porque `emailVerified` cambió, así que esta bandera es la
+  /// única forma de que el StreamBuilder deje pasar a este uid sin esperar
+  /// un nuevo evento del stream. Se reinicia al cerrar sesión para que la
+  /// próxima cuenta sin verificar no se cuele heredando el valor anterior.
+  bool _verificacionConfirmada = false;
+
   Future<void> _perfilDe(String uid) {
     if (_uidCargado != uid || _cargaPerfil == null) {
       _uidCargado = uid;
@@ -47,7 +55,24 @@ class _RaizVeridiaState extends State<RaizVeridia> {
         if (usuario == null) {
           _uidCargado = null;
           _cargaPerfil = null;
+          _verificacionConfirmada = false;
           return const WelcomeScreen();
+        }
+
+        // Solo exige verificación a cuentas de correo/contraseña: quien
+        // entra con Google ya lo trae verificado por Google mismo (ver
+        // exigirSesion() en functions/index.js, misma regla del lado
+        // servidor). Cubre tanto "recién registrado" como "reabrió la app
+        // con una sesión vieja sin verificar" con la misma pantalla.
+        final esCuentaConContrasena = usuario.providerData.any(
+          (p) => p.providerId == 'password',
+        );
+        if (esCuentaConContrasena &&
+            !usuario.emailVerified &&
+            !_verificacionConfirmada) {
+          return _VerificacionPendiente(
+            onVerificado: () => setState(() => _verificacionConfirmada = true),
+          );
         }
 
         return FutureBuilder<void>(
@@ -66,6 +91,135 @@ class _RaizVeridiaState extends State<RaizVeridia> {
           },
         );
       },
+    );
+  }
+}
+
+/// Bloquea el paso a la app mientras el correo no esté verificado.
+/// Aparece justo después de registrarse y también si se reabre la app con
+/// una sesión antigua que nunca llegó a confirmarse.
+class _VerificacionPendiente extends StatefulWidget {
+  const _VerificacionPendiente({required this.onVerificado});
+
+  final VoidCallback onVerificado;
+
+  @override
+  State<_VerificacionPendiente> createState() => _VerificacionPendienteState();
+}
+
+class _VerificacionPendienteState extends State<_VerificacionPendiente> {
+  bool _cargando = false;
+
+  Future<void> _reenviarCorreo() async {
+    setState(() => _cargando = true);
+    try {
+      await FirebaseAuth.instance.currentUser?.sendEmailVerification();
+      if (mounted) {
+        mostrarMensajeVeridia(context, 'Correo de verificación reenviado.');
+      }
+    } catch (_) {
+      if (mounted) {
+        mostrarMensajeVeridia(
+          context,
+          'No se pudo reenviar el correo. Intenta más tarde.',
+          esError: true,
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _cargando = false);
+    }
+  }
+
+  Future<void> _yaVerifique() async {
+    setState(() => _cargando = true);
+    try {
+      // reload() trae el emailVerified real desde Firebase Auth: el objeto
+      // User en memoria no se actualiza solo cuando alguien hace clic en el
+      // enlace del correo en otra pestaña/dispositivo.
+      await FirebaseAuth.instance.currentUser?.reload();
+      final actualizado = FirebaseAuth.instance.currentUser;
+      if (actualizado != null && actualizado.emailVerified) {
+        widget.onVerificado();
+      } else if (mounted) {
+        mostrarMensajeVeridia(
+          context,
+          'Todavía no detectamos la verificación. Revisa tu correo.',
+          esError: true,
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _cargando = false);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final text = Theme.of(context).textTheme;
+    final email = FirebaseAuth.instance.currentUser?.email ?? 'tu correo';
+
+    return Scaffold(
+      body: VeridiaMontanas(
+        child: SafeArea(
+          child: Center(
+            child: SingleChildScrollView(
+              padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 28),
+              child: ConstrainedBox(
+                constraints: const BoxConstraints(maxWidth: 460),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    const VeridiaSymbol(size: 92),
+                    const SizedBox(height: 18),
+                    Text('Verifica tu correo', style: text.headlineSmall),
+                    const SizedBox(height: 6),
+                    Text(
+                      'Te enviamos un enlace de confirmación a $email. '
+                      'Ábrelo y luego vuelve aquí.',
+                      textAlign: TextAlign.center,
+                      style: text.bodySmall,
+                    ),
+                    const SizedBox(height: 26),
+                    VeridiaCard(
+                      padding: const EdgeInsets.all(20),
+                      glow: true,
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.stretch,
+                        children: [
+                          FilledButton(
+                            onPressed: _cargando ? null : _yaVerifique,
+                            style: FilledButton.styleFrom(
+                              minimumSize: const Size(double.infinity, 52),
+                            ),
+                            child: _cargando
+                                ? const VeridiaLoader()
+                                : const Text('Ya verifiqué mi correo'),
+                          ),
+                          const SizedBox(height: 12),
+                          OutlinedButton(
+                            onPressed: _cargando ? null : _reenviarCorreo,
+                            style: OutlinedButton.styleFrom(
+                              minimumSize: const Size(double.infinity, 52),
+                            ),
+                            child: const Text('Reenviar correo'),
+                          ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(height: 18),
+                    TextButton.icon(
+                      onPressed: _cargando
+                          ? null
+                          : () => FirebaseAuth.instance.signOut(),
+                      icon: const Icon(Icons.logout, size: 18),
+                      label: const Text('Cerrar sesión'),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+        ),
+      ),
     );
   }
 }

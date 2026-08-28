@@ -1,10 +1,9 @@
 import 'dart:async';
 
-import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
-import 'package:google_sign_in/google_sign_in.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'services/auth_google.dart';
 import 'services/repositorio_u.dart';
 import 'models/user.dart';
 import 'admin_home.dart';
@@ -13,7 +12,6 @@ import 'register.dart';
 import 'theme/veridia_theme.dart';
 import 'widgets/animated_visibility.dart';
 import 'widgets/google_logo_icon.dart';
-import 'widgets/google_web_button.dart';
 import 'widgets/veridia_logo.dart';
 import 'widgets/veridia_montanas.dart';
 import 'widgets/veridia_ui.dart';
@@ -38,12 +36,6 @@ class _LoginScreenState extends State<LoginScreen>
   Timer? _lockTimer;
   int _segundosRestantesBloqueo = 0;
 
-  late final GoogleSignIn _googleSignIn = GoogleSignIn(
-    scopes: ['email'],
-    clientId: kIsWeb ? webGoogleClientId : null,
-  );
-  StreamSubscription<GoogleSignInAccount?>? _googleSignInSub;
-
   late final AnimationController _entranceController = AnimationController(
     vsync: this,
     duration: const Duration(milliseconds: 700),
@@ -63,19 +55,6 @@ class _LoginScreenState extends State<LoginScreen>
     parent: _entranceController,
     curve: const Interval(0.0, 0.8, curve: Curves.easeOutBack),
   );
-
-  @override
-  void initState() {
-    super.initState();
-    if (kIsWeb) {
-      _googleSignInSub = _googleSignIn.onCurrentUserChanged.listen((account) {
-        if (account != null) {
-          _completeGoogleSignIn(account);
-        }
-      });
-      _googleSignIn.signInSilently();
-    }
-  }
 
   void _mostrarAlerta(String mensaje) {
     mostrarMensajeVeridia(context, mensaje, esError: true);
@@ -448,27 +427,6 @@ class _LoginScreenState extends State<LoginScreen>
   }
 
   Future<void> _signInWithGoogle() async {
-    GoogleSignInAccount? googleUser;
-
-    try {
-      googleUser = await _googleSignIn.signIn();
-    } catch (e) {
-      if (mounted) {
-        _mostrarAlerta(
-          'Error al abrir la ventana de Google. Intenta de nuevo.',
-        );
-      }
-      return;
-    }
-
-    if (googleUser == null) {
-      return;
-    }
-
-    await _completeGoogleSignIn(googleUser);
-  }
-
-  Future<void> _completeGoogleSignIn(GoogleSignInAccount googleUser) async {
     if (_selectedRole == 'Administrador') {
       return;
     }
@@ -485,34 +443,10 @@ class _LoginScreenState extends State<LoginScreen>
     );
 
     try {
-      debugPrint('Google Sign-In: obteniendo tokens...');
-      final googleAuth = await googleUser.authentication.timeout(
-        const Duration(seconds: 20),
-        onTimeout: () => throw TimeoutException('authentication'),
-      );
-      debugPrint('Google Sign-In: tokens obtenidos.');
-      if (googleAuth.idToken == null && googleAuth.accessToken == null) {
-        if (mounted) {
-          _mostrarAlerta('No se pudieron obtener las credenciales de Google.');
-        }
-        return;
-      }
+      final userCredential = await iniciarSesionConGoogle();
+      // null = cerró la ventana de Google sin elegir cuenta: no es un error.
+      if (userCredential == null) return;
 
-      final credential = GoogleAuthProvider.credential(
-        accessToken: googleAuth.accessToken,
-        idToken: googleAuth.idToken,
-      );
-
-      debugPrint('Google Sign-In: iniciando sesión en Firebase...');
-      final userCredential = await FirebaseAuth.instance
-          .signInWithCredential(credential)
-          .timeout(
-            const Duration(seconds: 20),
-            onTimeout: () => throw TimeoutException('signInWithCredential'),
-          );
-      debugPrint(
-        'Google Sign-In: sesión de Firebase OK, uid=${userCredential.user?.uid}',
-      );
       await UserRepository.instance.initializeUser();
 
       if (didShowDialog && mounted) {
@@ -552,7 +486,6 @@ class _LoginScreenState extends State<LoginScreen>
   @override
   void dispose() {
     _entranceController.dispose();
-    _googleSignInSub?.cancel();
     _lockTimer?.cancel();
     _emailController.dispose();
     _passwordController.dispose();
@@ -711,24 +644,21 @@ class _LoginScreenState extends State<LoginScreen>
                                       ],
                                     ),
                                     const SizedBox(height: 16),
-                                    if (kIsWeb)
-                                      Center(child: buildGoogleWebButton())
-                                    else
-                                      OutlinedButton.icon(
-                                        onPressed: _signInWithGoogle,
-                                        icon: const GoogleLogoIcon(size: 20),
-                                        label: const Text(
-                                          'Iniciar sesión con Google',
-                                        ),
-                                        style: OutlinedButton.styleFrom(
-                                          minimumSize: const Size(
-                                            double.infinity,
-                                            52,
-                                          ),
-                                          foregroundColor:
-                                              VeridiaColors.onSurface,
-                                        ),
+                                    OutlinedButton.icon(
+                                      onPressed: _signInWithGoogle,
+                                      icon: const GoogleLogoIcon(size: 20),
+                                      label: const Text(
+                                        'Iniciar sesión con Google',
                                       ),
+                                      style: OutlinedButton.styleFrom(
+                                        minimumSize: const Size(
+                                          double.infinity,
+                                          52,
+                                        ),
+                                        foregroundColor:
+                                            VeridiaColors.onSurface,
+                                      ),
+                                    ),
                                   ],
                                 ),
                               ),

@@ -2,15 +2,12 @@ import 'dart:async';
 import 'package:flutter/foundation.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:google_sign_in/google_sign_in.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../models/user.dart';
+import 'auth_google.dart';
 import 'economia.dart';
 
 import '../theme/veridia_theme.dart';
-
-const webGoogleClientId =
-    '523510024166-g4se2aa356mnlmkotah178gss2efve3a.apps.googleusercontent.com';
 
 class UserRepository {
   UserRepository._();
@@ -107,12 +104,7 @@ class UserRepository {
 
   Future<void> signOut() async {
     try {
-      final googleSignIn = GoogleSignIn(
-        clientId: kIsWeb ? webGoogleClientId : null,
-      );
-      if (await googleSignIn.isSignedIn()) {
-        await googleSignIn.signOut();
-      }
+      await cerrarSesionGoogle();
     } catch (e) {
       debugPrint('Google sign-out error: $e');
     }

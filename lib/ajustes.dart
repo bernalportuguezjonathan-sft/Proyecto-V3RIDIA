@@ -15,7 +15,7 @@ class SettingsScreen extends StatefulWidget {
 
 class _SettingsScreenState extends State<SettingsScreen> {
   void _openNotificationSettings() {
-    AppSettings.openNotificationSettings();
+    AppSettings.openAppSettings(type: AppSettingsType.notification);
   }
 
   void _abrirPrivacidadYSeguridad() {

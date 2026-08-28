@@ -50,11 +50,27 @@
       },
       "oauth_client": [
         {
+          "client_id": "523510024166-8d0h3qk9nnf2f4kor50bsqp9r3uunt0f.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.example.veridia_app",
+            "certificate_hash": "10225b5464428b39a1051ac57f4d1cdf0d1d05ea"
+          }
+        },
+        {
           "client_id": "523510024166-d3k82tjdo8kdgijqkn8ad85emneed9ba.apps.googleusercontent.com",
           "client_type": 1,
           "android_info": {
             "package_name": "com.example.veridia_app",
             "certificate_hash": "0adfbfcbbed94e67d36e614a845a1f6e53226a18"
+          }
+        },
+        {
+          "client_id": "523510024166-q9nb8fs0ri9nruvmh9utaqn644omtii1.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.example.veridia_app",
+            "certificate_hash": "3bb845ce49fc0fcb902307aabb9c51c289defb3f"
           }
         },
         {

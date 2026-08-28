@@ -27,6 +27,13 @@
  *      -> lee esa identificacion YA VERIFICADA (el cliente no puede
  *         inventarla), crea el avistamiento y avanza TODOS los desafios
  *         propios cuya especie coincida, en una sola transaccion.
+ *
+ * NOTA (2026-08-28): firebase.json ya NO declara este directorio como
+ * target de deploy (functions v2 exige el plan Blaze, y el proyecto sigue
+ * en Spark) -- `firebase deploy` intentarlo aqui fallaba pidiendo upgrade.
+ * El codigo se queda intacto para cuando se active Blaze: solo hay que
+ * devolver el bloque "functions" a firebase.json (ver git history) y
+ * volver a habilitar la version dura de firestore.rules.
  */
 
 const { onCall, HttpsError } = require('firebase-functions/v2/https');

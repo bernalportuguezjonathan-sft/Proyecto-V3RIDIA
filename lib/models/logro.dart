@@ -200,9 +200,7 @@ List<Logro> logrosConseguidos(EstadisticasExplorador stats) =>
 /// Los que faltan, ordenados por lo cerca que están: el siguiente que se
 /// puede conseguir va primero, que es el único que motiva.
 List<Logro> logrosPendientes(EstadisticasExplorador stats) {
-  final pendientes = catalogoLogros
-      .where((l) => !l.conseguido(stats))
-      .toList()
+  final pendientes = catalogoLogros.where((l) => !l.conseguido(stats)).toList()
     ..sort((a, b) => b.progreso(stats).compareTo(a.progreso(stats)));
   return pendientes;
 }

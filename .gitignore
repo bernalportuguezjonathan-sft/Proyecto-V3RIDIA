@@ -38,6 +38,13 @@ migrate_working_dir/
 lib/config/gemini_config.dart
 lib/config/supabase_config.dart
 
+# Firma de release de Android. El .jks es la identidad de la app: quien lo
+# tenga puede publicar actualizaciones haciendose pasar por Veridia, y si se
+# pierde no hay forma de actualizar una app ya publicada en Play Store. Se
+# comparte a mano entre quienes compilan releases, nunca por git.
+android/veridia-release.jks
+android/key.properties
+
 # Symbolication related
 app.*.symbols
 

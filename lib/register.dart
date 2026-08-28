@@ -1,9 +1,8 @@
 import 'dart:async';
 
-import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
-import 'package:google_sign_in/google_sign_in.dart';
+import 'services/auth_google.dart';
 import 'services/repositorio_u.dart';
 import 'models/user.dart';
 import 'home.dart';
@@ -11,7 +10,6 @@ import 'admin_home.dart';
 import 'theme/veridia_theme.dart';
 import 'widgets/animated_visibility.dart';
 import 'widgets/google_logo_icon.dart';
-import 'widgets/google_web_button.dart';
 import 'widgets/veridia_logo.dart';
 import 'widgets/veridia_montanas.dart';
 import 'widgets/veridia_ui.dart';
@@ -34,12 +32,6 @@ class _RegisterScreenState extends State<RegisterScreen>
   String? _selectedRole;
   String _passwordActual = '';
   bool _passwordEnfocado = false;
-
-  late final GoogleSignIn _googleSignIn = GoogleSignIn(
-    scopes: ['email'],
-    clientId: kIsWeb ? webGoogleClientId : null,
-  );
-  StreamSubscription<GoogleSignInAccount?>? _googleSignInSub;
 
   late final AnimationController _entranceController = AnimationController(
     vsync: this,
@@ -64,13 +56,6 @@ class _RegisterScreenState extends State<RegisterScreen>
   @override
   void initState() {
     super.initState();
-    if (kIsWeb) {
-      _googleSignInSub = _googleSignIn.onCurrentUserChanged.listen((account) {
-        if (account != null) {
-          _completeGoogleSignIn(account);
-        }
-      });
-    }
     _passwordFocusNode.addListener(() {
       setState(() => _passwordEnfocado = _passwordFocusNode.hasFocus);
     });
@@ -267,38 +252,30 @@ class _RegisterScreenState extends State<RegisterScreen>
         );
       }
 
-      // Redirigir según rol (Admin recibe diálogo de bienvenida)
-      if (mounted) {
-        if (_selectedRole == 'Administrador') {
-          await showDialog(
-            context: context,
-            builder: (context) => AlertDialog(
-              title: const Text('Bienvenido, Administrador'),
-              content: const Text('Has sido registrado como Administrador.'),
-              actions: [
-                TextButton(
-                  onPressed: () => Navigator.pop(context),
-                  child: const Text('Continuar'),
-                ),
-              ],
-            ),
-          );
-          if (!mounted) return;
+      if (_selectedRole == 'Administrador' && mounted) {
+        await showDialog(
+          context: context,
+          builder: (context) => AlertDialog(
+            title: const Text('Bienvenido, Administrador'),
+            content: const Text('Has sido registrado como Administrador.'),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(context),
+                child: const Text('Continuar'),
+              ),
+            ],
+          ),
+        );
+      }
 
-          unawaited(
-            Navigator.pushReplacement(
-              context,
-              MaterialPageRoute(builder: (context) => const AdminHomeScreen()),
-            ),
-          );
-        } else {
-          unawaited(
-            Navigator.pushReplacement(
-              context,
-              MaterialPageRoute(builder: (context) => const HomeScreen()),
-            ),
-          );
-        }
+      // No navegamos a Home/AdminHome nosotros mismos: el correo todavía no
+      // está verificado, así que solo volvemos a la raíz (RaizVeridia, en
+      // main.dart) y es ella la que -viendo el mismo FirebaseAuth.currentUser-
+      // muestra la pantalla de "verifica tu correo" en vez de dejar pasar.
+      // Es la misma pantalla que ve alguien que reabre la app sin haber
+      // verificado, así que no hay dos caminos distintos para bloquear esto.
+      if (mounted) {
+        Navigator.popUntil(context, (route) => route.isFirst);
       }
     } on FirebaseAuthException catch (e) {
       if (mounted) Navigator.pop(context);
@@ -397,24 +374,6 @@ class _RegisterScreenState extends State<RegisterScreen>
       return;
     }
 
-    GoogleSignInAccount? googleUser;
-    try {
-      googleUser = await _googleSignIn.signIn();
-    } catch (e) {
-      _mostrarAlerta('Error al abrir la ventana de Google. Intenta de nuevo.');
-      return;
-    }
-
-    if (googleUser == null) return;
-
-    await _completeGoogleSignIn(googleUser);
-  }
-
-  Future<void> _completeGoogleSignIn(GoogleSignInAccount googleUser) async {
-    if (_selectedRole == null) {
-      _mostrarAlerta('Por favor selecciona el tipo de usuario');
-      return;
-    }
     final role = _selectedRole!;
 
     if (role == 'Administrador') {
@@ -432,32 +391,10 @@ class _RegisterScreenState extends State<RegisterScreen>
     );
 
     try {
-      debugPrint('Google Sign-In: obteniendo tokens...');
-      final googleAuth = await googleUser.authentication.timeout(
-        const Duration(seconds: 20),
-        onTimeout: () => throw TimeoutException('authentication'),
-      );
-      debugPrint('Google Sign-In: tokens obtenidos.');
-      if (googleAuth.idToken == null && googleAuth.accessToken == null) {
-        _mostrarAlerta('No se pudieron obtener las credenciales de Google.');
-        return;
-      }
+      final userCredential = await iniciarSesionConGoogle();
+      // null = cerró la ventana de Google sin elegir cuenta: no es un error.
+      if (userCredential == null) return;
 
-      final credential = GoogleAuthProvider.credential(
-        accessToken: googleAuth.accessToken,
-        idToken: googleAuth.idToken,
-      );
-
-      debugPrint('Google Sign-In: iniciando sesión en Firebase...');
-      final userCredential = await FirebaseAuth.instance
-          .signInWithCredential(credential)
-          .timeout(
-            const Duration(seconds: 20),
-            onTimeout: () => throw TimeoutException('signInWithCredential'),
-          );
-      debugPrint(
-        'Google Sign-In: sesión de Firebase OK, uid=${userCredential.user?.uid}',
-      );
       await UserRepository.instance.initializeUser();
 
       if (mounted) {
@@ -490,7 +427,6 @@ class _RegisterScreenState extends State<RegisterScreen>
   @override
   void dispose() {
     _entranceController.dispose();
-    _googleSignInSub?.cancel();
     _nameController.dispose();
     _emailController.dispose();
     _passwordController.dispose();
@@ -709,24 +645,21 @@ class _RegisterScreenState extends State<RegisterScreen>
                                       ],
                                     ),
                                     const SizedBox(height: 16),
-                                    if (kIsWeb)
-                                      Center(child: buildGoogleWebButton())
-                                    else
-                                      OutlinedButton.icon(
-                                        onPressed: _registrarseConGoogle,
-                                        icon: const GoogleLogoIcon(size: 20),
-                                        label: const Text(
-                                          'Registrarse con Google',
-                                        ),
-                                        style: OutlinedButton.styleFrom(
-                                          minimumSize: const Size(
-                                            double.infinity,
-                                            52,
-                                          ),
-                                          foregroundColor:
-                                              VeridiaColors.onSurface,
-                                        ),
+                                    OutlinedButton.icon(
+                                      onPressed: _registrarseConGoogle,
+                                      icon: const GoogleLogoIcon(size: 20),
+                                      label: const Text(
+                                        'Registrarse con Google',
                                       ),
+                                      style: OutlinedButton.styleFrom(
+                                        minimumSize: const Size(
+                                          double.infinity,
+                                          52,
+                                        ),
+                                        foregroundColor:
+                                            VeridiaColors.onSurface,
+                                      ),
+                                    ),
                                   ],
                                 ),
                               ),
