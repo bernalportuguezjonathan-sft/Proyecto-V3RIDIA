@@ -94,7 +94,11 @@ class _MapDetailScreenState extends State<MapDetailScreen> {
                             width: 72,
                             height: 72,
                             decoration: BoxDecoration(
-                              color: widget.zone.color,
+                              // Ámbar: el mismo color del pin que se acaba de
+                              // tocar en el mapa. Es lo que hace que esta
+                              // pantalla se lea como "la zona que abrí" y no
+                              // como un sitio nuevo sin relación con él.
+                              color: VeridiaMapa.zona,
                               shape: BoxShape.circle,
                               border: Border.all(
                                 color: VeridiaColors.surfaceContainer,
@@ -158,14 +162,12 @@ class _MapDetailScreenState extends State<MapDetailScreen> {
                     Container(
                       padding: const EdgeInsets.all(12),
                       decoration: BoxDecoration(
-                        color: VeridiaColors.surfaceContainer,
-                        borderRadius: BorderRadius.circular(12),
-                        boxShadow: const [
-                          BoxShadow(
-                            color: Color.fromRGBO(0, 0, 0, 0.35),
-                            blurRadius: 8,
-                          ),
-                        ],
+                        gradient: veridiaCaraClay(
+                          VeridiaColors.surfaceContainer,
+                        ),
+                        borderRadius: BorderRadius.circular(VeridiaRadii.md),
+                        border: Border.all(color: VeridiaCard.bordePorDefecto),
+                        boxShadow: veridiaRelieve(),
                       ),
                       child: Row(
                         children: [
@@ -252,8 +254,14 @@ class _MapDetailScreenState extends State<MapDetailScreen> {
                         width: double.infinity,
                         padding: const EdgeInsets.all(16),
                         decoration: BoxDecoration(
-                          color: VeridiaColors.surfaceContainer,
-                          borderRadius: BorderRadius.circular(14),
+                          gradient: veridiaCaraClay(
+                            VeridiaColors.surfaceContainer,
+                          ),
+                          borderRadius: BorderRadius.circular(VeridiaRadii.md),
+                          border: Border.all(
+                            color: VeridiaCard.bordePorDefecto,
+                          ),
+                          boxShadow: veridiaRelieve(),
                         ),
                         child: Text(
                           'Nadie ha fotografiado especies aquí todavía. '
@@ -288,9 +296,7 @@ class _MapDetailScreenState extends State<MapDetailScreen> {
                           icon: const Icon(Icons.add_a_photo_outlined),
                           label: const Text('Capturar observación aquí'),
                           style: ElevatedButton.styleFrom(
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(10),
-                            ),
+                            shape: const StadiumBorder(),
                           ),
                         ),
                       ),
@@ -311,11 +317,10 @@ class _MapDetailScreenState extends State<MapDetailScreen> {
       width: 160,
       padding: const EdgeInsets.all(8),
       decoration: BoxDecoration(
-        color: VeridiaColors.surfaceContainer,
-        borderRadius: BorderRadius.circular(14),
-        boxShadow: const [
-          BoxShadow(color: Color.fromRGBO(0, 0, 0, 0.35), blurRadius: 8),
-        ],
+        gradient: veridiaCaraClay(VeridiaColors.surfaceContainer),
+        borderRadius: BorderRadius.circular(VeridiaRadii.md),
+        border: Border.all(color: VeridiaCard.bordePorDefecto),
+        boxShadow: veridiaRelieve(),
       ),
       child: Row(
         children: [

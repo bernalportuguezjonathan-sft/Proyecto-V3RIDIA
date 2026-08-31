@@ -83,9 +83,31 @@ class _RaizVeridiaState extends State<RaizVeridia> {
             }
 
             final perfil = UserRepository.instance.currentUser.value;
-            if (perfil?.isBanned == true) return const BannedScreen();
 
-            return perfil?.role == 'Administrador'
+            // Si el perfil NO se pudo cargar hay que pararse aqui.
+            //
+            // Antes no se miraba ni `hasError` ni el perfil nulo: cuando
+            // `initializeUser()` fallaba -Firestore inalcanzable, red que se
+            // cae a mitad, permisos denegados- el FutureBuilder terminaba en
+            // error, el codigo seguia de largo y `perfil` quedaba en null.
+            // Como null no es 'Administrador', la app abria HomeScreen: un
+            // ADMINISTRADOR con un fallo de red acababa dentro de la sesion
+            // de explorador, y cualquiera entraba a una app sin perfil, sin
+            // Veridiums y sin mascota, como si su cuenta estuviera vacia.
+            // Es la misma clase de fallo de aislamiento de roles que ya se
+            // corrigio en la barra inferior.
+            if (initSnapshot.hasError || perfil == null) {
+              return _PerfilNoDisponible(
+                onReintentar: () => setState(() {
+                  _uidCargado = null;
+                  _cargaPerfil = null;
+                }),
+              );
+            }
+
+            if (perfil.isBanned) return const BannedScreen();
+
+            return perfil.role == 'Administrador'
                 ? const AdminHomeScreen()
                 : const HomeScreen();
           },
@@ -219,6 +241,70 @@ class _VerificacionPendienteState extends State<_VerificacionPendiente> {
                     ),
                   ],
                 ),
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// Se muestra cuando la sesion es valida pero el PERFIL no se pudo traer.
+///
+/// Es un estado distinto de "no has entrado" y de "estas baneado": la cuenta
+/// esta bien, solo que ahora mismo no se sabe quien es. Por eso ofrece
+/// reintentar y tambien salir de la sesion, que es la unica salida si el
+/// problema resulta ser de la propia cuenta y no de la red.
+class _PerfilNoDisponible extends StatelessWidget {
+  const _PerfilNoDisponible({required this.onReintentar});
+
+  final VoidCallback onReintentar;
+
+  @override
+  Widget build(BuildContext context) {
+    final texto = Theme.of(context).textTheme;
+
+    return Scaffold(
+      body: VeridiaBackground(
+        child: SafeArea(
+          child: Center(
+            child: SingleChildScrollView(
+              padding: const EdgeInsets.all(28),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  const VeridiaSymbol(size: 84),
+                  const SizedBox(height: 26),
+                  Text(
+                    'No pudimos cargar tu perfil',
+                    textAlign: TextAlign.center,
+                    style: texto.headlineSmall,
+                  ),
+                  const SizedBox(height: 10),
+                  Text(
+                    'Tu sesion sigue abierta, pero no se pudieron traer tus '
+                    'datos. Revisa tu conexion y reintenta.',
+                    textAlign: TextAlign.center,
+                    style: texto.bodyMedium?.copyWith(
+                      color: VeridiaColors.onSurfaceVariant,
+                    ),
+                  ),
+                  const SizedBox(height: 24),
+                  VeridiaBotonTactil(
+                    radius: VeridiaRadii.pill,
+                    child: FilledButton.icon(
+                      onPressed: onReintentar,
+                      icon: const Icon(Icons.refresh_rounded, size: 18),
+                      label: const Text('Reintentar'),
+                    ),
+                  ),
+                  const SizedBox(height: 10),
+                  TextButton(
+                    onPressed: () => FirebaseAuth.instance.signOut(),
+                    child: const Text('Cerrar sesion'),
+                  ),
+                ],
               ),
             ),
           ),

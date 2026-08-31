@@ -191,14 +191,23 @@ class EspecieIAService {
     String? origen,
   }) async {
     if (faltaClaveGemini) {
-      // Dos mensajes distintos a propósito: en web es una decisión de
-      // seguridad (la clave no se compila ahí, ver config/gemini_key.dart) y
-      // quien lo lee es un explorador, no quien programa; en móvil sí es algo
-      // que hay que configurar.
+      // Tres mensajes distintos a propósito, según QUIÉN lo está leyendo.
+      //
+      // En la web publicada lo lee un explorador: para él la IA simplemente
+      // no existe ahí, y eso es una decisión de seguridad (la clave no se
+      // compila en web, ver config/gemini_key.dart). En la web en modo
+      // desarrollo lo lee quien programa, que SÍ puede activarla en su
+      // máquina y necesita saber cómo. En móvil es algo por configurar.
       throw SpeciesIdentificationException(
         kIsWeb
-            ? 'La identificación con IA no está disponible en la versión web. '
-                  'Usa la app de Android para identificar especies.'
+            ? (kDebugMode
+                  ? 'IA desactivada en esta ejecución web. Para probarla en '
+                        'el navegador, arranca con probar-ia-en-web.ps1 (pasa '
+                        'la clave por --dart-define, sin dejarla en el '
+                        'bundle).'
+                  : 'La identificación con IA no está disponible en la '
+                        'versión web. Usa la app de Android para identificar '
+                        'especies.')
             : 'Falta configurar la clave de Gemini en '
                   'lib/config/gemini_config.dart',
       );

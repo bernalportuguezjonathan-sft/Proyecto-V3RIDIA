@@ -211,6 +211,21 @@ class _Cabecera extends StatelessWidget {
 
 // ---------------------------------------------------------------------------
 
+/// Fondo de las fichas del refugio: más OSCURO que el resto de la app.
+///
+/// El refugio es una vitrina, y lo que tiene que destacar son los sprites de
+/// 16 bits y las etiquetas de color de cada mejora — no la tarjeta que los
+/// contiene. El verde `surfaceContainer` es más CLARO que el fondo de la
+/// pantalla, así que cada ficha competía en brillo con su propio contenido y
+/// la rejilla entera se leía como un bloque verde uniforme. Sobre este casi
+/// negro, cada mascota queda iluminada dentro de su nicho.
+///
+/// Los sprites no se tocan: siguen exactamente con su paleta original.
+const _fondoFicha = Color(0xFF02150F);
+
+/// Hueco dentro de una ficha (el desplegable "¿Por qué esa mejora?").
+const _huecoFicha = Color(0xFF010A07);
+
 class _TarjetaMascota extends StatelessWidget {
   const _TarjetaMascota({
     required this.mascota,
@@ -238,6 +253,7 @@ class _TarjetaMascota extends StatelessWidget {
     return Opacity(
       opacity: bloqueada ? 0.55 : 1,
       child: VeridiaCard(
+        color: _fondoFicha,
         borderColor: activa ? mascota.color.withValues(alpha: 0.6) : null,
         glow: activa,
         child: Column(
@@ -375,15 +391,27 @@ class _BloqueRanura extends StatelessWidget {
               ),
               const Spacer(),
               if (equipado != null)
-                TextButton(
+                OutlinedButton.icon(
                   onPressed: () =>
                       MascotaRepository.instance.quitarAccesorio(ranura),
-                  style: TextButton.styleFrom(
-                    padding: const EdgeInsets.symmetric(horizontal: 8),
+                  icon: const Icon(Icons.close_rounded, size: 14),
+                  label: const Text('Quitar'),
+                  style: OutlinedButton.styleFrom(
+                    foregroundColor: VeridiaColors.onSurfaceVariant,
+                    side: BorderSide(
+                      color: VeridiaColors.onSurfaceVariant.withValues(
+                        alpha: 0.45,
+                      ),
+                    ),
+                    padding: const EdgeInsets.symmetric(horizontal: 12),
                     minimumSize: const Size(0, 32),
+                    textStyle: const TextStyle(
+                      fontFamily: VeridiaFonts.body,
+                      fontSize: 12,
+                      fontWeight: FontWeight.w700,
+                    ),
                     tapTargetSize: MaterialTapTargetSize.shrinkWrap,
                   ),
-                  child: const Text('Quitar'),
                 ),
             ],
           ),
@@ -436,7 +464,14 @@ class _FichaAccesorioState extends State<_FichaAccesorio> {
     final accesorio = widget.accesorio;
     setState(() => _ocupado = true);
 
-    if (repo.tiene(accesorio.id)) {
+    if (widget.equipado) {
+      // Tocar algo YA puesto lo quita. Antes no hacia nada: quitar un
+      // accesorio solo era posible desde el enlace "Quitar" de la esquina de
+      // la seccion, que casi nadie encuentra, asi que en la practica ponerse
+      // un accesorio era irreversible y no habia forma de dejar a la mascota
+      // sin nada. Alternar en el propio accesorio es donde la gente lo busca.
+      await repo.quitarAccesorio(accesorio.ranura);
+    } else if (repo.tiene(accesorio.id)) {
       await repo.equiparAccesorio(accesorio);
     } else {
       final resultado = await repo.comprarAccesorio(accesorio);
@@ -468,6 +503,9 @@ class _FichaAccesorioState extends State<_FichaAccesorio> {
       child: Tooltip(
         message: accesorio.descripcion,
         child: VeridiaCard(
+          // Mismo nicho oscuro que las fichas de mascota: los accesorios son
+          // sprites igual que ellas y necesitan el mismo fondo para leerse.
+          color: _fondoFicha,
           padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 10),
           borderColor: widget.equipado
               ? VeridiaColors.secondary.withValues(alpha: 0.7)
@@ -855,8 +893,14 @@ class _DatoPlegableState extends State<_DatoPlegable> {
             margin: const EdgeInsets.only(top: 6),
             padding: const EdgeInsets.all(10),
             decoration: BoxDecoration(
-              color: VeridiaColors.surfaceContainerLow,
+              // Hueco excavado en la ficha oscura. Con el verde de antes este
+              // desplegable salía más CLARO que la tarjeta que lo abre, y
+              // parecía una tarjeta nueva encima en vez de un cajón abierto.
+              color: _huecoFicha,
               borderRadius: BorderRadius.circular(VeridiaRadii.md),
+              border: Border.all(
+                color: VeridiaColors.primary.withValues(alpha: 0.14),
+              ),
             ),
             child: Text(
               widget.dato,

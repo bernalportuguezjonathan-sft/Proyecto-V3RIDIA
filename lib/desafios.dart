@@ -169,9 +169,7 @@ class _ChallengesScreenState extends State<ChallengesScreen> {
                   }
                 },
                 style: ElevatedButton.styleFrom(
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(16),
-                  ),
+                  shape: const StadiumBorder(),
                   padding: const EdgeInsets.symmetric(
                     vertical: 14,
                     horizontal: 24,
@@ -472,15 +470,16 @@ class _ChallengesScreenState extends State<ChallengesScreen> {
                             return Container(
                               margin: const EdgeInsets.only(bottom: 12),
                               decoration: BoxDecoration(
-                                color: VeridiaColors.surfaceContainer,
-                                borderRadius: BorderRadius.circular(18),
-                                boxShadow: [
-                                  const BoxShadow(
-                                    color: Color.fromRGBO(0, 0, 0, 0.35),
-                                    blurRadius: 8,
-                                    offset: Offset(0, 2),
-                                  ),
-                                ],
+                                gradient: veridiaCaraClay(
+                                  VeridiaColors.surfaceContainer,
+                                ),
+                                borderRadius: BorderRadius.circular(
+                                  VeridiaRadii.lg,
+                                ),
+                                border: Border.all(
+                                  color: VeridiaCard.bordePorDefecto,
+                                ),
+                                boxShadow: veridiaRelieve(),
                               ),
                               child: Padding(
                                 padding: const EdgeInsets.all(16),

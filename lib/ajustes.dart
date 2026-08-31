@@ -5,6 +5,7 @@ import 'models/user.dart';
 import 'privacidad_seguridad.dart';
 import 'services/repositorio_u.dart';
 import 'theme/veridia_theme.dart';
+import 'widgets/veridia_ui.dart';
 
 class SettingsScreen extends StatefulWidget {
   const SettingsScreen({super.key});
@@ -92,11 +93,10 @@ class _SettingsScreenState extends State<SettingsScreen> {
       margin: const EdgeInsets.only(bottom: 14),
       padding: const EdgeInsets.all(18),
       decoration: BoxDecoration(
-        color: VeridiaColors.surfaceContainer,
-        borderRadius: BorderRadius.circular(18),
-        boxShadow: const [
-          BoxShadow(color: Color.fromRGBO(0, 0, 0, 0.35), blurRadius: 10),
-        ],
+        gradient: veridiaCaraClay(VeridiaColors.surfaceContainer),
+        borderRadius: BorderRadius.circular(VeridiaRadii.lg),
+        border: Border.all(color: VeridiaCard.bordePorDefecto),
+        boxShadow: veridiaRelieve(),
       ),
       child: Row(
         children: [
@@ -142,11 +142,10 @@ class _SettingsScreenState extends State<SettingsScreen> {
         margin: const EdgeInsets.only(bottom: 16),
         padding: const EdgeInsets.all(18),
         decoration: BoxDecoration(
-          color: VeridiaColors.surfaceContainer,
-          borderRadius: BorderRadius.circular(18),
-          boxShadow: const [
-            BoxShadow(color: Color.fromRGBO(0, 0, 0, 0.35), blurRadius: 10),
-          ],
+          gradient: veridiaCaraClay(VeridiaColors.surfaceContainer),
+          borderRadius: BorderRadius.circular(VeridiaRadii.lg),
+          border: Border.all(color: VeridiaCard.bordePorDefecto),
+          boxShadow: veridiaRelieve(),
         ),
         child: Row(
           children: [

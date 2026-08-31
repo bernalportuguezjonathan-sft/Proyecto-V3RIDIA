@@ -170,6 +170,9 @@ class ObservationRepository {
     // IA identificó, uno por uno: la misma foto puede sumar a más de un
     // desafío a la vez si varios piden la misma especie.
     final repo = ChallengeRepository.instance;
+    // Red de seguridad: si el stream de desafios todavia no emitio, esta
+    // lista estaria vacia y la foto no sumaria a ningun desafio en silencio.
+    await repo.asegurarCargado();
     final coincidencias = repo.challengesForUser(perfil.userId).where((c) {
       if (repo.progreso(c.id).completado) return false;
       return especieCoincide(c.targetSpecies, identificacion);

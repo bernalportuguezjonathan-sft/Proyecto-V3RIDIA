@@ -1,52 +1,72 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
-/// Paleta "Eco-Esmeralda" (Google Stitch — Veridia Biodiversity Explorer).
-/// Material 3, modo oscuro, headline Manrope / body Hanken Grotesk.
+/// Paleta "Deep Emerald" (Google Stitch — VitalClay). Material 3, modo
+/// oscuro, headline Manrope / body Hanken Grotesk.
+///
+/// Sustituye a la "Eco-Esmeralda" anterior, que era verde OLIVA (fondo
+/// #09160A, primario #A1D494 salvia): la escala nueva es esmeralda profundo
+/// —fondo #022C22, primario jade #10B981— con más saturación y más contraste
+/// entre niveles, que es lo que hace legible el relieve "clay" de
+/// veridia_ui.dart. Los nombres de los tokens no cambian, así que las ~60
+/// pantallas que ya leen de aquí se retiñen solas.
 abstract final class VeridiaColors {
-  static const background = Color(0xFF09160A);
-  static const surface = Color(0xFF09160A);
-  static const surfaceDim = Color(0xFF09160A);
-  static const surfaceBright = Color(0xFF2F3D2E);
-  static const surfaceContainerLowest = Color(0xFF051106);
-  static const surfaceContainerLow = Color(0xFF121F12);
-  static const surfaceContainer = Color(0xFF162315);
-  static const surfaceContainerHigh = Color(0xFF202D1F);
-  static const surfaceContainerHighest = Color(0xFF2B382A);
-  static const surfaceVariant = Color(0xFF2B382A);
+  static const background = Color(0xFF022C22);
+  static const surface = Color(0xFF022C22);
+  static const surfaceDim = Color(0xFF011E17);
+  static const surfaceBright = Color(0xFF0A5741);
+  static const surfaceContainerLowest = Color(0xFF011A14);
+  static const surfaceContainerLow = Color(0xFF04352A);
 
-  static const onSurface = Color(0xFFD7E7D2);
-  static const onSurfaceVariant = Color(0xFFC2C9BB);
-  static const outline = Color(0xFF8C9387);
-  static const outlineVariant = Color(0xFF42493E);
+  /// Base de las tarjetas "clay" (emerald-900 de la referencia).
+  static const surfaceContainer = Color(0xFF064E3B);
+  static const surfaceContainerHigh = Color(0xFF065F46);
+  static const surfaceContainerHighest = Color(0xFF047857);
+  static const surfaceVariant = Color(0xFF065F46);
 
-  static const primary = Color(0xFFA1D494);
-  static const onPrimary = Color(0xFF0A3909);
-  static const primaryContainer = Color(0xFF2D5A27);
-  static const onPrimaryContainer = Color(0xFF9DD090);
-  static const inversePrimary = Color(0xFF3B6934);
+  static const onSurface = Color(0xFFE4FFF4);
+  static const onSurfaceVariant = Color(0xFF8BD6B7);
+  static const outline = Color(0xFF5E9E86);
+  static const outlineVariant = Color(0xFF14503E);
 
-  /// Verde neón de acento: usado en brillos, progreso y datos destacados.
-  static const secondary = Color(0xFF9FD75B);
-  static const onSecondary = Color(0xFF1F3700);
-  static const secondaryContainer = Color(0xFF4C7C00);
-  static const onSecondaryContainer = Color(0xFFDFFFB5);
+  /// Jade vibrante: el acento principal de la referencia (`vibrant-jade`).
+  static const primary = Color(0xFF10B981);
+  static const onPrimary = Color(0xFF012A20);
+  static const primaryContainer = Color(0xFF065F46);
+  static const onPrimaryContainer = Color(0xFFA6F2D1);
+  static const inversePrimary = Color(0xFF047857);
 
-  static const tertiary = Color(0xFFBCCABC);
-  static const onTertiary = Color(0xFF27332A);
-  static const tertiaryContainer = Color(0xFF465348);
-  static const onTertiaryContainer = Color(0xFFB7C6B8);
+  /// Menta neón de acento: usada en brillos, progreso y datos destacados.
+  static const secondary = Color(0xFF6FFBBE);
+  static const onSecondary = Color(0xFF00281B);
+  static const secondaryContainer = Color(0xFF047857);
+  static const onSecondaryContainer = Color(0xFFD6FFEE);
+
+  static const tertiary = Color(0xFFA6F2D1);
+  static const onTertiary = Color(0xFF013A2A);
+  static const tertiaryContainer = Color(0xFF0A5741);
+  static const onTertiaryContainer = Color(0xFF97D4B4);
 
   static const error = Color(0xFFFFB4AB);
   static const onError = Color(0xFF690005);
   static const errorContainer = Color(0xFF93000A);
   static const onErrorContainer = Color(0xFFFFDAD6);
 
-  static const inverseSurface = Color(0xFFD7E7D2);
-  static const inverseOnSurface = Color(0xFF263425);
+  static const inverseSurface = Color(0xFFDCFCE9);
+  static const inverseOnSurface = Color(0xFF0B3B2C);
 
   /// Dorado de los Veridiums (moneda). Alto contraste sobre fondo oscuro.
   static const veridium = Color(0xFFFFD166);
+
+  /// Verde del relleno de los botones sólidos de la referencia
+  /// (`clay-button`, emerald-600). Un paso por debajo de [primary]: deja que
+  /// el jade siga siendo lo más brillante de la pantalla.
+  static const jadeProfundo = Color(0xFF059669);
+
+  /// Luz que "rebota" en el cuarto superior izquierdo de cada pieza clay.
+  /// Es blanco puro a muy baja opacidad: no es un color nuevo de la paleta,
+  /// es el reflejo especular del relieve.
+  static const brilloClay = Color(0x1AFFFFFF);
 }
 
 abstract final class VeridiaFonts {
@@ -70,26 +90,60 @@ abstract final class VeridiaMapa {
 
   static const atribucion = '© OpenStreetMap';
 
-  /// Baja la saturación de la base clara, la oscurece un poco y la inclina
-  /// hacia el verde de la paleta. El resultado es un mapa en tono medio:
-  /// se leen calles y lugares, pero no desentona con el resto de la app.
+  /// Conserva los colores PROPIOS de OpenStreetMap y solo les quita el brillo.
+  ///
+  /// Las dos versiones anteriores de esta matriz teñían el mapa entero a un
+  /// solo color —primero menta, después pizarra— para que casara con la
+  /// paleta de la app. Las dos estaban mal por la misma razón: en un mapa el
+  /// color ES información. El verde dice parque, el azul dice agua, el blanco
+  /// dice calle. Aplastar los tres a un mismo tono deja un plano bonito y
+  /// mudo, que se ve peor cuanto más se mira, y encima no se parece a ningún
+  /// mapa que alguien haya usado nunca.
+  ///
+  /// Así que aquí no hay tinte de color, solo una calma: desatura apenas al
+  /// 88%, baja el brillo un 10% y resta 8 a cada canal. Eso basta para que el
+  /// blanco del papel caiga a (222, 222, 222) y no deslumbre junto a una
+  /// interfaz oscura, mientras un parque sigue llegando verde a (174, 198,
+  /// 174) y el agua sigue llegando azul a (149, 180, 204). El mapa se lee
+  /// como un mapa; lo que lo ata a la app son los marcadores de abajo, que
+  /// para eso son lo único saturado en pantalla.
   static const tinte = ColorFilter.matrix(<double>[
-    0.7414, 0.1259, 0.0127, 0, -8, //
-    0.0383, 0.8487, 0.0130, 0, 2, //
-    0.0357, 0.1202, 0.6841, 0, -10, //
+    0.81496, 0.07724, 0.00779, 0, -8, //
+    0.02296, 0.86924, 0.00779, 0, -8, //
+    0.02296, 0.07724, 0.79979, 0, -8, //
     0, 0, 0, 1, 0, //
   ]);
+
+  /// Los cuatro tipos de marcador del mapa, cada uno con un tono propio.
+  ///
+  /// Antes cada capa elegía su color por su cuenta y dos de ellas cayeron casi
+  /// en el mismo naranja quemado, así que "una zona" y "una foto mía" se
+  /// distinguían solo por el ícono de dentro —a 20 px, por nada—. Sobre la
+  /// base pizarra estos cuatro se separan de un vistazo.
+  ///
+  /// [zona] va en ÁMBAR porque es el complementario del pizarra: es el tono
+  /// que más salta de ese fondo, y las zonas son el contenido principal del
+  /// mapa. El mismo ámbar marca el punto en la lista de zonas, para que la
+  /// ficha de abajo y el pin de arriba se lean como la misma cosa.
+  static const zona = Color(0xFFFFB020);
+  static const avistamiento = Color(0xFF10B981);
+  static const lugarBuscado = Color(0xFFFF6B4A);
+  static const tuPosicion = Color(0xFF2563EB);
 
   /// Aplica [tinte] a cada tesela. Se pasa a `TileLayer.tileBuilder`.
   static Widget teselaTenida(BuildContext context, Widget tesela, Object _) =>
       ColorFiltered(colorFilter: tinte, child: tesela);
 }
 
+/// Radios de la referencia "clay": redondeos MÁS generosos que los de antes
+/// (8/12/16/24). Una pieza con relieve necesita esquinas amplias para leerse
+/// como algo moldeado; con 12px el mismo relieve parece un rectángulo con
+/// sombra pegada.
 abstract final class VeridiaRadii {
-  static const sm = 8.0;
-  static const md = 12.0;
-  static const lg = 16.0;
-  static const xl = 24.0;
+  static const sm = 12.0;
+  static const md = 18.0;
+  static const lg = 24.0;
+  static const xl = 32.0;
   static const pill = 999.0;
 }
 
@@ -141,14 +195,46 @@ TextTheme _buildTextTheme() {
     color: VeridiaColors.onSurface,
   );
 
+  // Interletrado NEGATIVO en los tamaños grandes, como en la referencia
+  // (-0.04em en display, -0.02em en headline). A 44px el espaciado por
+  // defecto deja los titulares sueltos; apretarlos los compacta en un bloque
+  // y es la mitad de lo que hace que un número grande se lea "de tablero".
   return TextTheme(
-    displayLarge: display.copyWith(fontSize: 44, fontWeight: FontWeight.w800),
-    displayMedium: display.copyWith(fontSize: 36, fontWeight: FontWeight.w800),
-    displaySmall: display.copyWith(fontSize: 30, fontWeight: FontWeight.w700),
-    headlineLarge: display.copyWith(fontSize: 28, fontWeight: FontWeight.w700),
-    headlineMedium: display.copyWith(fontSize: 24, fontWeight: FontWeight.w700),
-    headlineSmall: display.copyWith(fontSize: 20, fontWeight: FontWeight.w700),
-    titleLarge: display.copyWith(fontSize: 18, fontWeight: FontWeight.w700),
+    displayLarge: display.copyWith(
+      fontSize: 44,
+      fontWeight: FontWeight.w800,
+      letterSpacing: -1.76,
+    ),
+    displayMedium: display.copyWith(
+      fontSize: 36,
+      fontWeight: FontWeight.w800,
+      letterSpacing: -1.44,
+    ),
+    displaySmall: display.copyWith(
+      fontSize: 30,
+      fontWeight: FontWeight.w800,
+      letterSpacing: -0.9,
+    ),
+    headlineLarge: display.copyWith(
+      fontSize: 28,
+      fontWeight: FontWeight.w800,
+      letterSpacing: -0.7,
+    ),
+    headlineMedium: display.copyWith(
+      fontSize: 24,
+      fontWeight: FontWeight.w700,
+      letterSpacing: -0.5,
+    ),
+    headlineSmall: display.copyWith(
+      fontSize: 20,
+      fontWeight: FontWeight.w700,
+      letterSpacing: -0.4,
+    ),
+    titleLarge: display.copyWith(
+      fontSize: 18,
+      fontWeight: FontWeight.w700,
+      letterSpacing: -0.3,
+    ),
     titleMedium: display.copyWith(fontSize: 16, fontWeight: FontWeight.w600),
     titleSmall: display.copyWith(fontSize: 14, fontWeight: FontWeight.w600),
     bodyLarge: body.copyWith(fontSize: 16, height: 1.45),
@@ -167,6 +253,22 @@ TextTheme _buildTextTheme() {
     ),
   );
 }
+
+/// Etiqueta en VERSALES espaciadas (`label-caps` de la referencia: 12px,
+/// +0.1em, bold). Es el rótulo pequeño que acompaña a un número grande —
+/// "PASOS", "RACHA"— y se separa de él justamente por el espaciado.
+///
+/// No entra en el [TextTheme] porque Material no tiene una ranura para este
+/// papel: `labelSmall` ya está ocupado por los rótulos normales de la barra
+/// inferior y de las métricas, que NO van en versales.
+const veridiaLabelCaps = TextStyle(
+  fontFamily: VeridiaFonts.body,
+  fontSize: 12,
+  height: 1.33,
+  fontWeight: FontWeight.w700,
+  letterSpacing: 1.2,
+  color: VeridiaColors.onSurfaceVariant,
+);
 
 ThemeData buildVeridiaTheme() {
   final textTheme = _buildTextTheme();
@@ -197,6 +299,15 @@ ThemeData buildVeridiaTheme() {
       ),
       titleTextStyle: textTheme.titleLarge,
       systemOverlayStyle: SystemUiOverlayStyle.light,
+      // Filo jade al pie de la barra: la separa del contenido sin recurrir a
+      // una sombra. Es el `border-b border-vibrant-jade/10` de la referencia,
+      // y aquí hace falta porque la barra y el fondo son ahora dos verdes muy
+      // cercanos (#04352A sobre #022C22) y sin línea se fundían.
+      shape: Border(
+        bottom: BorderSide(
+          color: VeridiaColors.primary.withValues(alpha: 0.18),
+        ),
+      ),
     ),
 
     cardTheme: CardThemeData(
@@ -206,7 +317,10 @@ ThemeData buildVeridiaTheme() {
       margin: EdgeInsets.zero,
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(VeridiaRadii.lg),
-        side: const BorderSide(color: VeridiaColors.outlineVariant),
+        // Jade al 20%, el mismo contorno que la referencia le pone a cada
+        // pieza clay. El `outlineVariant` gris de antes desaparecía contra
+        // el fondo y dejaba la tarjeta sin canto visible.
+        side: BorderSide(color: VeridiaColors.primary.withValues(alpha: 0.20)),
       ),
     ),
 
@@ -228,7 +342,11 @@ ThemeData buildVeridiaTheme() {
 
     inputDecorationTheme: InputDecorationTheme(
       filled: true,
-      fillColor: VeridiaColors.surfaceContainerHigh,
+      // Más OSCURO que la tarjeta que lo contiene, no más claro: en la
+      // referencia un campo es un `clay-inset`, un hueco excavado en la
+      // pieza. El relleno claro de antes lo hacía sobresalir, que es lo
+      // contrario de lo que debe comunicar un sitio donde se escribe.
+      fillColor: VeridiaColors.surfaceContainerLowest,
       contentPadding: const EdgeInsets.symmetric(vertical: 16, horizontal: 16),
       hintStyle: textTheme.bodyMedium?.copyWith(
         color: VeridiaColors.onSurfaceVariant,
@@ -263,21 +381,24 @@ ThemeData buildVeridiaTheme() {
       ),
     ),
 
+    // Los tres tipos de botón van en PÍLDORA (`clay-button` de la
+    // referencia: `border-radius: 9999px`). Antes eran rectángulos de 12px
+    // de radio; la píldora es lo que separa visualmente un botón —algo que
+    // se pulsa— de una tarjeta, ahora que ambos comparten el mismo relieve.
     elevatedButtonTheme: ElevatedButtonThemeData(
       style: ElevatedButton.styleFrom(
         backgroundColor: VeridiaColors.primary,
         foregroundColor: VeridiaColors.onPrimary,
-        disabledBackgroundColor: VeridiaColors.surfaceContainerHighest,
+        disabledBackgroundColor: VeridiaColors.surfaceContainerHigh,
         disabledForegroundColor: VeridiaColors.onSurfaceVariant,
         elevation: 0,
-        minimumSize: const Size(double.infinity, 52),
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(VeridiaRadii.md),
-        ),
+        minimumSize: const Size(double.infinity, 54),
+        shape: const StadiumBorder(),
         textStyle: const TextStyle(
           fontFamily: VeridiaFonts.headline,
           fontSize: 16,
-          fontWeight: FontWeight.w700,
+          fontWeight: FontWeight.w800,
+          letterSpacing: 0.2,
         ),
       ),
     ),
@@ -286,14 +407,15 @@ ThemeData buildVeridiaTheme() {
       style: FilledButton.styleFrom(
         backgroundColor: VeridiaColors.primary,
         foregroundColor: VeridiaColors.onPrimary,
-        minimumSize: const Size(0, 48),
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(VeridiaRadii.md),
-        ),
+        disabledBackgroundColor: VeridiaColors.surfaceContainerHigh,
+        disabledForegroundColor: VeridiaColors.onSurfaceVariant,
+        minimumSize: const Size(0, 50),
+        shape: const StadiumBorder(),
         textStyle: const TextStyle(
           fontFamily: VeridiaFonts.headline,
           fontSize: 15,
-          fontWeight: FontWeight.w700,
+          fontWeight: FontWeight.w800,
+          letterSpacing: 0.2,
         ),
       ),
     ),
@@ -301,18 +423,17 @@ ThemeData buildVeridiaTheme() {
     outlinedButtonTheme: OutlinedButtonThemeData(
       style: OutlinedButton.styleFrom(
         foregroundColor: VeridiaColors.primary,
-        minimumSize: const Size(0, 48),
+        minimumSize: const Size(0, 50),
         // Verde y de 1.6 en vez del gris `outline` de 1: el contorno es lo
         // único que dibuja a un botón sin relleno, y en gris se perdía contra
         // el fondo oscuro en vez de leerse como algo que se puede pulsar.
         side: const BorderSide(color: VeridiaColors.primary, width: 1.6),
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(VeridiaRadii.md),
-        ),
+        shape: const StadiumBorder(),
         textStyle: const TextStyle(
           fontFamily: VeridiaFonts.headline,
           fontSize: 15,
-          fontWeight: FontWeight.w600,
+          fontWeight: FontWeight.w700,
+          letterSpacing: 0.2,
         ),
       ),
     ),
@@ -340,7 +461,7 @@ ThemeData buildVeridiaTheme() {
     chipTheme: ChipThemeData(
       backgroundColor: VeridiaColors.surfaceContainerHigh,
       selectedColor: VeridiaColors.primaryContainer,
-      side: const BorderSide(color: VeridiaColors.outlineVariant),
+      side: BorderSide(color: VeridiaColors.primary.withValues(alpha: 0.22)),
       labelStyle: textTheme.labelMedium!,
       secondaryLabelStyle: textTheme.labelMedium!,
       shape: RoundedRectangleBorder(
@@ -349,12 +470,12 @@ ThemeData buildVeridiaTheme() {
     ),
 
     dialogTheme: DialogThemeData(
-      backgroundColor: VeridiaColors.surfaceContainerHigh,
+      backgroundColor: VeridiaColors.surfaceContainer,
       surfaceTintColor: Colors.transparent,
       elevation: 0,
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(VeridiaRadii.xl),
-        side: const BorderSide(color: VeridiaColors.outlineVariant),
+        side: BorderSide(color: VeridiaColors.primary.withValues(alpha: 0.22)),
       ),
       titleTextStyle: textTheme.titleLarge,
       contentTextStyle: textTheme.bodyMedium,
@@ -387,7 +508,11 @@ ThemeData buildVeridiaTheme() {
     navigationBarTheme: NavigationBarThemeData(
       backgroundColor: VeridiaColors.surfaceContainerLow,
       surfaceTintColor: Colors.transparent,
-      indicatorColor: VeridiaColors.primaryContainer,
+      // Jade translúcido, no el verde sólido `primaryContainer`: en la
+      // referencia la pestaña activa es un halo detrás del ícono, no una
+      // pastilla opaca que compite con él.
+      indicatorColor: VeridiaColors.primary.withValues(alpha: 0.20),
+      indicatorShape: const StadiumBorder(),
       elevation: 0,
       labelTextStyle: WidgetStateProperty.resolveWith(
         (states) => states.contains(WidgetState.selected)
@@ -400,29 +525,32 @@ ThemeData buildVeridiaTheme() {
       iconTheme: WidgetStateProperty.resolveWith(
         (states) => IconThemeData(
           color: states.contains(WidgetState.selected)
-              ? VeridiaColors.onPrimaryContainer
+              ? VeridiaColors.primary
               : VeridiaColors.onSurfaceVariant,
         ),
       ),
     ),
 
     snackBarTheme: SnackBarThemeData(
-      backgroundColor: VeridiaColors.surfaceContainerHighest,
+      backgroundColor: VeridiaColors.surfaceContainerHigh,
       contentTextStyle: textTheme.bodyMedium?.copyWith(
         color: VeridiaColors.onSurface,
       ),
-      actionTextColor: VeridiaColors.primary,
+      actionTextColor: VeridiaColors.secondary,
       behavior: SnackBarBehavior.floating,
       elevation: 0,
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(VeridiaRadii.md),
-        side: const BorderSide(color: VeridiaColors.outlineVariant),
+        side: BorderSide(color: VeridiaColors.primary.withValues(alpha: 0.28)),
       ),
     ),
 
     progressIndicatorTheme: const ProgressIndicatorThemeData(
       color: VeridiaColors.primary,
-      linearTrackColor: VeridiaColors.surfaceContainerHighest,
+      // El carril va OSCURO (era `surfaceContainerHighest`, casi tan claro
+      // como el relleno): así la barra llena se lee como luz dentro de un
+      // canal excavado, que es el gesto de la referencia.
+      linearTrackColor: VeridiaColors.surfaceContainerLowest,
       circularTrackColor: Colors.transparent,
     ),
 
@@ -454,7 +582,7 @@ ThemeData buildVeridiaTheme() {
       textStyle: textTheme.bodyMedium,
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(VeridiaRadii.md),
-        side: const BorderSide(color: VeridiaColors.outlineVariant),
+        side: BorderSide(color: VeridiaColors.primary.withValues(alpha: 0.22)),
       ),
     ),
 

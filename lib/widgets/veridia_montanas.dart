@@ -24,7 +24,7 @@ class VeridiaMontanas extends StatelessWidget {
             gradient: LinearGradient(
               begin: Alignment.topCenter,
               end: Alignment.bottomCenter,
-              colors: [Color(0xFF061007), Color(0xFF0C2010), Color(0xFF13301A)],
+              colors: [Color(0xFF011A14), Color(0xFF022C22), Color(0xFF04372B)],
               stops: [0.0, 0.55, 1.0],
             ),
           ),
@@ -36,7 +36,7 @@ class VeridiaMontanas extends StatelessWidget {
             gradient: LinearGradient(
               begin: Alignment.topCenter,
               end: Alignment.bottomCenter,
-              colors: [Color(0xE6091609), Color(0xB30C1D0D), Color(0xF2050F06)],
+              colors: [Color(0xE6011E17), Color(0xB3033126), Color(0xF2011A14)],
               stops: [0.0, 0.5, 1.0],
             ),
           ),
@@ -63,7 +63,7 @@ class _PaisajePainter extends CustomPainter {
       altura: h * 0.20,
       cumbres: 4,
       desfase: 0.0,
-      color: const Color(0xFF16301B),
+      color: const Color(0xFF053B2D),
       nieve: true,
     );
     _cordillera(
@@ -73,7 +73,7 @@ class _PaisajePainter extends CustomPainter {
       altura: h * 0.17,
       cumbres: 5,
       desfase: 0.35,
-      color: const Color(0xFF1C3D22),
+      color: const Color(0xFF06503C),
       nieve: true,
     );
     _cordillera(
@@ -83,12 +83,12 @@ class _PaisajePainter extends CustomPainter {
       altura: h * 0.12,
       cumbres: 6,
       desfase: 0.7,
-      color: const Color(0xFF224A29),
+      color: const Color(0xFF086349),
       nieve: false,
     );
 
     // Laderas boscosas en primer plano.
-    final colinas = Paint()..color = const Color(0xFF1A3B20);
+    final colinas = Paint()..color = const Color(0xFF064C39);
     final trazoColinas = Path()..moveTo(0, h);
     trazoColinas.lineTo(0, h * 0.78);
     trazoColinas.quadraticBezierTo(w * 0.22, h * 0.70, w * 0.45, h * 0.77);
@@ -102,14 +102,14 @@ class _PaisajePainter extends CustomPainter {
       size,
       y: h * 0.80,
       escala: 0.72,
-      color: const Color(0xFF122C17),
+      color: const Color(0xFF04372A),
     );
     _bosque(
       canvas,
       size,
       y: h * 0.90,
       escala: 1.0,
-      color: const Color(0xFF0C1F10),
+      color: const Color(0xFF02261D),
     );
   }
 
@@ -148,7 +148,7 @@ class _PaisajePainter extends CustomPainter {
     if (!nieve) return;
 
     // Casquetes: un triángulo pequeño colgando de cada cumbre.
-    final blanco = Paint()..color = const Color(0x40D7E7D2);
+    final blanco = Paint()..color = const Color(0x40D6FFEE);
     for (final pico in picos) {
       final capa = Path()
         ..moveTo(pico.dx, pico.dy)

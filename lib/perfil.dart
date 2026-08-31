@@ -344,6 +344,38 @@ class _ProfileScreenState extends State<ProfileScreen> {
       _photoURL = updatedPhotoURL;
 
       final currentProfile = UserRepository.instance.currentUser.value;
+
+      // Escribir el nombre en FIRESTORE, no solo en FirebaseAuth.
+      //
+      // Este era el motivo de que cambiar el nombre no sirviera de nada: se
+      // guardaba en FirebaseAuth y en la copia en memoria, pero nunca en el
+      // documento `users/{uid}`. Doce lineas mas abajo se llama a
+      // `initializeUser()`, que RELEE ese documento y prefiere su
+      // `displayName` sobre cualquier otra fuente, asi que devolvia el nombre
+      // viejo y pisaba el nuevo: la pantalla decia "Perfil actualizado
+      // correctamente" y acto seguido volvia a mostrar el de siempre.
+      //
+      // El photoURL va con el valor ya resuelto y no con `newPhotoURL` a
+      // secas: cuando solo se cambia el nombre, `newPhotoURL` es null y
+      // escribirlo tal cual borraria de Firestore la foto que ya hubiera.
+      await UserRepository.instance.updateUserProfile(
+        userId: user.uid,
+        displayName: newName,
+        photoURL: updatedPhotoURL,
+      );
+
+      // Y tambien en la cache local, que es de donde se lee cuando Firestore
+      // no responde: sin esto, cambiar el nombre sin conexion se deshacia
+      // solo al reabrir la app.
+      if (currentProfile != null) {
+        await UserRepository.instance.cacheUserProfile(
+          user.uid,
+          currentProfile.tokens,
+          currentProfile.role,
+          newName,
+        );
+      }
+
       if (currentProfile != null) {
         UserRepository.instance.currentUser.value = currentProfile.copyWith(
           displayName: newName,
@@ -427,20 +459,27 @@ class _ProfileScreenState extends State<ProfileScreen> {
                     margin: const EdgeInsets.all(16),
                     padding: const EdgeInsets.all(20),
                     decoration: BoxDecoration(
-                      gradient: LinearGradient(
-                        colors: [
-                          VeridiaColors.primary,
-                          VeridiaColors.primaryContainer,
-                        ],
+                      // Esmeralda PROFUNDO, no el jade brillante de antes.
+                      // La cabecera arrancaba en `primary` puro, el color mas
+                      // claro de la paleta, y contra el se perdian las tres
+                      // cosas que esta tarjeta existe para ensenar: el retrato,
+                      // las insignias -que son translucidas- y el correo. Un
+                      // fondo oscuro les devuelve el contraste sin sacarla de
+                      // la paleta; lo que la mantiene como la pieza principal
+                      // de la pantalla es el halo, no el brillo del relleno.
+                      gradient: const LinearGradient(
+                        begin: Alignment.topLeft,
+                        end: Alignment.bottomRight,
+                        colors: [Color(0xFF0A5741), Color(0xFF03211A)],
                       ),
-                      borderRadius: BorderRadius.circular(16),
-                      boxShadow: const [
-                        BoxShadow(
-                          color: Color.fromRGBO(30, 86, 49, 0.2),
-                          blurRadius: 10,
-                          offset: Offset(0, 5),
-                        ),
-                      ],
+                      border: Border.all(
+                        color: VeridiaColors.primary.withValues(alpha: 0.30),
+                      ),
+                      borderRadius: BorderRadius.circular(VeridiaRadii.lg),
+                      // Con halo: es la cabecera del perfil, la pieza que
+                      // manda en esa pantalla. La sombra que tenía antes era
+                      // un verde oliva (30,86,49) de la paleta anterior.
+                      boxShadow: veridiaRelieve(glow: true),
                     ),
                     child: Column(
                       children: [
@@ -635,39 +674,45 @@ class _ProfileScreenState extends State<ProfileScreen> {
                             children: [
                               Expanded(
                                 child: VeridiaBotonTactil(
+                                  // Sin `backgroundColor` propio: hereda el
+                                  // jade del tema. Antes se pintaba en
+                                  // `surfaceContainer`, o sea del mismo verde
+                                  // que la tarjeta que lo contiene, y la
+                                  // accion principal de la pantalla quedaba
+                                  // mas apagada que el boton de Cancelar.
+                                  //
+                                  // Y sin `horizontal: 24`: dentro de un
+                                  // Expanded ese relleno robaba 48 px al
+                                  // ancho y partia "Guardar cambios" en dos
+                                  // lineas. El alto ya lo pone el tema.
                                   child: ElevatedButton(
                                     onPressed: _isSaving
                                         ? null
                                         : _saveProfileChanges,
                                     style: ElevatedButton.styleFrom(
-                                      backgroundColor:
-                                          VeridiaColors.surfaceContainer,
-                                      foregroundColor: VeridiaColors.primary,
-                                      shape: RoundedRectangleBorder(
-                                        borderRadius: BorderRadius.circular(12),
-                                      ),
-                                    ),
-                                    child: Padding(
+                                      minimumSize: const Size(0, 50),
                                       padding: const EdgeInsets.symmetric(
-                                        vertical: 12,
-                                        horizontal: 24,
+                                        horizontal: 12,
                                       ),
-                                      child: _isSaving
-                                          ? const SizedBox(
-                                              width: 18,
-                                              height: 18,
-                                              child: CircularProgressIndicator(
-                                                color: VeridiaColors.primary,
-                                                strokeWidth: 2,
-                                              ),
-                                            )
-                                          : const Text(
-                                              'Guardar cambios',
-                                              style: TextStyle(
-                                                fontWeight: FontWeight.bold,
-                                              ),
-                                            ),
+                                      shape: const StadiumBorder(),
                                     ),
+                                    child: _isSaving
+                                        ? const SizedBox(
+                                            width: 18,
+                                            height: 18,
+                                            child: CircularProgressIndicator(
+                                              color: VeridiaColors.onPrimary,
+                                              strokeWidth: 2,
+                                            ),
+                                          )
+                                        // FittedBox por si el idioma o el
+                                        // tamanio de fuente del sistema lo
+                                        // hacen crecer: encoge antes que
+                                        // partirse en dos lineas.
+                                        : const FittedBox(
+                                            fit: BoxFit.scaleDown,
+                                            child: Text('Guardar cambios'),
+                                          ),
                                   ),
                                 ),
                               ),
@@ -685,20 +730,26 @@ class _ProfileScreenState extends State<ProfileScreen> {
                                               _nameController.text = _userName;
                                             });
                                           },
+                                    // Contorno visible: `outlineVariant` es
+                                    // ahora un verde muy oscuro y el boton
+                                    // quedaba sin borde perceptible, como un
+                                    // texto suelto flotando en la tarjeta.
                                     style: OutlinedButton.styleFrom(
-                                      foregroundColor: VeridiaColors.onSurface,
-                                      side: const BorderSide(
-                                        color: VeridiaColors.outlineVariant,
+                                      foregroundColor:
+                                          VeridiaColors.onSurfaceVariant,
+                                      side: BorderSide(
+                                        color: VeridiaColors.onSurfaceVariant
+                                            .withValues(alpha: 0.55),
+                                        width: 1.4,
                                       ),
-                                      shape: RoundedRectangleBorder(
-                                        borderRadius: BorderRadius.circular(12),
+                                      minimumSize: const Size(0, 50),
+                                      padding: const EdgeInsets.symmetric(
+                                        horizontal: 12,
                                       ),
+                                      shape: const StadiumBorder(),
                                     ),
-                                    child: const Padding(
-                                      padding: EdgeInsets.symmetric(
-                                        vertical: 12,
-                                        horizontal: 24,
-                                      ),
+                                    child: const FittedBox(
+                                      fit: BoxFit.scaleDown,
                                       child: Text('Cancelar'),
                                     ),
                                   ),
@@ -714,27 +765,23 @@ class _ProfileScreenState extends State<ProfileScreen> {
                                   _isEditingProfile = true;
                                 });
                               },
+                              // Un solo relleno. Antes llevaba DOS -el del
+                              // `style` y el del `Padding` hijo-, que se
+                              // sumaban a 26 px por lado y convertian el
+                              // boton en una losa. Y hereda el jade del tema
+                              // en vez de pintarse del mismo verde que la
+                              // tarjeta que lo contiene.
                               style: ElevatedButton.styleFrom(
-                                backgroundColor: VeridiaColors.surfaceContainer,
-                                foregroundColor: VeridiaColors.primary,
-                                shape: RoundedRectangleBorder(
-                                  borderRadius: BorderRadius.circular(16),
-                                ),
+                                shape: const StadiumBorder(),
                                 elevation: 0,
+                                minimumSize: const Size(double.infinity, 52),
                                 padding: const EdgeInsets.symmetric(
-                                  vertical: 14,
-                                  horizontal: 24,
+                                  horizontal: 20,
                                 ),
                               ),
-                              child: const Padding(
-                                padding: EdgeInsets.symmetric(
-                                  vertical: 12,
-                                  horizontal: 24,
-                                ),
-                                child: Text(
-                                  'Modificar perfil',
-                                  style: TextStyle(fontWeight: FontWeight.bold),
-                                ),
+                              child: const FittedBox(
+                                fit: BoxFit.scaleDown,
+                                child: Text('Modificar perfil'),
                               ),
                             ),
                           ),
@@ -950,11 +997,10 @@ class _ProfileScreenState extends State<ProfileScreen> {
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: VeridiaColors.surfaceContainer,
-        borderRadius: BorderRadius.circular(16),
-        boxShadow: const [
-          BoxShadow(color: Color.fromRGBO(0, 0, 0, 0.35), blurRadius: 8),
-        ],
+        gradient: veridiaCaraClay(VeridiaColors.surfaceContainer),
+        borderRadius: BorderRadius.circular(VeridiaRadii.lg),
+        border: Border.all(color: VeridiaCard.bordePorDefecto),
+        boxShadow: veridiaRelieve(),
       ),
       child: Column(
         children: [
@@ -987,11 +1033,10 @@ class _ProfileScreenState extends State<ProfileScreen> {
     return Container(
       margin: const EdgeInsets.only(bottom: 12),
       decoration: BoxDecoration(
-        color: VeridiaColors.surfaceContainer,
-        borderRadius: BorderRadius.circular(16),
-        boxShadow: const [
-          BoxShadow(color: Color.fromRGBO(0, 0, 0, 0.35), blurRadius: 8),
-        ],
+        gradient: veridiaCaraClay(VeridiaColors.surfaceContainer),
+        borderRadius: BorderRadius.circular(VeridiaRadii.lg),
+        border: Border.all(color: VeridiaCard.bordePorDefecto),
+        boxShadow: veridiaRelieve(),
       ),
       child: Material(
         color: Colors.transparent,

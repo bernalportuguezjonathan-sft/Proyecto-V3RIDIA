@@ -709,9 +709,13 @@ class _SelectorRol extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.all(4),
       decoration: BoxDecoration(
+        // Canal hundido con la pastilla elegida en relieve dentro: es el
+        // mismo gesto del selector de la referencia.
         color: VeridiaColors.surfaceContainerLowest,
         borderRadius: BorderRadius.circular(VeridiaRadii.pill),
-        border: Border.all(color: VeridiaColors.outlineVariant),
+        border: Border.all(
+          color: VeridiaColors.primary.withValues(alpha: 0.18),
+        ),
       ),
       child: Row(
         children: [
@@ -758,10 +762,11 @@ class _OpcionRol extends StatelessWidget {
         duration: const Duration(milliseconds: 180),
         padding: const EdgeInsets.symmetric(vertical: 10),
         decoration: BoxDecoration(
-          color: seleccionado
-              ? VeridiaColors.primaryContainer
-              : Colors.transparent,
+          gradient: seleccionado
+              ? veridiaCaraClay(VeridiaColors.primaryContainer)
+              : null,
           borderRadius: BorderRadius.circular(VeridiaRadii.pill),
+          boxShadow: seleccionado ? veridiaRelieve() : null,
         ),
         child: Row(
           mainAxisAlignment: MainAxisAlignment.center,

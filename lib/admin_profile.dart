@@ -505,14 +505,16 @@ class _AdminProfileScreenState extends State<AdminProfileScreen> {
                           width: double.infinity,
                           padding: const EdgeInsets.all(16),
                           decoration: BoxDecoration(
-                            color: VeridiaColors.surfaceContainer,
-                            borderRadius: BorderRadius.circular(12),
-                            boxShadow: const [
-                              BoxShadow(
-                                color: Color.fromRGBO(0, 0, 0, 0.35),
-                                blurRadius: 8,
-                              ),
-                            ],
+                            gradient: veridiaCaraClay(
+                              VeridiaColors.surfaceContainer,
+                            ),
+                            borderRadius: BorderRadius.circular(
+                              VeridiaRadii.md,
+                            ),
+                            border: Border.all(
+                              color: VeridiaCard.bordePorDefecto,
+                            ),
+                            boxShadow: veridiaRelieve(),
                           ),
                           child: Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
@@ -547,9 +549,7 @@ class _AdminProfileScreenState extends State<AdminProfileScreen> {
                             child: ElevatedButton(
                               onPressed: _isSaving ? null : _saveProfileChanges,
                               style: ElevatedButton.styleFrom(
-                                shape: RoundedRectangleBorder(
-                                  borderRadius: BorderRadius.circular(12),
-                                ),
+                                shape: const StadiumBorder(),
                               ),
                               child: _isSaving
                                   ? const SizedBox(
@@ -584,9 +584,7 @@ class _AdminProfileScreenState extends State<AdminProfileScreen> {
                                 side: const BorderSide(
                                   color: VeridiaColors.primary,
                                 ),
-                                shape: RoundedRectangleBorder(
-                                  borderRadius: BorderRadius.circular(12),
-                                ),
+                                shape: const StadiumBorder(),
                               ),
                               child: const Text('Cancelar'),
                             ),
@@ -614,9 +612,7 @@ class _AdminProfileScreenState extends State<AdminProfileScreen> {
                           ),
                           style: ElevatedButton.styleFrom(
                             padding: const EdgeInsets.symmetric(vertical: 14),
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(12),
-                            ),
+                            shape: const StadiumBorder(),
                           ),
                         ),
                       ),

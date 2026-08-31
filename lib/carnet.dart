@@ -1,8 +1,5 @@
-import 'dart:convert';
-
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
-import 'package:shared_preferences/shared_preferences.dart';
 
 import 'models/logro.dart';
 import 'models/observation.dart';
@@ -15,7 +12,8 @@ import 'services/repositorio_o.dart';
 import 'services/repositorio_r.dart';
 import 'services/repositorio_u.dart';
 import 'theme/veridia_theme.dart';
-import 'widgets/mascota_vista.dart';
+import 'widgets/foto_perfil.dart';
+import 'widgets/mascota_vitrina.dart';
 import 'widgets/logros_vista.dart';
 import 'widgets/veridia_logo.dart';
 import 'widgets/veridia_ui.dart';
@@ -49,17 +47,13 @@ class _CarnetScreenState extends State<CarnetScreen> {
 
   /// Lee la foto de perfil del mismo caché que usa ProfileScreen, para que el
   /// carnet no muestre un avatar distinto del que la persona ya se puso.
+  ///
+  /// Toda la lógica de DÓNDE puede estar esa foto vive en [FotoPerfil], que
+  /// mira las tres fuentes posibles. Aquí solo se piden los bytes.
   Future<void> _cargarFoto() async {
-    final uid = UserRepository.instance.currentUser.value?.userId;
-    if (uid == null) return;
-    try {
-      final prefs = await SharedPreferences.getInstance();
-      final codificada = prefs.getString('profile_image_$uid');
-      if (codificada == null || !mounted) return;
-      setState(() => _foto = base64Decode(codificada));
-    } catch (e) {
-      debugPrint('Carnet: no se pudo leer la foto de perfil: $e');
-    }
+    final bytes = await FotoPerfil.bytesGuardados();
+    if (bytes == null || !mounted) return;
+    setState(() => _foto = bytes);
   }
 
   @override
@@ -113,6 +107,19 @@ Future<void> abrirCarnet(BuildContext context) {
 
 // ---------------------------------------------------------------------------
 
+/// Fondo del carnet: casi negro, NO el verde de las demás tarjetas.
+///
+/// El carnet es lo único de la app pensado para salir de la app: se captura y
+/// se comparte por fuera. Por eso no debe leerse como una tarjeta más del
+/// montón. Sobre este casi negro, el dorado del nivel, el retrato y los
+/// sprites de la mascota recuperan todo el contraste que verde sobre verde se
+/// comía, y la captura funciona igual pegada en un chat claro o en uno oscuro.
+const _fondoCarnet = Color(0xFF03110C);
+
+/// Hueco donde se apoyan las cuatro cifras. Aún más oscuro que el carnet, para
+/// que los números queden dentro de algo excavado y no flotando en el negro.
+const _huecoCarnet = Color(0xFF010A07);
+
 class _Carnet extends StatelessWidget {
   const _Carnet({required this.perfil, required this.fotos, this.foto});
 
@@ -152,7 +159,9 @@ class _Carnet extends StatelessWidget {
 
     return VeridiaCard(
       glow: true,
+      color: _fondoCarnet,
       borderColor: acento.withValues(alpha: 0.55),
+      radius: VeridiaRadii.xl,
       padding: const EdgeInsets.all(18),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -185,7 +194,14 @@ class _Carnet extends StatelessWidget {
           Row(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              _Retrato(foto: foto, photoURL: perfil.photoURL, marco: marco),
+              _Retrato(
+                foto: foto,
+                // La URL pasa por [FotoPerfil] y no directo desde el perfil:
+                // así el carnet también alcanza el avatar de Google, que solo
+                // existe en FirebaseAuth y era el caso que fallaba.
+                photoURL: FotoPerfil.urlDeRespaldo(perfil.photoURL),
+                marco: marco,
+              ),
               const SizedBox(width: 14),
               Expanded(
                 child: Column(
@@ -217,12 +233,15 @@ class _Carnet extends StatelessWidget {
               if (mascota != null)
                 Column(
                   children: [
-                    MascotaVista(
+                    // Enmarcada en su habitat: en el carnet la mascota es una
+                    // credencial mas -como el nivel o las insignias- y suelta
+                    // sobre el negro se leia como un sticker pegado encima.
+                    MascotaVitrina(
                       mascota: mascota,
                       equipado: mascotas.equipados(perfil),
                       tamano: 64,
                     ),
-                    const SizedBox(height: 4),
+                    const SizedBox(height: 5),
                     SizedBox(
                       width: 68,
                       child: Text(
@@ -242,27 +261,44 @@ class _Carnet extends StatelessWidget {
             ],
           ),
           const SizedBox(height: 18),
-          Row(
-            children: [
-              Expanded(
-                child: _Cifra(
-                  valor: '${stats.especiesDistintas}',
-                  etiqueta: 'especies',
+          // Las cuatro cifras, hundidas en su propio panel: es lo primero que
+          // mira quien recibe la captura, y suelto sobre el fondo se leía como
+          // texto cualquiera en vez de como el marcador del carnet.
+          Container(
+            padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 8),
+            decoration: BoxDecoration(
+              gradient: veridiaCaraClay(_huecoCarnet),
+              borderRadius: BorderRadius.circular(VeridiaRadii.md),
+              border: Border.all(
+                color: VeridiaColors.veridium.withValues(alpha: 0.18),
+              ),
+            ),
+            child: Row(
+              children: [
+                Expanded(
+                  child: _Cifra(
+                    valor: '${stats.especiesDistintas}',
+                    etiqueta: 'especies',
+                  ),
                 ),
-              ),
-              Expanded(
-                child: _Cifra(valor: '${fotos.length}', etiqueta: 'registros'),
-              ),
-              Expanded(
-                child: _Cifra(valor: '$desafios', etiqueta: 'desafíos'),
-              ),
-              Expanded(
-                child: _Cifra(
-                  valor: '${perfil.tokensTotales}',
-                  etiqueta: 'ganados',
+                Expanded(
+                  child: _Cifra(
+                    valor: '${fotos.length}',
+                    etiqueta: 'registros',
+                  ),
                 ),
-              ),
-            ],
+                Expanded(
+                  child: _Cifra(valor: '$desafios', etiqueta: 'desafíos'),
+                ),
+                Expanded(
+                  child: _Cifra(
+                    valor: '${perfil.tokensTotales}',
+                    etiqueta: 'ganados',
+                    acento: VeridiaColors.veridium,
+                  ),
+                ),
+              ],
+            ),
           ),
           const SizedBox(height: 16),
           VeridiaProgressBar(
@@ -339,7 +375,9 @@ class _Retrato extends StatelessWidget {
       width: 74,
       height: 74,
       decoration: BoxDecoration(
-        color: VeridiaColors.surfaceContainerLow,
+        // Hueco, no `surfaceContainerLow`: sobre el casi negro del carnet ese
+        // verde dibujaba un círculo claro alrededor del retrato.
+        color: _huecoCarnet,
         shape: BoxShape.circle,
         border: Border.all(color: color, width: marco == null ? 1.5 : 3),
         boxShadow: marco == null
@@ -374,10 +412,18 @@ class _SinRetrato extends StatelessWidget {
 
 /// Una cifra del carnet: número grande, etiqueta pequeña.
 class _Cifra extends StatelessWidget {
-  const _Cifra({required this.valor, required this.etiqueta});
+  const _Cifra({
+    required this.valor,
+    required this.etiqueta,
+    this.acento = VeridiaColors.onSurface,
+  });
 
   final String valor;
   final String etiqueta;
+
+  /// Los Veridiums ganados van en dorado: es la cifra que resume todo lo
+  /// demás, y en el mismo blanco que las otras tres no se distinguía.
+  final Color acento;
 
   @override
   Widget build(BuildContext context) {
@@ -385,18 +431,26 @@ class _Cifra extends StatelessWidget {
       children: [
         Text(
           valor,
-          style: const TextStyle(
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
+          style: TextStyle(
             fontFamily: VeridiaFonts.headline,
             fontSize: 22,
-            fontWeight: FontWeight.w700,
-            color: VeridiaColors.onSurface,
+            fontWeight: FontWeight.w800,
+            letterSpacing: -0.6,
+            color: acento,
           ),
         ),
+        const SizedBox(height: 2),
         Text(
-          etiqueta,
+          etiqueta.toUpperCase(),
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
           style: const TextStyle(
             fontFamily: VeridiaFonts.body,
-            fontSize: 10,
+            fontSize: 9,
+            fontWeight: FontWeight.w700,
+            letterSpacing: 0.9,
             color: VeridiaColors.onSurfaceVariant,
           ),
         ),

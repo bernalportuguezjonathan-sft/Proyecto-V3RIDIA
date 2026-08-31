@@ -52,6 +52,29 @@ class ChallengeRepository {
     // usuario, Firestore cerraría el stream con permission-denied y la lista
     // quedaría vacía para siempre.
     FirebaseAuth.instance.authStateChanges().listen(_subscribe);
+
+    // Y otra vez cuando se sepa el ROL, que llega despues.
+    //
+    // authStateChanges() dispara en cuanto hay sesion, pero el perfil -y con
+    // el, si eres Administrador- se carga de forma asincrona un momento mas
+    // tarde. Como [_subscribe] elige la consulta según el rol, un
+    // administrador se suscribía con el filtro de explorador y su panel se
+    // quedaba SIN los desafíos asignados a otras personas: creaba uno para un
+    // estudiante y no volvía a verlo. Al enterarnos del rol rehacemos la
+    // suscripción.
+    UserRepository.instance.currentUser.addListener(_revisarRol);
+  }
+
+  /// Rol con el que se armo la suscripcion actual, para no rehacerla en cada
+  /// notificacion del perfil (que cambia tambien al ganar Veridiums).
+  String? _rolSuscrito;
+
+  void _revisarRol() {
+    final rol = UserRepository.instance.currentUser.value?.role;
+    if (rol == _rolSuscrito) return;
+    final user = FirebaseAuth.instance.currentUser;
+    if (user == null) return;
+    _subscribe(user);
   }
 
   static final ChallengeRepository instance = ChallengeRepository._();
@@ -72,32 +95,75 @@ class ChallengeRepository {
   final ValueNotifier<Map<String, ProgresoDesafio>> misProgresos =
       ValueNotifier<Map<String, ProgresoDesafio>>({});
 
+  /// Desafíos globales (o TODOS, si quien mira es administrador).
   StreamSubscription<QuerySnapshot<Map<String, dynamic>>>? _sub;
+
+  /// Desafíos asignados personalmente a este explorador. Va aparte porque
+  /// Firestore no sabe hacer un OR en una sola consulta (ver [_subscribe]).
+  StreamSubscription<QuerySnapshot<Map<String, dynamic>>>? _subAsignados;
+
   StreamSubscription<QuerySnapshot<Map<String, dynamic>>>? _subProgreso;
+
+  List<Challenge> _globales = const [];
+  List<Challenge> _asignados = const [];
 
   void _subscribe(User? user) {
     _sub?.cancel();
+    _subAsignados?.cancel();
     _subProgreso?.cancel();
     _sub = null;
+    _subAsignados = null;
     _subProgreso = null;
+    _globales = const [];
+    _asignados = const [];
 
     if (user == null) {
       challenges.value = [];
       misProgresos.value = {};
+      _rolSuscrito = null;
       return;
     }
 
-    // El administrador necesita ver todos los desafíos; un explorador solo
-    // los suyos. Traérselos todos a cada dispositivo no solo gastaba lecturas
-    // de más: le enseñaba el nombre y el correo de las personas a las que se
-    // asignaron los desafíos ajenos.
-    _sub = _consultaPara(user.uid).snapshots().listen((snapshot) {
-      final list = snapshot.docs
-          .map((doc) => Challenge.fromMap(doc.id, doc.data()))
-          .toList();
-      list.sort((a, b) => b.createdDate.compareTo(a.createdDate));
-      challenges.value = list;
-    }, onError: (e) => debugPrint('ChallengeRepository stream error: $e'));
+    final rol = UserRepository.instance.currentUser.value?.role;
+    _rolSuscrito = rol;
+    final esAdmin = rol == 'Administrador';
+
+    // DOS consultas para el explorador, no una.
+    //
+    // Antes esto era una sola: `where('assignedToUserId', whereIn: [null,
+    // uid])`, para sacar de un golpe los globales y los suyos. Pero Firestore
+    // NO admite null dentro de un `in`: rechaza la consulta entera, el error
+    // cae en el `onError` de abajo —que solo lo imprime— y la lista se queda
+    // vacía para siempre. El administrador no lo notaba porque su consulta no
+    // lleva filtro, así que veía los desafíos que acababa de crear mientras
+    // que a los exploradores no les llegaba ninguno.
+    //
+    // `isNull: true` e `isEqualTo` sí son comparaciones válidas, así que se
+    // hacen por separado y se juntan aquí. Sigue sin traerse los desafíos
+    // ajenos, que es lo que protegía el filtro original: el nombre y el
+    // correo de otras personas no salen del servidor.
+    if (esAdmin) {
+      _sub = _collection.snapshots().listen((snapshot) {
+        _globales = _leerDesafios(snapshot);
+        _publicarDesafios();
+      }, onError: (e) => debugPrint('ChallengeRepository stream error: $e'));
+    } else {
+      _sub = _collection
+          .where('assignedToUserId', isNull: true)
+          .snapshots()
+          .listen((snapshot) {
+            _globales = _leerDesafios(snapshot);
+            _publicarDesafios();
+          }, onError: (e) => debugPrint('ChallengeRepository globales: $e'));
+
+      _subAsignados = _collection
+          .where('assignedToUserId', isEqualTo: user.uid)
+          .snapshots()
+          .listen((snapshot) {
+            _asignados = _leerDesafios(snapshot);
+            _publicarDesafios();
+          }, onError: (e) => debugPrint('ChallengeRepository asignados: $e'));
+    }
 
     _subProgreso = _progresoDe(user.uid).snapshots().listen((snapshot) {
       misProgresos.value = {
@@ -107,17 +173,18 @@ class ChallengeRepository {
     }, onError: (e) => debugPrint('ChallengeRepository progreso error: $e'));
   }
 
-  /// Consulta de desafíos según el rol.
-  ///
-  /// Firestore no sabe hacer un OR entre "global" y "asignado a mí" en una
-  /// sola consulta, así que se usa `whereIn` sobre `assignedToUserId`: null
-  /// (global) o el propio uid. Un administrador se salta el filtro porque su
-  /// panel tiene que verlos todos.
-  Query<Map<String, dynamic>> _consultaPara(String uid) {
-    final esAdmin =
-        UserRepository.instance.currentUser.value?.role == 'Administrador';
-    if (esAdmin) return _collection;
-    return _collection.where('assignedToUserId', whereIn: [null, uid]);
+  List<Challenge> _leerDesafios(QuerySnapshot<Map<String, dynamic>> snapshot) =>
+      snapshot.docs
+          .map((doc) => Challenge.fromMap(doc.id, doc.data()))
+          .toList();
+
+  /// Junta las dos consultas en la lista que ve la app. Un desafío no puede
+  /// estar en las dos (o su `assignedToUserId` es null o es un uid), así que
+  /// no hay que quitar repetidos.
+  void _publicarDesafios() {
+    final todos = [..._globales, ..._asignados]
+      ..sort((a, b) => b.createdDate.compareTo(a.createdDate));
+    challenges.value = todos;
   }
 
   /// Desafíos que le corresponden a un usuario: los globales más los que un
@@ -138,6 +205,49 @@ class ChallengeRepository {
     return misProgresos.value.values
         .where((p) => p.completado && mios.contains(p.challengeId))
         .length;
+  }
+
+  /// Garantiza que la lista de desafíos esté cargada antes de consultarla.
+  ///
+  /// `guardarConIA` decide a qué desafíos suma una foto leyendo
+  /// `challenges.value`, que llena un stream de Firestore. Si la foto se
+  /// guarda ANTES de que ese stream emita por primera vez —abrir la app e ir
+  /// derecho a la cámara, o hacerlo con mala conexión— la lista está vacía,
+  /// no coincide ningún desafío y la foto no suma a nada. Sin ningún aviso:
+  /// la observación se guarda bien, el desafío simplemente no avanza, y desde
+  /// fuera parece que los desafíos "a veces no funcionan".
+  ///
+  /// Una lectura puntual cubre ese hueco. Si el stream llega mientras tanto,
+  /// gana el stream y esto no pisa nada.
+  Future<void> asegurarCargado() async {
+    if (challenges.value.isNotEmpty) return;
+    final user = FirebaseAuth.instance.currentUser;
+    if (user == null) return;
+    try {
+      // Las mismas dos consultas que [_subscribe], por el mismo motivo: un
+      // `whereIn` con null no es una consulta válida en Firestore.
+      final esAdmin =
+          UserRepository.instance.currentUser.value?.role == 'Administrador';
+      const espera = Duration(seconds: 8);
+
+      if (esAdmin) {
+        final snap = await _collection.get().timeout(espera);
+        _globales = _leerDesafios(snap);
+        _asignados = const [];
+      } else {
+        final resultados = await Future.wait([
+          _collection.where('assignedToUserId', isNull: true).get(),
+          _collection.where('assignedToUserId', isEqualTo: user.uid).get(),
+        ]).timeout(espera);
+        _globales = _leerDesafios(resultados[0]);
+        _asignados = _leerDesafios(resultados[1]);
+      }
+
+      if (challenges.value.isNotEmpty) return;
+      _publicarDesafios();
+    } catch (e) {
+      debugPrint('ChallengeRepository: no se pudo asegurar la carga: $e');
+    }
   }
 
   /// Id único para un desafío nuevo, generado por Firestore.

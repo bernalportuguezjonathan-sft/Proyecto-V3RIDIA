@@ -50,94 +50,6 @@ class _HistoryScreenState extends State<HistoryScreen>
     super.dispose();
   }
 
-  void _showEditDialog(Observation captura) {
-    final commonNameController = TextEditingController(
-      text: captura.commonName,
-    );
-    final scientificNameController = TextEditingController(
-      text: captura.scientificName,
-    );
-    final locationController = TextEditingController(text: captura.location);
-    final notesController = TextEditingController(text: captura.notes);
-    final formKey = GlobalKey<FormState>();
-
-    showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Editar especie'),
-        content: Form(
-          key: formKey,
-          child: SingleChildScrollView(
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                TextFormField(
-                  controller: commonNameController,
-                  decoration: const InputDecoration(labelText: 'Nombre común'),
-                  validator: (value) => value == null || value.trim().isEmpty
-                      ? 'Requerido'
-                      : null,
-                ),
-                TextFormField(
-                  controller: scientificNameController,
-                  decoration: const InputDecoration(
-                    labelText: 'Nombre científico',
-                  ),
-                  validator: (value) => value == null || value.trim().isEmpty
-                      ? 'Requerido'
-                      : null,
-                ),
-                TextFormField(
-                  controller: locationController,
-                  decoration: const InputDecoration(labelText: 'Ubicación'),
-                ),
-                TextFormField(
-                  controller: notesController,
-                  decoration: const InputDecoration(labelText: 'Notas'),
-                  maxLines: 3,
-                ),
-              ],
-            ),
-          ),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('Cancelar'),
-          ),
-          VeridiaBotonTactil(
-            child: ElevatedButton(
-              onPressed: () async {
-                if (formKey.currentState?.validate() ?? false) {
-                  final navigator = Navigator.of(context);
-                  await ObservationRepository.instance.updateObservation(
-                    Observation(
-                      id: captura.id,
-                      commonName: commonNameController.text.trim(),
-                      scientificName: scientificNameController.text.trim(),
-                      location: locationController.text.trim(),
-                      notes: notesController.text.trim(),
-                      dateTime: captura.dateTime,
-                      imagePath: captura.imagePath,
-                      latitude: captura.latitude,
-                      longitude: captura.longitude,
-                      type: captura.type,
-                      userId: captura.userId,
-                      userDisplayName: captura.userDisplayName,
-                    ),
-                  );
-                  navigator.pop();
-                }
-              },
-              style: ElevatedButton.styleFrom(),
-              child: const Text('Guardar'),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
   void _showDeleteDialog(String id) {
     showDialog(
       context: context,
@@ -392,11 +304,10 @@ class _HistoryScreenState extends State<HistoryScreen>
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: VeridiaColors.surfaceContainer,
-        borderRadius: BorderRadius.circular(12),
-        boxShadow: const [
-          BoxShadow(color: Color.fromRGBO(0, 0, 0, 0.35), blurRadius: 8),
-        ],
+        gradient: veridiaCaraClay(VeridiaColors.surfaceContainer),
+        borderRadius: BorderRadius.circular(VeridiaRadii.md),
+        border: Border.all(color: VeridiaCard.bordePorDefecto),
+        boxShadow: veridiaRelieve(),
       ),
       child: Column(
         children: [
@@ -452,119 +363,223 @@ class _HistoryScreenState extends State<HistoryScreen>
     );
   }
 
+  /// Ficha de una observación del diario.
+  ///
+  /// La versión anterior metía nombre, especie, fecha, coordenadas y toda la
+  /// descripción en una sola columna estrecha al lado de la miniatura: seis
+  /// líneas de texto de anchos distintos apiladas contra el borde, sin nada
+  /// que dijera cuál era el dato principal. Ahora la ficha tiene dos zonas
+  /// —una cabecera de identificación y, debajo, la descripción a todo el
+  /// ancho— y los dos metadatos van en cápsulas en vez de sueltos, que es lo
+  /// que los separa de la prosa.
   Widget _crearTarjetaCaptura(Observation captura) {
+    final tieneNota = captura.notes.trim().isNotEmpty;
+
     return Container(
-      margin: const EdgeInsets.only(bottom: 12),
+      margin: const EdgeInsets.only(bottom: 14),
       decoration: BoxDecoration(
-        color: VeridiaColors.surfaceContainer,
-        borderRadius: BorderRadius.circular(12),
-        boxShadow: const [
-          BoxShadow(
-            color: Color.fromRGBO(0, 0, 0, 0.35),
-            blurRadius: 8,
-            offset: Offset(0, 2),
-          ),
-        ],
+        gradient: veridiaCaraClay(VeridiaColors.surfaceContainer),
+        borderRadius: BorderRadius.circular(VeridiaRadii.lg),
+        border: Border.all(color: VeridiaCard.bordePorDefecto),
+        boxShadow: veridiaRelieve(),
       ),
       child: Padding(
-        padding: const EdgeInsets.all(12),
-        child: Row(
+        padding: const EdgeInsets.all(14),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            ClipRRect(
-              borderRadius: BorderRadius.circular(10),
-              child: Container(
-                width: 80,
-                height: 80,
-                color: VeridiaColors.surfaceContainerHighest,
-                child: captura.hasPhoto
-                    ? Image.network(
-                        captura.imagePath!,
-                        fit: BoxFit.cover,
-                        errorBuilder: (_, _, _) => const Icon(
-                          Icons.broken_image,
-                          color: VeridiaColors.onSurfaceVariant,
-                          size: 36,
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                _miniaturaCaptura(captura),
+                const SizedBox(width: 14),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        captura.commonName,
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(
+                          fontFamily: VeridiaFonts.headline,
+                          fontSize: 17,
+                          fontWeight: FontWeight.w800,
+                          letterSpacing: -0.35,
+                          height: 1.15,
+                          color: VeridiaColors.onSurface,
                         ),
-                        loadingBuilder: (context, child, progress) =>
-                            progress == null
-                            ? child
-                            : const Center(
-                                child: SizedBox(
-                                  width: 18,
-                                  height: 18,
-                                  child: CircularProgressIndicator(
-                                    strokeWidth: 2,
-                                  ),
-                                ),
-                              ),
-                      )
-                    : const Icon(
-                        Icons.image,
-                        color: VeridiaColors.onSurfaceVariant,
-                        size: 40,
                       ),
-              ),
+                      const SizedBox(height: 2),
+                      Text(
+                        captura.scientificName,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(
+                          fontFamily: VeridiaFonts.body,
+                          fontSize: 12.5,
+                          fontStyle: FontStyle.italic,
+                          color: VeridiaColors.primary,
+                        ),
+                      ),
+                      const SizedBox(height: 10),
+                      // Wrap y no Row: en un móvil angosto la fecha y las
+                      // coordenadas no caben en una sola línea, y dentro de
+                      // un Row la segunda cápsula se desbordaba por el lado.
+                      Wrap(
+                        spacing: 6,
+                        runSpacing: 6,
+                        children: [
+                          _metaCaptura(
+                            Icons.schedule_rounded,
+                            formatoFechaHora(captura.dateTime),
+                          ),
+                          if (captura.location.trim().isNotEmpty)
+                            _metaCaptura(
+                              Icons.place_outlined,
+                              captura.location,
+                            ),
+                        ],
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(width: 8),
+                _borrarCaptura(captura.id),
+              ],
             ),
-            const SizedBox(width: 12),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
+            if (tieneNota) ...[
+              const SizedBox(height: 14),
+              Container(
+                height: 1,
+                color: VeridiaColors.primary.withValues(alpha: 0.12),
+              ),
+              const SizedBox(height: 12),
+              Text(
+                captura.notes,
+                style: const TextStyle(
+                  fontFamily: VeridiaFonts.body,
+                  fontSize: 12.5,
+                  height: 1.5,
+                  color: VeridiaColors.onSurfaceVariant,
+                ),
+              ),
+            ],
+          ],
+        ),
+      ),
+    );
+  }
+
+  /// La foto de la observación, o el hueco cuando no la hay.
+  Widget _miniaturaCaptura(Observation captura) {
+    return ClipRRect(
+      borderRadius: BorderRadius.circular(VeridiaRadii.sm),
+      child: Container(
+        width: 92,
+        height: 92,
+        // Hueco oscuro: la miniatura es un nicho excavado en la ficha, y en
+        // un verde claro una foto oscura se recorta mal contra el marco.
+        color: VeridiaColors.surfaceContainerLowest,
+        child: captura.hasPhoto
+            ? Image.network(
+                captura.imagePath!,
+                fit: BoxFit.cover,
+                errorBuilder: (_, _, _) => const Center(
+                  child: Icon(
+                    Icons.broken_image_outlined,
+                    color: VeridiaColors.onSurfaceVariant,
+                    size: 26,
+                  ),
+                ),
+                loadingBuilder: (context, child, progress) => progress == null
+                    ? child
+                    : const Center(
+                        child: SizedBox(
+                          width: 18,
+                          height: 18,
+                          child: CircularProgressIndicator(strokeWidth: 2),
+                        ),
+                      ),
+              )
+            : const Column(
+                mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  Text(
-                    captura.commonName,
-                    style: const TextStyle(
-                      fontSize: 14,
-                      fontWeight: FontWeight.bold,
-                      color: VeridiaColors.onSurface,
-                    ),
+                  Icon(
+                    Icons.no_photography_outlined,
+                    color: VeridiaColors.onSurfaceVariant,
+                    size: 24,
                   ),
+                  SizedBox(height: 4),
                   Text(
-                    captura.scientificName,
+                    'Sin foto',
                     style: TextStyle(
-                      fontSize: 12,
-                      color: VeridiaColors.onSurfaceVariant,
-                    ),
-                  ),
-                  const SizedBox(height: 4),
-                  Text(
-                    '${captura.dateTime}',
-                    style: TextStyle(
-                      fontSize: 11,
-                      color: VeridiaColors.onSurfaceVariant,
-                    ),
-                  ),
-                  const SizedBox(height: 8),
-                  Text(
-                    captura.location,
-                    style: TextStyle(
-                      fontSize: 11,
-                      color: VeridiaColors.onSurfaceVariant,
-                    ),
-                  ),
-                  const SizedBox(height: 4),
-                  Text(
-                    captura.notes,
-                    style: TextStyle(
-                      fontSize: 11,
+                      fontFamily: VeridiaFonts.body,
+                      fontSize: 9,
+                      fontWeight: FontWeight.w700,
+                      letterSpacing: 0.4,
                       color: VeridiaColors.onSurfaceVariant,
                     ),
                   ),
                 ],
               ),
+      ),
+    );
+  }
+
+  /// Cápsula de un dato de contexto: cuándo y dónde.
+  Widget _metaCaptura(IconData icono, String texto) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+      decoration: BoxDecoration(
+        color: VeridiaColors.surfaceContainerLowest,
+        borderRadius: BorderRadius.circular(VeridiaRadii.pill),
+        border: Border.all(
+          color: VeridiaColors.primary.withValues(alpha: 0.18),
+        ),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(icono, size: 11, color: VeridiaColors.onSurfaceVariant),
+          const SizedBox(width: 4),
+          Text(
+            texto,
+            style: const TextStyle(
+              fontFamily: VeridiaFonts.body,
+              fontSize: 10.5,
+              fontWeight: FontWeight.w600,
+              color: VeridiaColors.onSurfaceVariant,
             ),
-            Column(
-              children: [
-                IconButton(
-                  icon: const Icon(Icons.edit, color: VeridiaColors.primary),
-                  onPressed: () => _showEditDialog(captura),
-                ),
-                IconButton(
-                  icon: const Icon(Icons.delete, color: VeridiaColors.error),
-                  onPressed: () => _showDeleteDialog(captura.id),
-                ),
-              ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  /// Solo borrar: el lápiz de editar se quitó porque lo que hay en la ficha
+  /// son datos de la IA y coordenadas de campo, y reescribirlos a mano
+  /// convierte el diario en algo que ya no prueba nada.
+  Widget _borrarCaptura(String id) {
+    return Tooltip(
+      message: 'Borrar del diario',
+      child: Material(
+        color: VeridiaColors.error.withValues(alpha: 0.12),
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(VeridiaRadii.sm),
+          side: BorderSide(color: VeridiaColors.error.withValues(alpha: 0.45)),
+        ),
+        clipBehavior: Clip.antiAlias,
+        child: InkWell(
+          onTap: () => _showDeleteDialog(id),
+          child: const Padding(
+            padding: EdgeInsets.all(8),
+            child: Icon(
+              Icons.delete_outline_rounded,
+              color: VeridiaColors.error,
+              size: 19,
             ),
-          ],
+          ),
         ),
       ),
     );
@@ -573,11 +588,10 @@ class _HistoryScreenState extends State<HistoryScreen>
   Widget _crearInsignia(String titulo, IconData icon, bool desbloqueada) {
     return Container(
       decoration: BoxDecoration(
-        color: VeridiaColors.surfaceContainer,
-        borderRadius: BorderRadius.circular(12),
-        boxShadow: const [
-          BoxShadow(color: Color.fromRGBO(0, 0, 0, 0.35), blurRadius: 8),
-        ],
+        gradient: veridiaCaraClay(VeridiaColors.surfaceContainer),
+        borderRadius: BorderRadius.circular(VeridiaRadii.md),
+        border: Border.all(color: VeridiaCard.bordePorDefecto),
+        boxShadow: veridiaRelieve(),
       ),
       child: Opacity(
         opacity: desbloqueada ? 1 : 0.35,

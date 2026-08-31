@@ -15,7 +15,7 @@ import 'services/repositorio_m.dart';
 import 'services/repositorio_o.dart';
 import 'services/repositorio_u.dart';
 import 'theme/veridia_theme.dart';
-import 'widgets/mascota_vista.dart';
+import 'widgets/mascota_vitrina.dart';
 import 'widgets/veridia_logo.dart';
 import 'widgets/veridia_ui.dart';
 
@@ -450,10 +450,15 @@ class _MascotaSaludo extends StatelessWidget {
               child: Column(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  MascotaVista(
+                  // En su habitat, no suelta sobre la cabecera: es el
+                  // unico punto de la app donde la mascota aparece sin que la
+                  // hayas ido a buscar, asi que tiene que leerse como una
+                  // criatura que vive en algun sitio -y ese cuadrito es lo que
+                  // hace que se note que se puede tocar-.
+                  MascotaVitrina(
                     mascota: mascota,
                     equipado: MascotaRepository.instance.equipados(perfil),
-                    tamano: 52,
+                    tamano: 64,
                   ),
                   const SizedBox(height: 4),
                   VeridiaTag(

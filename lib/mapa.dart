@@ -369,7 +369,7 @@ class _MapScreenState extends State<MapScreen> {
             Row(
               children: [
                 const CircleAvatar(
-                  backgroundColor: Color(0xFFB45309),
+                  backgroundColor: VeridiaMapa.avistamiento,
                   child: Icon(
                     Icons.camera_alt,
                     color: VeridiaColors.onSurface,
@@ -1297,7 +1297,7 @@ class _MapScreenState extends State<MapScreen> {
                         width: 8,
                         height: 8,
                         decoration: BoxDecoration(
-                          color: zone.color,
+                          color: VeridiaMapa.zona,
                           shape: BoxShape.circle,
                         ),
                       ),
@@ -1417,7 +1417,7 @@ class _MapScreenState extends State<MapScreen> {
                 borderRadius: BorderRadius.circular(VeridiaRadii.md),
                 border: Border.all(
                   color: elegido
-                      ? const Color(0xFFE85D4E)
+                      ? VeridiaMapa.lugarBuscado
                       : VeridiaColors.outlineVariant,
                   width: elegido ? 1.4 : 1,
                 ),
@@ -1430,7 +1430,7 @@ class _MapScreenState extends State<MapScreen> {
                       const Icon(
                         Icons.place_rounded,
                         size: 13,
-                        color: Color(0xFFE85D4E),
+                        color: VeridiaMapa.lugarBuscado,
                       ),
                       const SizedBox(width: 5),
                       Expanded(
@@ -1501,7 +1501,7 @@ class _MapScreenState extends State<MapScreen> {
           onTap: () => _showLugarSheet(lugar),
           child: Container(
             decoration: BoxDecoration(
-              color: const Color(0xFFE85D4E),
+              color: VeridiaMapa.lugarBuscado,
               shape: BoxShape.circle,
               border: Border.all(color: VeridiaColors.onSurface, width: 2.5),
               boxShadow: [
@@ -1541,7 +1541,7 @@ class _MapScreenState extends State<MapScreen> {
             Row(
               children: [
                 const CircleAvatar(
-                  backgroundColor: Color(0xFFE85D4E),
+                  backgroundColor: VeridiaMapa.lugarBuscado,
                   child: Icon(
                     Icons.place_rounded,
                     color: VeridiaColors.onSurface,
@@ -1633,7 +1633,7 @@ class _MapScreenState extends State<MapScreen> {
               width: 22,
               height: 22,
               decoration: BoxDecoration(
-                color: const Color(0xFF1D4ED8),
+                color: VeridiaMapa.tuPosicion,
                 shape: BoxShape.circle,
                 border: Border.all(color: VeridiaColors.onSurface, width: 3),
                 boxShadow: [
@@ -1673,7 +1673,7 @@ class _MapScreenState extends State<MapScreen> {
           onTap: () => _showSightingSheet(sighting),
           child: Container(
             decoration: BoxDecoration(
-              color: const Color(0xFFB45309),
+              color: VeridiaMapa.avistamiento,
               shape: BoxShape.circle,
               border: Border.all(color: VeridiaColors.onSurface, width: 2),
               boxShadow: [
@@ -1708,7 +1708,7 @@ class _MapScreenState extends State<MapScreen> {
               Container(
                 padding: const EdgeInsets.all(6),
                 decoration: BoxDecoration(
-                  color: zone.color,
+                  color: VeridiaMapa.zona,
                   shape: BoxShape.circle,
                   border: Border.all(color: VeridiaColors.onSurface, width: 3),
                   boxShadow: [
@@ -1894,22 +1894,33 @@ class _ChipEspecie extends StatelessWidget {
       elevation: 3,
       shadowColor: Colors.black.withValues(alpha: 0.35),
       borderRadius: BorderRadius.circular(VeridiaRadii.pill),
-      color: activo
-          ? VeridiaColors.primaryContainer
-          : VeridiaColors.surfaceContainerHigh,
+      // Igual que _BotonMapa: oscuro sobre el mapa claro, y el activo en
+      // jade solido para que se vea de un vistazo cual filtro esta puesto.
+      color: activo ? VeridiaColors.primary : const Color(0xFF04231B),
       child: InkWell(
         onTap: onTap,
         borderRadius: BorderRadius.circular(VeridiaRadii.pill),
+        splashColor: VeridiaColors.primary.withValues(alpha: 0.20),
         child: Container(
           alignment: Alignment.center,
-          padding: const EdgeInsets.symmetric(horizontal: 12),
+          padding: const EdgeInsets.symmetric(horizontal: 14),
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(VeridiaRadii.pill),
+            border: Border.all(
+              color: activo
+                  ? VeridiaColors.secondary
+                  : VeridiaColors.primary.withValues(alpha: 0.45),
+              width: 1.2,
+            ),
+          ),
           child: Text(
             etiqueta,
             style: TextStyle(
+              fontFamily: VeridiaFonts.body,
               fontSize: 12,
-              fontWeight: FontWeight.w600,
+              fontWeight: FontWeight.w700,
               color: activo
-                  ? VeridiaColors.onPrimaryContainer
+                  ? VeridiaColors.onPrimary
                   : VeridiaColors.onSurfaceVariant,
             ),
           ),
@@ -1936,27 +1947,45 @@ class _BotonMapa extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final fondo = activo
-        ? VeridiaColors.secondaryContainer
-        : VeridiaColors.surfaceContainer;
-    final tinte = activo
-        ? VeridiaColors.onSecondaryContainer
-        : VeridiaColors.onSurfaceVariant;
+    // Ahora que el mapa va en colores naturales -y por tanto CLARO-, estos
+    // controles tienen que ser oscuros. En el verde medio de antes
+    // (`surfaceContainer` / `secondaryContainer`) quedaban a media luz entre
+    // la cartografia clara y el icono, y no se leian ni como boton ni como
+    // parte de la app. Casi negro con aro jade se recorta contra cualquier
+    // tesela: calle blanca, parque verde o agua azul.
+    final fondo = activo ? VeridiaColors.primary : const Color(0xFF04231B);
+    final tinte = activo ? VeridiaColors.onPrimary : VeridiaColors.primary;
 
     return Tooltip(
       message: tooltip,
       child: Material(
         elevation: 6,
-        shadowColor: Colors.black.withValues(alpha: 0.45),
+        shadowColor: Colors.black.withValues(alpha: 0.5),
         color: fondo,
-        shape: const CircleBorder(),
+        shape: CircleBorder(
+          side: BorderSide(
+            color: activo
+                ? VeridiaColors.secondary
+                : VeridiaColors.primary.withValues(alpha: 0.55),
+            width: 1.5,
+          ),
+        ),
         child: InkWell(
           onTap: onTap,
           customBorder: const CircleBorder(),
+          splashColor: VeridiaColors.primary.withValues(alpha: 0.20),
           child: SizedBox(
-            width: 42,
-            height: 42,
-            child: Icon(icono, size: 20, color: tinte),
+            width: 44,
+            height: 44,
+            // Encendido, el icono ademas crece un poco: en un boton que
+            // alterna algo -mostrar u ocultar los puntos- el color solo no
+            // basta para saber en que estado esta.
+            child: AnimatedScale(
+              scale: activo ? 1.12 : 1.0,
+              duration: const Duration(milliseconds: 160),
+              curve: Curves.easeOut,
+              child: Icon(icono, size: 20, color: tinte),
+            ),
           ),
         ),
       ),
@@ -2004,31 +2033,61 @@ class _ChipPanel extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final color = activo ? VeridiaColors.secondary : VeridiaColors.outline;
+    // El inactivo iba en `outline` -un gris verdoso- al 8% de opacidad: se
+    // leia como texto apagado, no como una pestania que se puede pulsar, y
+    // las tres parecian deshabilitadas. Ahora la capsula es opaca y el
+    // contador va en su propia burbuja, que es el dato que se mira.
+    final activoColor = VeridiaColors.secondary;
+    final tinte = activo ? VeridiaColors.onPrimary : VeridiaColors.primary;
 
     return InkWell(
       onTap: onTap,
       borderRadius: BorderRadius.circular(VeridiaRadii.pill),
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 180),
+        curve: Curves.easeOut,
+        padding: const EdgeInsets.fromLTRB(11, 7, 8, 7),
         decoration: BoxDecoration(
-          color: color.withValues(alpha: activo ? 0.18 : 0.08),
+          color: activo ? activoColor : const Color(0xFF04231B),
           borderRadius: BorderRadius.circular(VeridiaRadii.pill),
           border: Border.all(
-            color: color.withValues(alpha: activo ? 0.6 : 0.3),
+            color: activo
+                ? activoColor
+                : VeridiaColors.primary.withValues(alpha: 0.40),
+            width: 1.2,
           ),
         ),
         child: Row(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(icono, size: 13, color: color),
-            const SizedBox(width: 5),
+            Icon(icono, size: 13, color: tinte),
+            const SizedBox(width: 6),
             Text(
-              '$etiqueta ($cantidad)',
+              etiqueta,
               style: TextStyle(
+                fontFamily: VeridiaFonts.body,
                 fontSize: 11,
                 fontWeight: FontWeight.w700,
-                color: color,
+                color: tinte,
+              ),
+            ),
+            const SizedBox(width: 6),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1),
+              decoration: BoxDecoration(
+                color: activo
+                    ? VeridiaColors.onPrimary.withValues(alpha: 0.22)
+                    : VeridiaColors.primary.withValues(alpha: 0.18),
+                borderRadius: BorderRadius.circular(VeridiaRadii.pill),
+              ),
+              child: Text(
+                '$cantidad',
+                style: TextStyle(
+                  fontFamily: VeridiaFonts.headline,
+                  fontSize: 10,
+                  fontWeight: FontWeight.w800,
+                  color: tinte,
+                ),
               ),
             ),
           ],

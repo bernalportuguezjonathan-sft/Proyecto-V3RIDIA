@@ -93,6 +93,12 @@ class PanelLogros extends StatelessWidget {
     final pendientes = logrosPendientes(stats);
 
     return VeridiaCard(
+      // Contorno DORADO y no el jade de las demas: los logros son la unica
+      // seccion del perfil que habla de merito, y con el borde estandar la
+      // tarjeta se perdia entre las otras tres a pesar de ser la que la gente
+      // baja a mirar. El dorado ya era el color de la medalla del titulo y de
+      // los Veridiums, asi que no entra ningun color nuevo a la paleta.
+      borderColor: VeridiaColors.veridium.withValues(alpha: 0.45),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [

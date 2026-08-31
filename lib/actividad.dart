@@ -145,11 +145,10 @@ class ActivityScreen extends StatelessWidget {
         padding: const EdgeInsets.all(16),
         margin: const EdgeInsets.only(right: 8),
         decoration: BoxDecoration(
-          color: VeridiaColors.surfaceContainer,
-          borderRadius: BorderRadius.circular(18),
-          boxShadow: const [
-            BoxShadow(color: Color.fromRGBO(0, 0, 0, 0.35), blurRadius: 10),
-          ],
+          gradient: veridiaCaraClay(VeridiaColors.surfaceContainer),
+          borderRadius: BorderRadius.circular(VeridiaRadii.lg),
+          border: Border.all(color: VeridiaCard.bordePorDefecto),
+          boxShadow: veridiaRelieve(),
         ),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,

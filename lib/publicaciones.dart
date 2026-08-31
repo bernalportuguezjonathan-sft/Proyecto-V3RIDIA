@@ -4,6 +4,7 @@ import 'models/observation.dart';
 import 'services/repositorio_o.dart';
 import 'services/repositorio_u.dart';
 import 'theme/veridia_theme.dart';
+import 'widgets/veridia_ui.dart';
 
 class PublicationsScreen extends StatelessWidget {
   const PublicationsScreen({super.key});
@@ -103,11 +104,10 @@ class PublicationsScreen extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: VeridiaColors.surfaceContainer,
-        borderRadius: BorderRadius.circular(18),
-        boxShadow: const [
-          BoxShadow(color: Color.fromRGBO(0, 0, 0, 0.35), blurRadius: 10),
-        ],
+        gradient: veridiaCaraClay(VeridiaColors.surfaceContainer),
+        borderRadius: BorderRadius.circular(VeridiaRadii.lg),
+        border: Border.all(color: VeridiaCard.bordePorDefecto),
+        boxShadow: veridiaRelieve(),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,

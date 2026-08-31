@@ -526,8 +526,14 @@ class _IdentifySpeciesScreenState extends State<IdentifySpeciesScreen> {
                         width: double.infinity,
                         padding: const EdgeInsets.all(16),
                         decoration: BoxDecoration(
-                          color: VeridiaColors.surfaceContainer,
-                          borderRadius: BorderRadius.circular(14),
+                          gradient: veridiaCaraClay(
+                            VeridiaColors.surfaceContainer,
+                          ),
+                          borderRadius: BorderRadius.circular(VeridiaRadii.md),
+                          border: Border.all(
+                            color: VeridiaCard.bordePorDefecto,
+                          ),
+                          boxShadow: veridiaRelieve(),
                         ),
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
@@ -595,6 +601,12 @@ class _IdentifySpeciesScreenState extends State<IdentifySpeciesScreen> {
                           SizedBox(
                             width: double.infinity,
                             child: VeridiaBotonTactil(
+                              // El único botón de la app con destello
+                              // permanente: es la acción estrella (la IA) y
+                              // en la referencia el botón "premium" es
+                              // justamente el que brilla solo.
+                              destelloContinuo: !_isAnalyzing,
+                              radius: VeridiaRadii.pill,
                               child: OutlinedButton.icon(
                                 onPressed: _isAnalyzing ? null : _analizarConIA,
                                 icon: _isAnalyzing
@@ -627,9 +639,11 @@ class _IdentifySpeciesScreenState extends State<IdentifySpeciesScreen> {
                                   padding: const EdgeInsets.symmetric(
                                     vertical: 12,
                                   ),
-                                  shape: RoundedRectangleBorder(
-                                    borderRadius: BorderRadius.circular(10),
-                                  ),
+                                  // Píldora, como el resto de botones. El
+                                  // radio fijo de 10 que había aquí anulaba
+                                  // la forma del tema y dejaba este botón
+                                  // rectangular en medio de puras píldoras.
+                                  shape: const StadiumBorder(),
                                 ),
                               ),
                             ),
@@ -748,9 +762,7 @@ class _IdentifySpeciesScreenState extends State<IdentifySpeciesScreen> {
                                   padding: const EdgeInsets.symmetric(
                                     vertical: 14,
                                   ),
-                                  shape: RoundedRectangleBorder(
-                                    borderRadius: BorderRadius.circular(10),
-                                  ),
+                                  shape: const StadiumBorder(),
                                 ),
                                 child: _isSaving
                                     ? const SizedBox(
@@ -797,15 +809,10 @@ class _IdentifySpeciesScreenState extends State<IdentifySpeciesScreen> {
       child: Container(
         padding: const EdgeInsets.symmetric(vertical: 12),
         decoration: BoxDecoration(
-          color: VeridiaColors.surfaceContainer,
-          borderRadius: BorderRadius.circular(12),
-          boxShadow: [
-            BoxShadow(
-              color: Colors.black.withValues(alpha: 0.05),
-              blurRadius: 8,
-              offset: const Offset(0, 2),
-            ),
-          ],
+          gradient: veridiaCaraClay(VeridiaColors.surfaceContainer),
+          borderRadius: BorderRadius.circular(VeridiaRadii.md),
+          border: Border.all(color: VeridiaCard.bordePorDefecto),
+          boxShadow: veridiaRelieve(),
         ),
         child: Column(
           children: [
