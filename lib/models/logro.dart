@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../theme/veridia_theme.dart';
+import '../services/marca_logros.dart';
 import 'observation.dart';
 
 /// Qué mide un logro. Todo sale de datos que la app YA guarda: no hay que
@@ -33,16 +34,28 @@ class EstadisticasExplorador {
   ///
   /// Un solo sitio que cuenta, para que el perfil, el carnet y los logros
   /// nunca discrepen entre ellos.
+  /// Los registros y las especies pasan por [MarcaLogros]: se toma el máximo
+  /// entre lo que hay AHORA y lo que hubo alguna vez.
+  ///
+  /// Sin eso, borrar una foto del diario bajaba los dos contadores y hacía
+  /// desaparecer logros ya conseguidos. Va aquí dentro, y no en cada pantalla
+  /// que pinta logros, para que ninguna se pueda olvidar de aplicarlo.
   factory EstadisticasExplorador.de({
     required int veridiumsGanados,
     required List<Observation> fotos,
     required int desafios,
-  }) => EstadisticasExplorador(
-    veridiumsGanados: veridiumsGanados,
-    especiesDistintas: especiesDistintasDe(fotos),
-    registros: fotos.length,
-    desafios: desafios,
-  );
+  }) {
+    final marca = MarcaLogros.instance.elevar(
+      registros: fotos.length,
+      especies: especiesDistintasDe(fotos),
+    );
+    return EstadisticasExplorador(
+      veridiumsGanados: veridiumsGanados,
+      especiesDistintas: marca.especies,
+      registros: marca.registros,
+      desafios: desafios,
+    );
+  }
 
   final int veridiumsGanados;
   final int especiesDistintas;

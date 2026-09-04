@@ -9,6 +9,7 @@ import 'identify_species.dart';
 import 'mapa.dart';
 import 'perfil.dart';
 import 'raiz.dart';
+import 'services/marca_logros.dart';
 import 'services/repositorio_u.dart';
 import 'theme/veridia_theme.dart';
 import 'widgets/veridia_ui.dart';
@@ -54,7 +55,22 @@ abstract final class VeridiaNav {
       return;
     }
 
+    // Volver a INICIO se hace vaciando la pila, no apilando otro Inicio.
+    //
+    // La primera ruta es [RaizVeridia], que para un explorador YA dibuja
+    // HomeScreen. Empujar aquí otro HomeScreen dejaba dos Inicios seguidos en
+    // la pila: el de arriba salía con flecha de retroceso —porque tenía algo
+    // debajo— y al pulsarla "volvías" de Inicio a Inicio, sin que pasara nada
+    // visible. Vaciar hasta la raíz deja exactamente un Inicio y sin flecha,
+    // que es lo que significa estar en el menú principal.
+    if (destino == VeridiaSeccion.inicio) {
+      Navigator.popUntil(context, (route) => route.isFirst);
+      return;
+    }
+
     final Widget pantalla = switch (destino) {
+      // Inalcanzable: `inicio` se resuelve arriba con popUntil. Se deja para
+      // que el switch siga siendo exhaustivo sobre el enum.
       VeridiaSeccion.inicio => const HomeScreen(),
       VeridiaSeccion.camara => const IdentifySpeciesScreen(),
       VeridiaSeccion.mapa => const MapScreen(),
@@ -112,6 +128,10 @@ abstract final class VeridiaNav {
       ),
     );
 
+    // Las marcas de logros son de ESTE aparato: si no se olvidan, quien
+    // entre después en el mismo celular arrancaría con los máximos de la
+    // persona anterior y vería logros que no ganó.
+    MarcaLogros.instance.olvidar();
     await UserRepository.instance.signOut();
   }
 

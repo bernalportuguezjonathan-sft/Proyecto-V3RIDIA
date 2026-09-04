@@ -1,11 +1,16 @@
+import 'dart:ui' as ui;
+
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/rendering.dart';
+import 'package:share_plus/share_plus.dart';
 
 import 'models/logro.dart';
 import 'models/observation.dart';
 import 'models/recompensa.dart';
 import 'models/user.dart';
 import 'services/economia.dart';
+import 'services/marca_logros.dart';
 import 'services/repositorio_d.dart';
 import 'services/repositorio_m.dart';
 import 'services/repositorio_o.dart';
@@ -38,11 +43,19 @@ class CarnetScreen extends StatefulWidget {
 
 class _CarnetScreenState extends State<CarnetScreen> {
   Uint8List? _foto;
+  bool _compartiendo = false;
+
+  /// Marca en el árbol la parte que se convierte en imagen al compartir: solo
+  /// la tarjeta, sin el fondo de la pantalla ni el texto de abajo.
+  final GlobalKey _claveCarnet = GlobalKey();
 
   @override
   void initState() {
     super.initState();
     _cargarFoto();
+    // El carnet tambien pinta logros: sin esto saldria con los conteos vivos
+    // hasta que otra pantalla cargara las marcas.
+    MarcaLogros.instance.cargar();
   }
 
   /// Lee la foto de perfil del mismo caché que usa ProfileScreen, para que el
@@ -56,10 +69,67 @@ class _CarnetScreenState extends State<CarnetScreen> {
     setState(() => _foto = bytes);
   }
 
+  /// Convierte el carnet en un PNG y abre el menú de compartir del sistema.
+  ///
+  /// La captura la hace Flutter solo: [RepaintBoundary] ya guarda esa parte
+  /// del árbol en su propia capa, así que pedirle una imagen no necesita
+  /// ningún paquete. `pixelRatio: 3` la saca a triple resolución para que no
+  /// se vea pixelada al abrirla en un chat.
+  Future<void> _compartir() async {
+    if (_compartiendo) return;
+    setState(() => _compartiendo = true);
+    final messenger = ScaffoldMessenger.of(context);
+
+    try {
+      final limite =
+          _claveCarnet.currentContext?.findRenderObject()
+              as RenderRepaintBoundary?;
+      if (limite == null) throw StateError('El carnet aún no está dibujado.');
+
+      final imagen = await limite.toImage(pixelRatio: 3);
+      final datos = await imagen.toByteData(format: ui.ImageByteFormat.png);
+      imagen.dispose();
+      if (datos == null) throw StateError('No se pudo generar la imagen.');
+
+      await SharePlus.instance.share(
+        ShareParams(
+          files: [
+            XFile.fromData(
+              datos.buffer.asUint8List(),
+              mimeType: 'image/png',
+              name: 'carnet-veridia.png',
+            ),
+          ],
+          text: 'Mi carnet de explorador de Veridia.',
+          subject: 'Carnet de explorador · Veridia',
+        ),
+      );
+    } catch (e) {
+      debugPrint('No se pudo compartir el carnet: $e');
+      if (mounted) {
+        messenger.showSnackBar(
+          veridiaSnackBarError('No se pudo compartir el carnet.'),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _compartiendo = false);
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('Carnet de explorador')),
+      appBar: AppBar(
+        title: const Text('Carnet de explorador'),
+        actions: [
+          VeridiaAppBarAction(
+            icon: Icons.ios_share_rounded,
+            tooltip: 'Compartir mi carnet',
+            onPressed: _compartiendo ? () {} : _compartir,
+          ),
+          const SizedBox(width: 16),
+        ],
+      ),
       body: VeridiaBackground(
         child: SafeArea(
           top: false,
@@ -76,12 +146,43 @@ class _CarnetScreenState extends State<CarnetScreen> {
                   return ListView(
                     padding: const EdgeInsets.fromLTRB(16, 16, 16, 28),
                     children: [
-                      _Carnet(perfil: perfil, fotos: fotos, foto: _foto),
-                      const SizedBox(height: 16),
+                      RepaintBoundary(
+                        key: _claveCarnet,
+                        child: _Carnet(
+                          perfil: perfil,
+                          fotos: fotos,
+                          foto: _foto,
+                        ),
+                      ),
+                      const SizedBox(height: 18),
+                      VeridiaBotonTactil(
+                        radius: VeridiaRadii.pill,
+                        child: FilledButton.icon(
+                          onPressed: _compartiendo ? null : _compartir,
+                          icon: _compartiendo
+                              ? const SizedBox(
+                                  width: 16,
+                                  height: 16,
+                                  child: CircularProgressIndicator(
+                                    strokeWidth: 2,
+                                    color: VeridiaColors.onPrimary,
+                                  ),
+                                )
+                              : const Icon(Icons.ios_share_rounded, size: 18),
+                          label: const FittedBox(
+                            fit: BoxFit.scaleDown,
+                            child: Text('Compartir mi carnet'),
+                          ),
+                          style: FilledButton.styleFrom(
+                            minimumSize: const Size(double.infinity, 52),
+                            shape: const StadiumBorder(),
+                          ),
+                        ),
+                      ),
+                      const SizedBox(height: 14),
                       Text(
-                        'Captura la pantalla para compartir tu carnet. Todo lo '
-                        'que aparece aquí lo ganaste registrando especies '
-                        'reales de Cundinamarca.',
+                        'Todo lo que aparece aquí lo ganaste registrando '
+                        'especies reales de Cundinamarca.',
                         textAlign: TextAlign.center,
                         style: Theme.of(context).textTheme.bodySmall,
                       ),

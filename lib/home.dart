@@ -187,13 +187,6 @@ class _HomeScreenState extends State<HomeScreen> {
                             descripcion: 'Canjea tus Veridiums',
                             onTap: () => abrirRecompensas(context),
                           ),
-                          _AccesoRapido(
-                            icon: Icons.travel_explore_rounded,
-                            titulo: 'Fotos por zona',
-                            descripcion: 'Qué se ha visto cerca',
-                            onTap: () =>
-                                VeridiaNav.abrir(context, const MapScreen()),
-                          ),
                           // La cuadrícula se arma en cascada al abrir Inicio, en vez
                           // de aparecer entera de golpe.
                         ].indexed

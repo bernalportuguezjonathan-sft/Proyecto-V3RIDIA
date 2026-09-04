@@ -55,3 +55,9 @@ app.*.map.json
 /android/app/debug
 /android/app/profile
 /android/app/release
+
+# NUNCA pongas un .apk dentro de web/. Flutter lo copia a build/web y
+# Firebase Hosting rechaza el despliegue ENTERO con "Executable files are
+# forbidden on the Spark billing plan": no se publica ni el APK ni la pagina.
+# El APK se distribuye por GitHub Releases (ver web/info.html).
+web/*.apk

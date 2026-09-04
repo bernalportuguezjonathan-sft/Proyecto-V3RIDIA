@@ -31,13 +31,24 @@ class VeridiaMontanas extends StatelessWidget {
         ),
         Positioned.fill(child: CustomPaint(painter: const _PaisajePainter())),
         // Velo verde: baja el contraste del paisaje para que el texto mande.
+        //
+        // Se ABRE en el último tramo (42% de opacidad abajo, contra el 95%
+        // que tenía). El cielo se aclara hacia el horizonte, pero el velo se
+        // opacaba justo ahí, así que el pie de la pantalla terminaba siendo
+        // la zona MÁS oscura de todas —brillo 19 contra 33 en el centro— y se
+        // tragaba los dos bosques de primer plano, que se dibujan al 80% y al
+        // 90% de la altura. De ahí que el fondo pareciera una imagen cortada
+        // con una banda negra debajo.
+        //
+        // El grueso del velo se queda donde va el texto (arriba y centro),
+        // que es lo único para lo que existe.
         const DecoratedBox(
           decoration: BoxDecoration(
             gradient: LinearGradient(
               begin: Alignment.topCenter,
               end: Alignment.bottomCenter,
-              colors: [Color(0xE6011E17), Color(0xB3033126), Color(0xF2011A14)],
-              stops: [0.0, 0.5, 1.0],
+              colors: [Color(0xD9011E17), Color(0xCC033126), Color(0x6B011A14)],
+              stops: [0.0, 0.55, 1.0],
             ),
           ),
         ),

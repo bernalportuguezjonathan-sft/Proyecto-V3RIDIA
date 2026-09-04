@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../models/logro.dart';
+import '../services/marca_logros.dart';
 import '../models/observation.dart';
 import '../models/user.dart';
 import '../services/repositorio_d.dart';
@@ -15,18 +16,40 @@ import 'veridia_ui.dart';
 /// Perfil y carnet necesitan exactamente lo mismo (avistamientos propios +
 /// desafíos cerrados + Veridiums ganados), así que la consulta se escribe una
 /// vez. Si cada pantalla la montara por su cuenta acabarían contando distinto.
-class ConEstadisticas extends StatelessWidget {
+class ConEstadisticas extends StatefulWidget {
   const ConEstadisticas({super.key, required this.builder});
 
   final Widget Function(BuildContext, EstadisticasExplorador) builder;
 
   @override
+  State<ConEstadisticas> createState() => _ConEstadisticasState();
+}
+
+class _ConEstadisticasState extends State<ConEstadisticas> {
+  @override
+  void initState() {
+    super.initState();
+    // Las marcas históricas viven en disco y se leen de forma asíncrona.
+    // Mientras llegan valen 0, así que los logros salen calculados solo con
+    // los datos vivos; al cargarse, MarcaLogros avisa y esto se repinta ya
+    // con el máximo correcto.
+    MarcaLogros.instance.cargar();
+  }
+
+  @override
   Widget build(BuildContext context) {
+    return ListenableBuilder(
+      listenable: MarcaLogros.instance,
+      builder: (context, _) => _conPerfil(context),
+    );
+  }
+
+  Widget _conPerfil(BuildContext context) {
     return ValueListenableBuilder<UserProfile?>(
       valueListenable: UserRepository.instance.currentUser,
       builder: (context, perfil, _) {
         if (perfil == null) {
-          return builder(context, const EstadisticasExplorador());
+          return widget.builder(context, const EstadisticasExplorador());
         }
         return StreamBuilder<List<Observation>>(
           stream: ObservationRepository.instance.streamForUser(perfil.userId),
@@ -38,7 +61,7 @@ class ConEstadisticas extends StatelessWidget {
                 perfil.userId,
               ),
             );
-            return builder(context, stats);
+            return widget.builder(context, stats);
           },
         );
       },

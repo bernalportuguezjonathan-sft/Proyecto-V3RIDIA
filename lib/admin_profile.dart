@@ -617,15 +617,6 @@ class _AdminProfileScreenState extends State<AdminProfileScreen> {
                         ),
                       ),
                     ),
-                  const SizedBox(height: 24),
-                  const Text(
-                    'Acciones rápidas',
-                    style: TextStyle(
-                      fontSize: 16,
-                      fontWeight: FontWeight.bold,
-                      color: VeridiaColors.onSurface,
-                    ),
-                  ),
                   const SizedBox(height: 12),
                   // Aquí no va nada de navegación duplicada: "Volver al
                   // Panel" lo hace la flecha de la barra superior y

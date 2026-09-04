@@ -12,6 +12,28 @@ import 'repositorio_u.dart';
 class AssignmentRepository {
   AssignmentRepository._() {
     FirebaseAuth.instance.authStateChanges().listen(_subscribe);
+
+    // Y otra vez cuando se sepa el ROL, que llega DESPUES.
+    //
+    // Este era el motivo de que Feed & Monitoreo saliera siempre vacio, hasta
+    // para un administrador: authStateChanges() dispara en cuanto hay sesion,
+    // pero el perfil se carga de forma asincrona un momento mas tarde. En ese
+    // instante currentUser todavia vale null, asi que la comprobacion de rol
+    // de _subscribe daba "no es administrador", se rendia dejando la lista
+    // vacia y no reintentaba nunca. Al enterarnos del rol nos resuscribimos.
+    UserRepository.instance.currentUser.addListener(_revisarRol);
+  }
+
+  /// Rol con el que se armo la suscripcion, para no rehacerla cada vez que el
+  /// perfil notifica por otra cosa (ganar Veridiums, cambiar de mascota).
+  String? _rolSuscrito;
+
+  void _revisarRol() {
+    final rol = UserRepository.instance.currentUser.value?.role;
+    if (rol == _rolSuscrito) return;
+    final user = FirebaseAuth.instance.currentUser;
+    if (user == null) return;
+    _subscribe(user);
   }
 
   static final AssignmentRepository instance = AssignmentRepository._();
@@ -30,8 +52,10 @@ class AssignmentRepository {
 
     if (user == null) {
       records.value = [];
+      _rolSuscrito = null;
       return;
     }
+    _rolSuscrito = UserRepository.instance.currentUser.value?.role;
 
     // Solo los administradores pueden leer la bitácora (ver firestore.rules).
     // Suscribir a un explorador abría un stream que Firestore mataba al

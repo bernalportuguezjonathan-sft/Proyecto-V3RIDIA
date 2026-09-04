@@ -480,13 +480,6 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
                         ),
                       ),
                       _buildActionCard(
-                        icon: Icons.travel_explore_rounded,
-                        label: 'Avistamientos',
-                        subtitle: 'Todas las especies fotografiadas en el mapa',
-                        color: VeridiaColors.primary,
-                        onTap: _mostrarPuntosDeInteres,
-                      ),
-                      _buildActionCard(
                         icon: Icons.insights_rounded,
                         label: 'Analítica',
                         subtitle:

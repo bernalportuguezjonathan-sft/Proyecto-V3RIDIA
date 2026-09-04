@@ -39,6 +39,11 @@ dependencies:
   google_sign_in: ^6.1.0
   flutter_svg: ^2.0.10
 
+  # Abre el menu de compartir del sistema con el carnet ya convertido en PNG.
+  # La CAPTURA no necesita paquete: Flutter la hace nativa con RepaintBoundary
+  # (ver lib/carnet.dart), asi que aqui solo entra el menu de compartir.
+  share_plus: ^13.3.0
+
   supabase_flutter: ^2.3.1
 
   http: ^1.1.2

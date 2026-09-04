@@ -966,29 +966,16 @@ class _ProfileScreenState extends State<ProfileScreen> {
           ),
         ],
       ),
-      bottomNavigationBar: BottomNavigationBar(
-        backgroundColor: VeridiaColors.surfaceContainer,
-        selectedItemColor: VeridiaColors.primary,
-        unselectedItemColor: VeridiaColors.onSurfaceVariant,
-        type: BottomNavigationBarType.fixed,
+      // La barra COMPARTIDA, igual que las otras cuatro secciones.
+      //
+      // Perfil se dibujaba la suya a mano y por eso era la única sin la
+      // cápsula de cristal del ícono activo, con los íconos rellenos en vez
+      // de los redondeados, y con la pestaña central rotulada "Historial"
+      // mientras el resto de la app la llama "Diario". Además se le escapaba
+      // el ocultarse para el administrador, que VeridiaBottomNav ya resuelve.
+      bottomNavigationBar: VeridiaBottomNav(
         currentIndex: 4,
-        items: const [
-          BottomNavigationBarItem(icon: Icon(Icons.home), label: 'Inicio'),
-          BottomNavigationBarItem(
-            icon: Icon(Icons.camera_alt),
-            label: 'Cámara',
-          ),
-          BottomNavigationBarItem(icon: Icon(Icons.map), label: 'Mapa'),
-          BottomNavigationBarItem(
-            icon: Icon(Icons.history),
-            label: 'Historial',
-          ),
-          BottomNavigationBarItem(icon: Icon(Icons.person), label: 'Perfil'),
-        ],
-        // Delegado en VeridiaNav: hacer pushReplacement a mano aquí era
-        // otra vía por la que la ruta raíz se perdía (ver navegacion.dart).
-        onTap: (index) =>
-            VeridiaNav.ir(context, VeridiaSeccion.values[index], 4),
+        onTap: (i) => VeridiaNav.ir(context, VeridiaSeccion.values[i], 4),
       ),
     );
   }
