@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 
 import '../theme/veridia_theme.dart';
-import '../services/marca_logros.dart';
 import 'observation.dart';
 
 /// Qué mide un logro. Todo sale de datos que la app YA guarda: no hay que
@@ -34,28 +33,36 @@ class EstadisticasExplorador {
   ///
   /// Un solo sitio que cuenta, para que el perfil, el carnet y los logros
   /// nunca discrepen entre ellos.
-  /// Los registros y las especies pasan por [MarcaLogros]: se toma el máximo
-  /// entre lo que hay AHORA y lo que hubo alguna vez.
-  ///
-  /// Sin eso, borrar una foto del diario bajaba los dos contadores y hacía
-  /// desaparecer logros ya conseguidos. Va aquí dentro, y no en cada pantalla
-  /// que pinta logros, para que ninguna se pueda olvidar de aplicarlo.
   factory EstadisticasExplorador.de({
     required int veridiumsGanados,
     required List<Observation> fotos,
     required int desafios,
-  }) {
-    final marca = MarcaLogros.instance.elevar(
-      registros: fotos.length,
-      especies: especiesDistintasDe(fotos),
-    );
-    return EstadisticasExplorador(
-      veridiumsGanados: veridiumsGanados,
-      especiesDistintas: marca.especies,
-      registros: marca.registros,
-      desafios: desafios,
-    );
-  }
+  }) => EstadisticasExplorador(
+    veridiumsGanados: veridiumsGanados,
+    especiesDistintas: especiesDistintasDe(fotos),
+    registros: fotos.length,
+    desafios: desafios,
+  );
+
+  /// Una copia con los mínimos históricos aplicados: nunca menos registros ni
+  /// menos especies de las que se alcanzaron alguna vez.
+  ///
+  /// Recibe las marcas como PARÁMETROS en vez de ir a buscarlas. Ponerlas
+  /// dentro de la fábrica de arriba metía un singleton con estado en un
+  /// modelo que hasta entonces era puro, y eso rompió tres pruebas: la marca
+  /// sobrevivía de un caso al siguiente y contaminaba sus conteos. Quien
+  /// llama decide de dónde salen (ver [MarcaLogros]).
+  EstadisticasExplorador conMinimos({
+    required int registros,
+    required int especies,
+  }) => EstadisticasExplorador(
+    veridiumsGanados: veridiumsGanados,
+    especiesDistintas: especies > especiesDistintas
+        ? especies
+        : especiesDistintas,
+    registros: registros > this.registros ? registros : this.registros,
+    desafios: desafios,
+  );
 
   final int veridiumsGanados;
   final int especiesDistintas;

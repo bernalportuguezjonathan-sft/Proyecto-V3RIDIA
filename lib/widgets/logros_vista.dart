@@ -54,11 +54,16 @@ class _ConEstadisticasState extends State<ConEstadisticas> {
         return StreamBuilder<List<Observation>>(
           stream: ObservationRepository.instance.streamForUser(perfil.userId),
           builder: (context, snapshot) {
-            final stats = EstadisticasExplorador.de(
-              veridiumsGanados: perfil.tokensTotales,
-              fotos: snapshot.data ?? const <Observation>[],
-              desafios: ChallengeRepository.instance.completadosPorMi(
-                perfil.userId,
+            // `aplicar` deja los mínimos históricos: borrar una foto del
+            // diario baja los conteos vivos, pero un logro ya conseguido no
+            // se pierde por eso.
+            final stats = MarcaLogros.instance.aplicar(
+              EstadisticasExplorador.de(
+                veridiumsGanados: perfil.tokensTotales,
+                fotos: snapshot.data ?? const <Observation>[],
+                desafios: ChallengeRepository.instance.completadosPorMi(
+                  perfil.userId,
+                ),
               ),
             );
             return widget.builder(context, stats);

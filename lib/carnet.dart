@@ -249,10 +249,12 @@ class _Carnet extends StatelessWidget {
     );
     // Un solo sitio cuenta especies, registros y desafíos: si el carnet y el
     // perfil discreparan, el que se ve peor parece roto.
-    final stats = EstadisticasExplorador.de(
-      veridiumsGanados: perfil.tokensTotales,
-      fotos: fotos,
-      desafios: desafios,
+    final stats = MarcaLogros.instance.aplicar(
+      EstadisticasExplorador.de(
+        veridiumsGanados: perfil.tokensTotales,
+        fotos: fotos,
+        desafios: desafios,
+      ),
     );
     final logros = logrosConseguidos(stats);
 

@@ -4,6 +4,8 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/foundation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
+import '../models/logro.dart';
+
 /// Recuerda el MÁXIMO histórico de las métricas con las que se ganan logros.
 ///
 /// Los logros se calculan a partir de los datos vivos del explorador, que es
@@ -82,6 +84,22 @@ class MarcaLogros extends ChangeNotifier {
       unawaited(_guardar());
     }
     return (registros: _maxRegistros, especies: _maxEspecies);
+  }
+
+  /// Aplica la marca a unas estadísticas recién calculadas: sube la marca si
+  /// los valores vivos la superan, y devuelve las estadísticas con los
+  /// mínimos históricos ya puestos.
+  ///
+  /// Es el único punto donde se juntan el estado guardado y el modelo puro.
+  EstadisticasExplorador aplicar(EstadisticasExplorador vivas) {
+    final marca = elevar(
+      registros: vivas.registros,
+      especies: vivas.especiesDistintas,
+    );
+    return vivas.conMinimos(
+      registros: marca.registros,
+      especies: marca.especies,
+    );
   }
 
   Future<void> _guardar() async {

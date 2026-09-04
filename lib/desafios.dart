@@ -753,9 +753,18 @@ class _ChallengesScreenState extends State<ChallengesScreen> {
           },
         ),
       ),
+      // Desafíos NO es una de las cinco secciones: se abre apilada encima de
+      // otra. `currentIndex: 0` es solo para que la barra tenga un índice
+      // válido que resaltar (se llega desde Inicio).
+      //
+      // El -1 del onTap es lo que importa: VeridiaNav.ir descarta el toque
+      // cuando el destino coincide con la sección actual, así que declarando
+      // 0 la pestaña de Inicio quedaba MUERTA —tocarla no hacía nada y no
+      // había forma de volver al menú desde la barra—. Con -1 ninguna
+      // coincide y las cinco funcionan.
       bottomNavigationBar: VeridiaBottomNav(
         currentIndex: 0,
-        onTap: (i) => VeridiaNav.ir(context, VeridiaSeccion.values[i], 0),
+        onTap: (i) => VeridiaNav.ir(context, VeridiaSeccion.values[i], -1),
       ),
     );
   }
