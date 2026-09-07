@@ -26,6 +26,7 @@
     "rules": "firestore.rules"
   },
   "hosting": {
+    "site": "v3ridia",
     "public": "build/web",
     "predeploy": [
       "flutter build web --release"

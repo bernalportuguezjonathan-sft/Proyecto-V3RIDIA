@@ -170,8 +170,24 @@ service cloud.firestore {
     // Veridiums va en la misma transacción) y solo un administrador puede
     // marcarlas como entregadas o borrarlas.
     match /canjes/{canjeId} {
+      // El `resource == null` NO es cosmetico: es lo que hace que canjear
+      // funcione la primera vez.
+      //
+      // canjear() en repositorio_r.dart abre una transaccion que empieza
+      // leyendo canjes/{uid}_{recompensaId} para saber si esa recompensa ya
+      // se canjeo. Ese documento NO EXISTE la primera vez, y en un `get`
+      // sobre un documento inexistente Firestore evalua la regla con
+      // `resource` a null: `resource.data.userId` revienta, la regla se
+      // resuelve como falsa y devuelve permission-denied. La transaccion
+      // lanzaba, caia en el catch y el explorador veia "No se pudo completar
+      // el canje" SIEMPRE, en todas las recompensas no repetibles.
+      //
+      // Dejar leer un documento que no existe no filtra nada: no hay datos
+      // que devolver. Y la comprobacion de dueno sigue intacta para los que
+      // si existen.
       allow read: if isAdmin() ||
-        (isSignedIn() && resource.data.userId == request.auth.uid);
+        (isSignedIn() &&
+          (resource == null || resource.data.userId == request.auth.uid));
       // Nacen siempre 'activo': ya no hay aprobación del administrador, la
       // recompensa se entrega en el mismo momento del pago.
       allow create: if isSignedIn() &&
