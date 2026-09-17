@@ -5,6 +5,7 @@ import 'models/desafio.dart';
 import 'models/user.dart';
 import 'recompensas.dart';
 import 'services/especie_ia_service.dart';
+import 'services/limite_intentos.dart';
 import 'services/foto_service.dart';
 import 'services/repositorio_d.dart';
 import 'services/repositorio_o.dart';
@@ -262,6 +263,9 @@ class _ChallengesScreenState extends State<ChallengesScreen> {
           mimeType,
           origen: 'el desafío "${challenge.title}"',
         );
+      } on LimiteIntentosException catch (e) {
+        messenger.showSnackBar(veridiaSnackBarError(e.message));
+        return;
       } on FotoDuplicadaException catch (e) {
         messenger.showSnackBar(veridiaSnackBarError(e.message));
         return;
@@ -284,7 +288,11 @@ class _ChallengesScreenState extends State<ChallengesScreen> {
           veridiaSnackBarError(
             resultado.identified
                 ? 'La IA detectó "${resultado.commonName}", no "${challenge.targetSpecies}". No cuenta para este desafío.'
-                : 'La IA no identificó ninguna especie en esta foto.',
+                // El motivo concreto ("eso es una persona", "parece la foto
+                // de una pantalla") enseña qué corregir; "no se identificó
+                // ninguna especie" deja al explorador adivinando.
+                : resultado.reason ??
+                      'La IA no identificó ninguna especie en esta foto.',
           ),
         );
         return;

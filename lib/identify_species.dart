@@ -13,6 +13,7 @@ import 'services/consejo_mascota.dart';
 import 'services/economia.dart';
 import 'services/especie_ia_service.dart';
 import 'services/foto_service.dart';
+import 'services/limite_intentos.dart';
 import 'services/repositorio_m.dart';
 import 'services/repositorio_o.dart';
 import 'services/repositorio_u.dart';
@@ -39,7 +40,6 @@ class _IdentifySpeciesScreenState extends State<IdentifySpeciesScreen> {
   /// cae al GPS del dispositivo si la imagen no trae coordenadas.
   UbicacionFoto _ubicacion = const UbicacionFoto.desconocida();
   String _mensajeUbicacion = 'Toma o elige una foto para ubicar la especie.';
-  String? _selectedSpecies;
   final ImagePicker _imagePicker = ImagePicker();
   final EspecieIAService _especieIAService = EspecieIAService();
 
@@ -47,6 +47,19 @@ class _IdentifySpeciesScreenState extends State<IdentifySpeciesScreen> {
   bool _isSaving = false;
   SpeciesIdentification? _aiResult;
   String? _aiError;
+
+  /// Cuántas fotos rechazadas le quedan antes de la espera forzosa. Se avisa
+  /// antes de bloquear: que te frenen sin haber visto venir nada se siente
+  /// como un fallo de la app, no como una regla.
+  int? _rechazosRestantes;
+
+  /// La única puerta para guardar.
+  ///
+  /// Exige un análisis de IA aprobado para ESTA foto. Antes el botón estaba
+  /// siempre activo, así que se podía fotografiar a una persona —o elegir una
+  /// especie de la lista de identificaciones pasadas y adjuntarle cualquier
+  /// imagen— y mandarlo igual al mapa comunitario.
+  bool get _puedeGuardar => _aiResult?.identified == true;
 
   /// Lo que valdría la foto que se está encuadrando ahora mismo.
   ///
@@ -107,12 +120,16 @@ class _IdentifySpeciesScreenState extends State<IdentifySpeciesScreen> {
       if (!mounted) return;
 
       setState(() {
+        // Los bytes se guardan SIEMPRE, también en móvil. Antes en móvil se
+        // dejaban en null y tanto el análisis como el guardado volvían a leer
+        // el archivo del disco: tres lecturas completas de una foto de varios
+        // MB por cada observación. El File se conserva aparte porque la vista
+        // previa usa Image.file.
+        _selectedImageBytes = bytes;
         if (kIsWeb) {
-          _selectedImageBytes = bytes;
           _selectedImageFile = null;
         } else {
           _selectedImageFile = File(photo.path);
-          _selectedImageBytes = null;
         }
         _selectedImageMimeType = mimeType;
         _photoTaken = true;
@@ -162,6 +179,17 @@ class _IdentifySpeciesScreenState extends State<IdentifySpeciesScreen> {
     unawaited(_recalcularPreviaMascota());
   }
 
+  /// Relee del limitador cuántos rechazos quedan, para poder avisar.
+  Future<void> _refrescarRechazosRestantes() async {
+    final perfil = UserRepository.instance.currentUser.value;
+    if (perfil == null) return;
+    final restantes = await LimiteIntentosService.instance.rechazosRestantes(
+      perfil.userId,
+    );
+    if (!mounted) return;
+    setState(() => _rechazosRestantes = restantes);
+  }
+
   Future<void> _analizarConIA() async {
     final bytes =
         _selectedImageBytes ?? await _selectedImageFile?.readAsBytes();
@@ -184,18 +212,21 @@ class _IdentifySpeciesScreenState extends State<IdentifySpeciesScreen> {
         origen: 'una observación',
       );
       if (!mounted) return;
-      setState(() {
-        _aiResult = result;
-        if (result.identified && result.commonName != null) {
-          _selectedSpecies = result.commonName;
-        }
-      });
+      setState(() => _aiResult = result);
       // Ya se sabe QUÉ es: la mariquita puede confirmar si era un cultivo y
       // el colibrí si la especie cuenta como nueva del día.
       unawaited(_recalcularPreviaMascota());
+      unawaited(_refrescarRechazosRestantes());
+    } on LimiteIntentosException catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _aiError = e.message;
+        _rechazosRestantes = 0;
+      });
     } on FotoDuplicadaException catch (e) {
       if (!mounted) return;
       setState(() => _aiError = e.message);
+      unawaited(_refrescarRechazosRestantes());
     } on SpeciesIdentificationException catch (e) {
       if (!mounted) return;
       setState(() {
@@ -216,7 +247,16 @@ class _IdentifySpeciesScreenState extends State<IdentifySpeciesScreen> {
   }
 
   Future<void> _guardarObservacion() async {
-    final aiIdentified = _aiResult?.identified == true;
+    // El botón ya está deshabilitado en este caso; esto es el segundo cerrojo,
+    // por si algún día alguien vuelve a habilitarlo sin caer en la cuenta.
+    if (!_puedeGuardar) {
+      _mostrarError(
+        _aiResult?.reason ??
+            'Analiza la foto con la IA antes de guardar la observación.',
+      );
+      return;
+    }
+
     final currentUser = UserRepository.instance.currentUser.value;
     if (currentUser == null) {
       _mostrarError('Debes iniciar sesión para guardar observaciones.');
@@ -245,89 +285,59 @@ class _IdentifySpeciesScreenState extends State<IdentifySpeciesScreen> {
 
     List<String> mensajesDesafios = const [];
 
-    if (aiIdentified) {
-      // La IA sí identificó algo: guardar y avanzar desafíos es trabajo del
-      // servidor (Cloud Function `guardarObservacion`), que ya tiene en
-      // caché la identificación que Gemini dio para este sha256 — el
-      // cliente no le manda su propio `_aiResult`, así que no hay forma de
-      // fingir un resultado distinto.
-      try {
-        final resultado = await ObservationRepository.instance.guardarConIA(
-          identificacion: _aiResult!,
-          observationId: observationId,
-          imageUrl: imageUrl,
-          latitude: _ubicacion.latitude,
-          longitude: _ubicacion.longitude,
-          location: _ubicacion.etiqueta,
-        );
-        mensajesDesafios = resultado.avances.map((avance) {
-          final palabra = avance.veridiumsGanados == 1
-              ? 'Veridium'
-              : 'Veridiums';
-          return avance.completado
-              ? '🏆 Completaste "${avance.title}" — '
-                    '¡+${avance.veridiumsGanados} $palabra!'
-              : '🎯 Avanzaste en "${avance.title}": '
-                    '${avance.progreso}/${avance.meta} '
-                    '(+${avance.veridiumsGanados} $palabra)';
-        }).toList();
-
-        // Lo que pagó la foto en sí, aparte de los desafíos: el Veridium base
-        // y, si la mascota que lleva puesta aportó algo, por qué. Decirlo es
-        // la mitad de la mecánica: una mejora que suma en silencio no enseña
-        // a nadie que salir de noche o acercarse al humedal vale más.
-        if (resultado.veridiumsPorLaFoto > 0) {
-          final palabra = resultado.veridiumsPorLaFoto == 1
-              ? 'Veridium'
-              : 'Veridiums';
-          final bono = resultado.bonoMascota;
-          mensajesDesafios = [
-            '📷 Foto verificada: +${resultado.veridiumsPorLaFoto} $palabra',
-            if (bono != null) '🐾 ${bono.motivo} (+${bono.veridiums})',
-            ...mensajesDesafios,
-          ];
-        }
-      } on GuardarObservacionException catch (e) {
-        if (mounted) setState(() => _isSaving = false);
-        _mostrarError(e.message);
-        return;
-      } catch (e) {
-        if (mounted) setState(() => _isSaving = false);
-        _mostrarError('No se pudo guardar la observación: $e');
-        return;
-      }
-    } else {
-      // Sin IA (especie elegida a mano de la guía): no otorga Veridiums ni
-      // toca ningún desafío, así que sigue escribiendo directo desde aquí.
-      final observation = Observation(
-        id: observationId,
-        commonName: _selectedSpecies ?? 'Especie observada',
-        scientificName: _selectedSpecies != null
-            ? 'Referencia visual'
-            : 'Sin confirmar',
-        location: _ubicacion.etiqueta,
-        notes: 'Registrado desde la guía de observación',
-        dateTime: _ubicacion.fecha ?? DateTime.now(),
-        imagePath: imageUrl,
+    // Llegar aquí ya significa que la IA aprobó la foto: lo garantiza el
+    // cerrojo del principio del método. Antes había una rama `else` que
+    // guardaba sin IA (con el nombre puesto a mano o el relleno "Especie
+    // observada"), y era por donde entraba al mapa comunitario cualquier
+    // cosa. Se borró a propósito: que no exista es lo que impide volver a
+    // abrirla sin querer.
+    // La IA sí identificó algo: guardar y avanzar desafíos es trabajo del
+    // servidor (Cloud Function `guardarObservacion`), que ya tiene en
+    // caché la identificación que Gemini dio para este sha256 — el
+    // cliente no le manda su propio `_aiResult`, así que no hay forma de
+    // fingir un resultado distinto.
+    try {
+      final resultado = await ObservationRepository.instance.guardarConIA(
+        identificacion: _aiResult!,
+        observationId: observationId,
+        imageUrl: imageUrl,
         latitude: _ubicacion.latitude,
         longitude: _ubicacion.longitude,
-        type: null,
-        userId: currentUser.userId,
-        userDisplayName: currentUser.displayName,
+        location: _ubicacion.etiqueta,
       );
+      mensajesDesafios = resultado.avances.map((avance) {
+        final palabra = avance.veridiumsGanados == 1 ? 'Veridium' : 'Veridiums';
+        return avance.completado
+            ? '🏆 Completaste "${avance.title}" — '
+                  '¡+${avance.veridiumsGanados} $palabra!'
+            : '🎯 Avanzaste en "${avance.title}": '
+                  '${avance.progreso}/${avance.meta} '
+                  '(+${avance.veridiumsGanados} $palabra)';
+      }).toList();
 
-      try {
-        await ObservationRepository.instance
-            .addObservation(observation)
-            .timeout(const Duration(seconds: 20));
-      } catch (e) {
-        if (mounted) setState(() => _isSaving = false);
-        final mensaje = e is TimeoutException
-            ? 'La conexión está muy lenta y no se pudo guardar. Revisa tu internet e intenta de nuevo.'
-            : 'No se pudo guardar la observación: $e';
-        _mostrarError(mensaje);
-        return;
+      // Lo que pagó la foto en sí, aparte de los desafíos: el Veridium base
+      // y, si la mascota que lleva puesta aportó algo, por qué. Decirlo es
+      // la mitad de la mecánica: una mejora que suma en silencio no enseña
+      // a nadie que salir de noche o acercarse al humedal vale más.
+      if (resultado.veridiumsPorLaFoto > 0) {
+        final palabra = resultado.veridiumsPorLaFoto == 1
+            ? 'Veridium'
+            : 'Veridiums';
+        final bono = resultado.bonoMascota;
+        mensajesDesafios = [
+          '📷 Foto verificada: +${resultado.veridiumsPorLaFoto} $palabra',
+          if (bono != null) '🐾 ${bono.motivo} (+${bono.veridiums})',
+          ...mensajesDesafios,
+        ];
       }
+    } on GuardarObservacionException catch (e) {
+      if (mounted) setState(() => _isSaving = false);
+      _mostrarError(e.message);
+      return;
+    } catch (e) {
+      if (mounted) setState(() => _isSaving = false);
+      _mostrarError('No se pudo guardar la observación: $e');
+      return;
     }
 
     if (mounted) setState(() => _isSaving = false);
@@ -467,34 +477,13 @@ class _IdentifySpeciesScreenState extends State<IdentifySpeciesScreen> {
                           VeridiaNav.abrir(context, const HistoryScreen()),
                     ),
                   ),
-                  _MisIdentificaciones(
-                    onSeleccionar: (nombre) =>
-                        setState(() => _selectedSpecies = nombre),
-                  ),
+                  const _MisIdentificaciones(),
                   const SizedBox(height: 20),
                   Padding(
                     padding: const EdgeInsets.symmetric(horizontal: 16),
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        if (_selectedSpecies != null)
-                          Container(
-                            width: double.infinity,
-                            padding: const EdgeInsets.all(12),
-                            decoration: BoxDecoration(
-                              color: VeridiaColors.primary.withValues(
-                                alpha: 0.10,
-                              ),
-                              borderRadius: BorderRadius.circular(12),
-                            ),
-                            child: Text(
-                              'Seleccionada: $_selectedSpecies',
-                              style: const TextStyle(
-                                fontWeight: FontWeight.bold,
-                                color: VeridiaColors.primary,
-                              ),
-                            ),
-                          ),
                         const SizedBox(height: 12),
                         Row(
                           children: [
@@ -673,10 +662,22 @@ class _IdentifySpeciesScreenState extends State<IdentifySpeciesScreen> {
                               width: double.infinity,
                               padding: const EdgeInsets.all(14),
                               decoration: BoxDecoration(
-                                color: VeridiaColors.primary.withValues(
-                                  alpha: 0.10,
-                                ),
+                                // Verde solo cuando la foto sirve. Un rechazo
+                                // pintado del mismo color que un acierto se
+                                // lee como si hubiera funcionado.
+                                color:
+                                    (_aiResult!.identified
+                                            ? VeridiaColors.primary
+                                            : VeridiaColors.error)
+                                        .withValues(alpha: 0.10),
                                 borderRadius: BorderRadius.circular(14),
+                                border: _aiResult!.identified
+                                    ? null
+                                    : Border.all(
+                                        color: VeridiaColors.error.withValues(
+                                          alpha: 0.6,
+                                        ),
+                                      ),
                               ),
                               child: _aiResult!.identified
                                   ? Column(
@@ -740,22 +741,101 @@ class _IdentifySpeciesScreenState extends State<IdentifySpeciesScreen> {
                                           ),
                                       ],
                                     )
-                                  : Text(
-                                      _aiResult!.reason ??
-                                          'La IA no pudo identificar una especie en esta foto.',
-                                      style: TextStyle(
-                                        fontSize: 12,
-                                        color: VeridiaColors.onSurfaceVariant,
-                                      ),
+                                  : Row(
+                                      crossAxisAlignment:
+                                          CrossAxisAlignment.start,
+                                      children: [
+                                        Icon(
+                                          switch (_aiResult!.rechazo) {
+                                            MotivoRechazo.pantallaOImpresion =>
+                                              Icons.screenshot_monitor,
+                                            MotivoRechazo.noEsSerVivo =>
+                                              Icons.block,
+                                            _ => Icons.help_outline,
+                                          },
+                                          size: 18,
+                                          color: VeridiaColors.error,
+                                        ),
+                                        const SizedBox(width: 8),
+                                        Expanded(
+                                          child: Column(
+                                            crossAxisAlignment:
+                                                CrossAxisAlignment.start,
+                                            children: [
+                                              Text(
+                                                _aiResult!.reason ??
+                                                    'La IA no pudo identificar '
+                                                        'una especie en esta foto.',
+                                                style: const TextStyle(
+                                                  fontSize: 12,
+                                                  color: VeridiaColors.error,
+                                                  fontWeight: FontWeight.w600,
+                                                ),
+                                              ),
+                                              if (_rechazosRestantes != null &&
+                                                  _rechazosRestantes! > 0)
+                                                Padding(
+                                                  padding:
+                                                      const EdgeInsets.only(
+                                                        top: 6,
+                                                      ),
+                                                  child: Text(
+                                                    'Te quedan '
+                                                    '$_rechazosRestantes '
+                                                    '${_rechazosRestantes == 1 ? 'intento' : 'intentos'} '
+                                                    'antes de una pausa.',
+                                                    style: TextStyle(
+                                                      fontSize: 11,
+                                                      color: VeridiaColors
+                                                          .onSurfaceVariant,
+                                                    ),
+                                                  ),
+                                                ),
+                                            ],
+                                          ),
+                                        ),
+                                      ],
                                     ),
                             ),
                           ],
                           const SizedBox(height: 16),
+                          if (!_puedeGuardar)
+                            Padding(
+                              padding: const EdgeInsets.only(bottom: 10),
+                              child: Row(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Icon(
+                                    Icons.lock_outline,
+                                    size: 15,
+                                    color: VeridiaColors.onSurfaceVariant,
+                                  ),
+                                  const SizedBox(width: 7),
+                                  Expanded(
+                                    child: Text(
+                                      _aiResult == null
+                                          ? 'Analiza la foto con la IA para '
+                                                'poder guardarla. Solo entran '
+                                                'al mapa plantas, animales y '
+                                                'hongos verificados.'
+                                          : 'Esta foto no se puede guardar en '
+                                                'el mapa comunitario.',
+                                      style: TextStyle(
+                                        fontSize: 11.5,
+                                        color: VeridiaColors.onSurfaceVariant,
+                                      ),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
                           SizedBox(
                             width: double.infinity,
                             child: VeridiaBotonTactil(
                               child: ElevatedButton(
-                                onPressed: _isSaving
+                                // Sin identificación aprobada no se guarda
+                                // nada: es la puerta que faltaba.
+                                onPressed: (_isSaving || !_puedeGuardar)
                                     ? null
                                     : _guardarObservacion,
                                 style: ElevatedButton.styleFrom(
@@ -835,10 +915,15 @@ class _IdentifySpeciesScreenState extends State<IdentifySpeciesScreen> {
 
 /// Carrusel con las especies que el propio explorador ya identificó.
 /// Sustituye a la antigua lista de ejemplo: aquí todo lo que se ve es real.
+/// Galería de lo que este explorador ya identificó con la IA.
+///
+/// Es solo de consulta. Antes cada tarjeta se podía tocar para "seleccionar"
+/// la especie, pero desde que guardar exige una identificación aprobada para
+/// LA foto actual, esa selección no decidía nada: mostraba un "Seleccionada:
+/// X" que no cambiaba lo que se guardaba. Un control que no hace nada enseña
+/// mal cómo funciona la app, así que se quitó en vez de dejarlo de adorno.
 class _MisIdentificaciones extends StatelessWidget {
-  const _MisIdentificaciones({required this.onSeleccionar});
-
-  final ValueChanged<String> onSeleccionar;
+  const _MisIdentificaciones();
 
   @override
   Widget build(BuildContext context) {
@@ -899,7 +984,6 @@ class _MisIdentificaciones extends StatelessWidget {
                 width: 170,
                 child: VeridiaCard(
                   padding: EdgeInsets.zero,
-                  onTap: () => onSeleccionar(obs.commonName),
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [

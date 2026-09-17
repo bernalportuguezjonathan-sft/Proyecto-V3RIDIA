@@ -128,6 +128,35 @@ class UserRepository {
     currentUser.value = null;
   }
 
+  /// ¿Esta cuenta ya tiene perfil en Veridia?
+  ///
+  /// Hay que consultarlo ANTES de `initializeUser()`, nunca después: esa
+  /// función autorrepara el perfil que falte, así que una vez llamada ya no
+  /// existe forma de distinguir "se registró y falló la escritura" de "nunca
+  /// se registró aquí".
+  ///
+  /// Si Firestore no responde devuelve `true` (asume que sí está registrado).
+  /// Es deliberado: dejar entrar a alguien que sí lo estaba es mucho menos
+  /// grave que plantarle un "esta cuenta no existe" a quien lleva meses
+  /// usando la app solo porque se le cayó el wifi.
+  Future<bool> existePerfil(String userId) async {
+    try {
+      // Source.server a propósito: sin conexión, un `get()` normal puede
+      // resolverse contra la caché local y devolver "no existe" para una
+      // cuenta que sí está registrada. Pidiendo servidor, sin red LANZA, y el
+      // catch de abajo responde `true`, que es el lado seguro.
+      final doc = await _firestore
+          .collection('users')
+          .doc(userId)
+          .get(const GetOptions(source: Source.server))
+          .timeout(const Duration(seconds: 12));
+      return doc.exists;
+    } catch (e) {
+      debugPrint('No se pudo comprobar el perfil de $userId: $e');
+      return true;
+    }
+  }
+
   Future<void> initializeUser() async {
     final user = FirebaseAuth.instance.currentUser;
     if (user != null) {

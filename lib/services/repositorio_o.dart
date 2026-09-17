@@ -107,13 +107,6 @@ class ObservationRepository {
   /// nombrar la foto en Supabase Storage antes de guardar el documento.
   String nuevoId() => _collection.doc().id;
 
-  /// Guardado MANUAL, sin identificación de IA de por medio (el explorador
-  /// eligió la especie de una guía). No otorga Veridiums ni toca ningún
-  /// desafío — por eso puede seguir escribiendo directo desde el cliente.
-  Future<void> addObservation(Observation observation) async {
-    await _collection.doc(observation.id).set(observation.toMap());
-  }
-
   /// Guarda una observación identificada por la IA y avanza los desafíos
   /// propios que coincidan.
   ///
@@ -140,19 +133,51 @@ class ObservationRepository {
       );
     }
 
+    // Nada que la IA no haya aprobado entra al mapa comunitario, venga de la
+    // pantalla que venga. Los avistamientos los ve todo el mundo y no se
+    // pueden depurar después uno por uno, así que el filtro vive también
+    // aquí y no solo en la interfaz que llamó.
+    if (!identificacion.identified) {
+      throw GuardarObservacionException(
+        identificacion.reason ??
+            'Solo se pueden registrar plantas, animales y hongos '
+                'identificados por la IA.',
+      );
+    }
+
+    // Todo lo que viene de la IA se recorta a los topes que valida
+    // `firestore.rules`. `notes` sale de la descripción que devuelve Gemini,
+    // que es texto libre: si un día se pasa de largo, sin esto el avistamiento
+    // se perdería con un permission-denied que el explorador no entiende.
     final observation = Observation(
       id: observationId,
-      commonName: identificacion.commonName ?? 'Especie observada',
-      scientificName: identificacion.scientificName ?? 'Sin confirmar',
-      location: location ?? 'Sin ubicación',
-      notes: identificacion.description ?? 'Identificado con IA',
+      commonName: recortarCampo(
+        textoONull(identificacion.commonName) ?? 'Especie observada',
+        topeCommonName,
+      ),
+      scientificName: recortarCampo(
+        textoONull(identificacion.scientificName) ?? 'Sin confirmar',
+        topeScientificName,
+      ),
+      location: recortarCampo(
+        textoONull(location) ?? 'Sin ubicación',
+        topeLocation,
+      ),
+      notes: recortarCampo(
+        textoONull(identificacion.description) ?? 'Identificado con IA',
+        topeNotes,
+      ),
       dateTime: DateTime.now(),
-      imagePath: imageUrl,
-      latitude: latitude,
-      longitude: longitude,
-      type: identificacion.type,
+      imagePath: textoONull(imageUrl) == null
+          ? null
+          : recortarCampo(imageUrl!, topeImagePath),
+      latitude: coordenadaValida(latitude, maximo: 90),
+      longitude: coordenadaValida(longitude, maximo: 180),
+      type: textoONull(identificacion.type) == null
+          ? null
+          : recortarCampo(identificacion.type!, topeType),
       userId: perfil.userId,
-      userDisplayName: perfil.displayName,
+      userDisplayName: recortarCampo(perfil.displayName, topeUserDisplayName),
     );
 
     try {
@@ -373,10 +398,11 @@ class ObservationRepository {
     return false;
   }
 
-  Future<void> updateObservation(Observation observation) async {
-    await _collection.doc(observation.id).update(observation.toMap());
-  }
-
+  /// Borra un avistamiento propio. Lo usa el Diario (historial.dart) y es la
+  /// ÚNICA escritura que le queda al cliente sobre esta colección aparte de
+  /// crear: `firestore.rules` no deja editar un avistamiento ya publicado,
+  /// porque poder reescribirle la especie después sería la forma de saltarse
+  /// el filtro de la IA sin tocar la app.
   Future<void> deleteObservation(String id) async {
     await _collection.doc(id).delete();
   }

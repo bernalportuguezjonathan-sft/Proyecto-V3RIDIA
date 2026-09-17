@@ -69,6 +69,64 @@ class Observation {
   }
 }
 
+// ---------------------------------------------------------------------------
+// Topes de longitud de cada campo
+// ---------------------------------------------------------------------------
+// Son EXACTAMENTE los mismos que valida `firestore.rules` en
+// `avistamientoValido()`. Si se cambia uno hay que cambiar el otro.
+//
+// Existen en los dos sitios a propósito y con papeles distintos: el cliente
+// recorta antes de escribir para que un texto largo de la IA no acabe en un
+// permission-denied que el explorador no entiende, y la regla los vuelve a
+// comprobar para que un cliente modificado tampoco pueda saltárselos.
+//
+// El que de verdad hacía falta es `notes`: sale de la descripción que devuelve
+// Gemini, que es texto libre. Pedirle "1 o 2 frases" no es una garantía.
+
+const topeCommonName = 120;
+const topeScientificName = 160;
+const topeLocation = 200;
+const topeNotes = 500;
+const topeImagePath = 500;
+const topeType = 40;
+const topeUserDisplayName = 120;
+
+/// Recorta un texto al tope, sin partir una letra por la mitad.
+///
+/// Se mide con `length` de Dart (unidades UTF-16), que para cualquier carácter
+/// fuera del plano básico cuenta MÁS que el `size()` de las reglas de
+/// Firestore. Equivocarse por ese lado es inofensivo: recorta de más, nunca
+/// de menos, así que lo que se escribe siempre cabe.
+String recortarCampo(String texto, int tope) {
+  if (texto.length <= tope) return texto;
+  var corte = tope;
+  // Cortar entre las dos mitades de un par sustituto dejaría media letra y un
+  // texto inválido que Firestore rechaza.
+  final ultima = texto.codeUnitAt(corte - 1);
+  if (ultima >= 0xD800 && ultima <= 0xDBFF) corte -= 1;
+  return texto.substring(0, corte).trimRight();
+}
+
+/// El texto ya limpio, o null si venía vacío o solo con espacios.
+///
+/// La IA puede devolver `""` en vez de null, y un nombre común vacío no es un
+/// nombre: la regla exige que tenga al menos un carácter.
+String? textoONull(String? texto) {
+  final limpio = texto?.trim();
+  return (limpio == null || limpio.isEmpty) ? null : limpio;
+}
+
+/// La coordenada si es utilizable, o null.
+///
+/// Descarta NaN, infinitos y puntos fuera del planeta. Un valor así no se
+/// puede dibujar en el mapa y además hace que la regla rechace el avistamiento
+/// entero, así que es mejor guardar el avistamiento sin punto que perderlo.
+double? coordenadaValida(double? valor, {required double maximo}) {
+  if (valor == null || valor.isNaN || valor.isInfinite) return null;
+  if (valor < -maximo || valor > maximo) return null;
+  return valor;
+}
+
 /// true si la observación responde a la búsqueda (nombre común, científico,
 /// tipo, lugar, notas o quién la registró).
 ///

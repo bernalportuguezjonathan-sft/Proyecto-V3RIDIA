@@ -426,6 +426,84 @@ class _LoginScreenState extends State<LoginScreen>
     );
   }
 
+  /// Avisa de que la cuenta de Google elegida no está registrada en Veridia.
+  ///
+  /// Devuelve true si la persona quiere crear la cuenta con ese correo, false
+  /// si lo que pasó es que se equivocó de cuenta.
+  ///
+  /// No se cancela tocando fuera: equivocarse de cuenta es justo el momento en
+  /// el que hay que leer, y un diálogo que se cierra solo devolvería al mismo
+  /// silencio que causaba el problema.
+  Future<bool> _preguntarPorCuentaNoRegistrada(String correo) async {
+    final respuesta = await showDialog<bool>(
+      context: context,
+      barrierDismissible: false,
+      builder: (dialogContext) => AlertDialog(
+        backgroundColor: VeridiaColors.surfaceContainerHigh,
+        title: const Text('Esta cuenta no está registrada'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              correo,
+              style: const TextStyle(
+                fontWeight: FontWeight.bold,
+                color: VeridiaColors.primary,
+              ),
+            ),
+            const SizedBox(height: 10),
+            const Text(
+              'No tiene ninguna cuenta de Veridia, así que no hay progreso '
+              'que recuperar. Si esperabas encontrar tus especies, '
+              'seguramente elegiste otra cuenta de Google.',
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext, false),
+            child: const Text('Usar otra cuenta'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext, true),
+            child: const Text('Crear cuenta nueva'),
+          ),
+        ],
+      ),
+    );
+    return respuesta ?? false;
+  }
+
+  /// Deshace el acceso con una cuenta que no era la que se quería.
+  ///
+  /// Borrar de Firebase Auth la cuenta recién creada evita dejar cuentas
+  /// fantasma; se puede hacer sin volver a pedir credenciales porque la
+  /// autenticación acaba de ocurrir. Y `cerrarSesionGoogle()` es lo que hace
+  /// que el selector de cuentas vuelva a salir: sin eso, Google reutiliza la
+  /// misma cuenta en silencio y la persona no puede corregir su error.
+  Future<void> _descartarCuentaNoRegistrada({
+    required bool borrarDeAuth,
+  }) async {
+    final user = FirebaseAuth.instance.currentUser;
+    if (borrarDeAuth && user != null) {
+      try {
+        await user.delete();
+      } catch (e) {
+        debugPrint('No se pudo borrar la cuenta recién creada: $e');
+      }
+    }
+    try {
+      await FirebaseAuth.instance.signOut();
+    } catch (e) {
+      debugPrint('No se pudo cerrar la sesión de Firebase: $e');
+    }
+    await cerrarSesionGoogle();
+
+    if (!mounted) return;
+    _mostrarAlerta('Elige la cuenta con la que te registraste en Veridia.');
+  }
+
   Future<void> _signInWithGoogle() async {
     if (_selectedRole == 'Administrador') {
       return;
@@ -446,6 +524,41 @@ class _LoginScreenState extends State<LoginScreen>
       final userCredential = await iniciarSesionConGoogle();
       // null = cerró la ventana de Google sin elegir cuenta: no es un error.
       if (userCredential == null) return;
+
+      final cuentaGoogle = userCredential.user;
+      if (cuentaGoogle == null) return;
+
+      // Google autentica, pero no registra. Si esta cuenta no tiene perfil en
+      // Veridia no se entra en silencio: es exactamente el caso de tocar por
+      // error la cuenta equivocada en el selector de Google y acabar dentro de
+      // una sesión vacía creyendo que se perdió todo el progreso.
+      //
+      // Se miran DOS señales porque ninguna basta sola: `isNewUser` detecta la
+      // cuenta que Firebase acaba de crear en este mismo instante, y la
+      // ausencia del documento detecta la que quedó huérfana de un intento
+      // anterior (si el borrado de abajo falló, la segunda vez ya no sería
+      // "nueva" y se colaría).
+      final esCuentaNueva =
+          userCredential.additionalUserInfo?.isNewUser == true;
+      final tienePerfil = await UserRepository.instance.existePerfil(
+        cuentaGoogle.uid,
+      );
+
+      if (esCuentaNueva || !tienePerfil) {
+        if (didShowDialog && mounted) {
+          Navigator.pop(context);
+          didShowDialog = false;
+        }
+        if (!mounted) return;
+
+        final quiereRegistrarse = await _preguntarPorCuentaNoRegistrada(
+          cuentaGoogle.email ?? 'esta cuenta',
+        );
+        if (!quiereRegistrarse) {
+          await _descartarCuentaNoRegistrada(borrarDeAuth: esCuentaNueva);
+          return;
+        }
+      }
 
       await UserRepository.instance.initializeUser();
 

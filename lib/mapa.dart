@@ -1178,36 +1178,57 @@ class _MapScreenState extends State<MapScreen> {
               ),
               Row(
                 children: [
-                  _ChipPanel(
-                    etiqueta: 'Zonas',
-                    cantidad: zonas.length,
-                    icono: Icons.terrain_rounded,
-                    activo: _panelAbierto && _panel == _PanelMapa.zonas,
-                    onTap: () => _abrirPanel(_PanelMapa.zonas),
+                  // Los tres chips van dentro de un Expanded y cada uno es
+                  // Flexible: se reparten lo que sobre tras el mensaje y el
+                  // botón, y si no caben encogen entre ellos en vez de
+                  // desbordar. Antes eran de ancho fijo con un Spacer detrás,
+                  // así que en una pantalla de 360 dp el panel se salía 8 px
+                  // y salía la franja amarilla y negra de overflow.
+                  Expanded(
+                    child: Row(
+                      children: [
+                        Flexible(
+                          child: _ChipPanel(
+                            etiqueta: 'Zonas',
+                            cantidad: zonas.length,
+                            icono: Icons.terrain_rounded,
+                            activo: _panelAbierto && _panel == _PanelMapa.zonas,
+                            onTap: () => _abrirPanel(_PanelMapa.zonas),
+                          ),
+                        ),
+                        const SizedBox(width: 6),
+                        // No despliega el panel: abre la galería propia a
+                        // pantalla completa. En la franja de 200 px las
+                        // miniaturas eran ilegibles y encima se mezclaban con
+                        // las fotos de todos los demás.
+                        Flexible(
+                          child: _ChipPanel(
+                            etiqueta: 'Mis fotos',
+                            cantidad: _misFotos.length,
+                            icono: Icons.photo_camera_rounded,
+                            activo: false,
+                            onTap: () => abrirMisFotos(context, _birdZones),
+                          ),
+                        ),
+                        const SizedBox(width: 6),
+                        Flexible(
+                          child: _ChipPanel(
+                            etiqueta: 'Lugares',
+                            cantidad: _lugaresEncontrados.length,
+                            icono: Icons.travel_explore_rounded,
+                            activo:
+                                _panelAbierto && _panel == _PanelMapa.lugares,
+                            onTap: () => _abrirPanel(_PanelMapa.lugares),
+                          ),
+                        ),
+                      ],
+                    ),
                   ),
-                  const SizedBox(width: 6),
-                  // No despliega el panel: abre la galería propia a
-                  // pantalla completa. En la franja de 200 px las miniaturas
-                  // eran ilegibles y encima se mezclaban con las fotos de
-                  // todos los demás.
-                  _ChipPanel(
-                    etiqueta: 'Mis fotos',
-                    cantidad: _misFotos.length,
-                    icono: Icons.photo_camera_rounded,
-                    activo: false,
-                    onTap: () => abrirMisFotos(context, _birdZones),
-                  ),
-                  const SizedBox(width: 6),
-                  _ChipPanel(
-                    etiqueta: 'Lugares',
-                    cantidad: _lugaresEncontrados.length,
-                    icono: Icons.travel_explore_rounded,
-                    activo: _panelAbierto && _panel == _PanelMapa.lugares,
-                    onTap: () => _abrirPanel(_PanelMapa.lugares),
-                  ),
-                  const Spacer(),
+                  // Tope fijo en vez de Flexible: es el dato menos importante
+                  // de la fila y no puede robarles ancho a los chips.
                   if (_locationMessage != null)
-                    Flexible(
+                    ConstrainedBox(
+                      constraints: const BoxConstraints(maxWidth: 96),
                       child: Text(
                         _locationMessage!,
                         textAlign: TextAlign.end,
@@ -2062,13 +2083,23 @@ class _ChipPanel extends StatelessWidget {
           children: [
             Icon(icono, size: 13, color: tinte),
             const SizedBox(width: 6),
-            Text(
-              etiqueta,
-              style: TextStyle(
-                fontFamily: VeridiaFonts.body,
-                fontSize: 11,
-                fontWeight: FontWeight.w700,
-                color: tinte,
+            // Flexible + ellipsis: el icono y el contador son datos que no se
+            // pueden recortar, así que cuando falta ancho lo que cede es la
+            // etiqueta. Sin esto el Row de tamaño mínimo se negaba a encoger y
+            // el panel entero desbordaba unos pocos píxeles en pantallas
+            // estrechas.
+            Flexible(
+              child: Text(
+                etiqueta,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                softWrap: false,
+                style: TextStyle(
+                  fontFamily: VeridiaFonts.body,
+                  fontSize: 11,
+                  fontWeight: FontWeight.w700,
+                  color: tinte,
+                ),
               ),
             ),
             const SizedBox(width: 6),

@@ -61,3 +61,6 @@ app.*.map.json
 # forbidden on the Spark billing plan": no se publica ni el APK ni la pagina.
 # El APK se distribuye por GitHub Releases (ver web/info.html).
 web/*.apk
+
+# Dependencias de las pruebas de firestore.rules
+test_reglas/node_modules/

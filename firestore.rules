@@ -11,9 +11,20 @@ service cloud.firestore {
       return isSignedIn() && request.auth.uid == userId;
     }
 
+    // El `exists()` no es de adorno: si la cuenta esta autenticada pero
+    // todavia no tiene documento en `users` (por ejemplo justo antes de que
+    // initializeUser lo autorrepare), `get()` devuelve null y leer `.data`
+    // lanza un error de evaluacion que tumba la regla ENTERA. Es decir, en un
+    // `isAdmin() || otraCosa` ni siquiera se llega a evaluar `otraCosa`, y a
+    // esa persona se le niega algo a lo que si tenia derecho.
+    //
+    // Las llamadas a get()/exists() sobre el mismo documento dentro de una
+    // misma peticion se cachean, asi que anadir el exists() no duplica la
+    // lectura facturada.
     function isAdmin() {
       return isSignedIn() &&
-        get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'Administrador';
+        exists(/databases/$(database)/documents/users/$(request.auth.uid)) &&
+        get(/databases/$(database)/documents/users/$(request.auth.uid)).data.get('role', '') == 'Administrador';
     }
 
     // Un Explorador nunca puede leer esto. isAdminCodeValid() sí puede,
@@ -185,9 +196,12 @@ service cloud.firestore {
       // Dejar leer un documento que no existe no filtra nada: no hay datos
       // que devolver. Y la comprobacion de dueno sigue intacta para los que
       // si existen.
-      allow read: if isAdmin() ||
-        (isSignedIn() &&
-          (resource == null || resource.data.userId == request.auth.uid));
+      // El dueno va PRIMERO y isAdmin() despues: isAdmin() cuesta una lectura
+      // facturada de `users/{uid}`, y el caso normal —un explorador leyendo
+      // sus propios canjes— se resuelve sin llegar a ella.
+      allow read: if (isSignedIn() &&
+          (resource == null || resource.data.userId == request.auth.uid)) ||
+        isAdmin();
       // Nacen siempre 'activo': ya no hay aprobación del administrador, la
       // recompensa se entrega en el mismo momento del pago.
       allow create: if isSignedIn() &&
@@ -198,11 +212,72 @@ service cloud.firestore {
       allow update, delete: if isAdmin();
     }
 
+    // Un avistamiento es lo ÚNICO de esta base de datos que ven todos los
+    // demás exploradores, y una vez en el mapa no hay quien lo depure uno por
+    // uno. Por eso es la colección con la validación más estricta.
+    //
+    // Hasta el 2026-09-17 el `create` solo comprobaba que el userId fuera el
+    // de quien escribe: ni campos obligatorios, ni tipos, ni topes de tamaño.
+    // El filtro que decide si una foto es de verdad una especie (ver
+    // `evaluarRespuestaIA` en lib/services/especie_ia_service.dart) vivía
+    // entonces SOLO en la app, así que un cliente modificado escribía lo que
+    // quisiera y del tamaño que quisiera. Esto lo cierra desde el servidor,
+    // que es el único sitio donde un filtro no se puede evitar.
+    function avistamientoValido() {
+      let d = request.resource.data;
+      // `get(campo, null)` y no `d.campo`: los opcionales pueden llegar como
+      // null explícito o no llegar, y leer una clave ausente hace fallar la
+      // regla entera en vez de dar null.
+      let imagePath = d.get('imagePath', null);
+      let type = d.get('type', null);
+      let nombreAutor = d.get('userDisplayName', null);
+      let lat = d.get('latitude', null);
+      let lng = d.get('longitude', null);
+
+      return d.keys().hasOnly([
+          'commonName', 'scientificName', 'location', 'notes', 'dateTime',
+          'imagePath', 'latitude', 'longitude', 'type',
+          'userId', 'userDisplayName'
+        ]) &&
+        d.keys().hasAll([
+          'commonName', 'scientificName', 'location', 'notes', 'dateTime',
+          'userId'
+        ]) &&
+        // Nadie publica en nombre de otro.
+        d.userId == request.auth.uid &&
+        // Los topes son lo que impide engordar la base de datos a propósito:
+        // sin ellos, un solo documento puede llevar un megabyte de texto.
+        d.commonName is string && d.commonName.size() > 0 &&
+          d.commonName.size() <= 120 &&
+        d.scientificName is string && d.scientificName.size() <= 160 &&
+        d.location is string && d.location.size() <= 200 &&
+        d.notes is string && d.notes.size() <= 500 &&
+        d.dateTime is string && d.dateTime.size() <= 40 &&
+        (imagePath == null ||
+          (imagePath is string && imagePath.size() <= 500)) &&
+        (type == null || (type is string && type.size() <= 40)) &&
+        (nombreAutor == null ||
+          (nombreAutor is string && nombreAutor.size() <= 120)) &&
+        // Coordenadas dentro del planeta: un punto imposible rompe el mapa
+        // para todos, no solo para quien lo escribió.
+        (lat == null || (lat is number && lat >= -90 && lat <= 90)) &&
+        (lng == null || (lng is number && lng >= -180 && lng <= 180));
+    }
+
     match /avistamientos/{sightingId} {
       allow read: if isSignedIn();
-      allow create: if isSignedIn() &&
-        request.resource.data.userId == request.auth.uid;
-      allow update, delete: if isAdmin() ||
+      allow create: if isSignedIn() && avistamientoValido();
+
+      // El dueño NO puede editar: podría guardar una foto que la IA aprobó y
+      // reescribirle después la especie, saltándose el filtro entero sin
+      // tocar el cliente. Nada en la app actualiza avistamientos
+      // (`updateObservation` en repositorio_o.dart no lo llama nadie), así
+      // que cerrarlo no quita ninguna función; queda solo para moderación.
+      allow update: if isAdmin();
+
+      // Borrar el propio avistamiento SÍ: es lo que hace el Diario
+      // (historial.dart) y solo afecta a datos de quien lo borra.
+      allow delete: if isAdmin() ||
         (isSignedIn() && resource.data.userId == request.auth.uid);
     }
 
@@ -216,14 +291,16 @@ service cloud.firestore {
       //
       // NOTA (2026-08-26): el cliente vuelve a poder tocar este contador de
       // forma temporal (ver nota en soloEditaSuPerfil() arriba).
-      allow update: if isAdmin() ||
-        (isSignedIn() &&
+      // Igual que en canjes: el camino del explorador va primero para no
+      // pagar la lectura de isAdmin() en el caso normal.
+      allow update: if (isSignedIn() &&
           (resource.data.get('assignedToUserId', null) == null ||
             resource.data.get('assignedToUserId', null) == request.auth.uid) &&
           request.resource.data.diff(resource.data).affectedKeys()
             .hasOnly(['completadoPor']) &&
           request.resource.data.completadoPor ==
-            resource.data.get('completadoPor', 0) + 1);
+            resource.data.get('completadoPor', 0) + 1) ||
+        isAdmin();
     }
 
     match /assignments/{assignmentId} {

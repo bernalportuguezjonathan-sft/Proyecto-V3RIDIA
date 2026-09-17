@@ -5,7 +5,26 @@ import 'package:http/http.dart' as http;
 
 import '../config/gemini_key.dart';
 import 'huella_foto.dart';
+import 'limite_intentos.dart';
 import 'repositorio_u.dart';
+
+/// Por qué una foto no se puede registrar como avistamiento.
+enum MotivoRechazo {
+  /// Sirve: es una especie de fauna, flora u hongo vista en vivo.
+  ninguno,
+
+  /// Es un ser vivo, pero la IA no reconoció qué especie (foto borrosa,
+  /// demasiado lejos, sujeto tapado...).
+  noIdentificada,
+
+  /// Una persona, un objeto, comida, un vehículo... nada que pertenezca a un
+  /// inventario de biodiversidad.
+  noEsSerVivo,
+
+  /// La foto de una pantalla o de una impresión: la especie puede ser real,
+  /// pero el avistamiento no lo es.
+  pantallaOImpresion,
+}
 
 /// Resultado de identificar una foto.
 ///
@@ -33,8 +52,17 @@ class SpeciesIdentification {
     this.type,
     this.confidence = 'baja',
     this.reason,
+    this.rechazo = MotivoRechazo.ninguno,
   });
 
+  /// true solo si la foto sirve para registrar un avistamiento: especie
+  /// reconocida, ser vivo y tomada en vivo.
+  ///
+  /// Es deliberadamente estricto. Todo lo que decide si una foto se guarda,
+  /// si suma Veridiums o si avanza un desafío mira este campo, así que
+  /// cualquier duda tiene que resolverse hacia el NO: una foto de más que se
+  /// pierde es un incordio, una foto basura que entra se queda en el mapa
+  /// comunitario para siempre.
   final bool identified;
 
   /// Huella exacta de la foto (sha256). Se usa para marcarla como usada en
@@ -47,6 +75,14 @@ class SpeciesIdentification {
   final String? type;
   final String confidence;
   final String? reason;
+
+  /// Por qué se rechazó, cuando [identified] es false.
+  ///
+  /// Lo que la IA vio ("una persona", "un objeto") no va en un campo aparte:
+  /// ya viaja dentro de [reason], que es el texto que se le enseña al
+  /// explorador. Tenerlo dos veces obligaba a mantener los dos sincronizados
+  /// para nada.
+  final MotivoRechazo rechazo;
 }
 
 class SpeciesIdentificationException implements Exception {
@@ -90,9 +126,152 @@ forma:
           "aracnido", "planta", "hongo" u "otro" (o null),
   "confianza": "alta", "media" o "baja",
   "descripcion": "1 o 2 frases sobre la especie y su hábitat en Cundinamarca, o null",
-  "motivo": "si identificado es false, explica brevemente por qué (ej: no se ve un ser vivo, imagen borrosa)"
+  "es_ser_vivo": true o false,
+  "categoria_no_valida": uno de "persona", "objeto", "comida", "vehiculo",
+          "edificacion", "texto", "ninguna",
+  "es_pantalla_o_impresion": true o false,
+  "motivo": "si identificado es false, explica brevemente por qué"
 }
+
+REGLAS ESTRICTAS, en este orden:
+
+1. "es_ser_vivo" es true SOLO si el sujeto principal de la foto es una planta,
+   un animal o un hongo reales y vivos. Es false para personas, partes del
+   cuerpo humano, objetos, muebles, ropa, comida preparada, vehículos,
+   edificaciones, pantallas, dibujos, peluches, texto y logotipos.
+   UN SER HUMANO NO CUENTA COMO ESPECIE: si lo que domina la foto es una
+   persona o un rostro, "es_ser_vivo" es false y "categoria_no_valida" es
+   "persona", aunque biológicamente sea un animal.
+
+2. "es_pantalla_o_impresion" es true si la imagen NO es una escena real
+   captada en vivo, sino la foto de otra imagen. Señales: bordes o marco de
+   un monitor, celular o televisor; patrón de moiré o rejilla de píxeles;
+   reflejos sobre un vidrio; barra de navegador, cursor, íconos o menús;
+   marcas de agua de bancos de imágenes; fotografía de una página impresa,
+   un libro o un afiche; o una captura de pantalla directa.
+
+3. "categoria_no_valida" es "ninguna" cuando "es_ser_vivo" es true. En
+   cualquier otro caso indica qué es lo que se ve.
+
+4. "identificado" es true SOLO si "es_ser_vivo" es true, la especie se
+   reconoce y "es_pantalla_o_impresion" es false.
+
+5. Si "identificado" es false, "motivo" explica en una frase corta y en
+   español qué viste realmente.
 ''';
+
+/// Veredicto sobre lo que devolvió la IA.
+@immutable
+class EvaluacionIA {
+  const EvaluacionIA({required this.rechazo, this.mensaje});
+
+  final MotivoRechazo rechazo;
+
+  /// Qué decirle al explorador. null cuando la foto sirve.
+  final String? mensaje;
+
+  bool get sirve => rechazo == MotivoRechazo.ninguno;
+}
+
+/// Cómo se le nombra al explorador cada cosa que no es una especie.
+const _nombreDeCategoria = {
+  'persona': 'una persona',
+  'objeto': 'un objeto',
+  'comida': 'comida',
+  'vehiculo': 'un vehículo',
+  'edificacion': 'una construcción',
+  'texto': 'texto o un logotipo',
+};
+
+/// Decide si lo que devolvió Gemini sirve como avistamiento.
+///
+/// Vive aparte y es pura para poder probarla sin red: es la regla que sostiene
+/// todo el filtro. Una foto de más que se pierde es un incordio; una foto
+/// basura que entra se queda en el mapa comunitario para siempre, así que ante
+/// la duda se rechaza.
+///
+/// [esSerVivo] cae a [identificado] cuando la IA omite el campo: el modelo
+/// siempre devuelve `identificado`, así que ese es el respaldo sensato si un
+/// día responde con el formato viejo.
+EvaluacionIA evaluarRespuestaIA({
+  required bool identificado,
+  bool? esSerVivo,
+  String? categoriaNoValida,
+  bool esPantalla = false,
+  String? motivoIA,
+}) {
+  final categoria = (categoriaNoValida ?? 'ninguna').trim().toLowerCase();
+  final vivo = esSerVivo ?? identificado;
+  final categoriaInvalida = categoria.isNotEmpty && categoria != 'ninguna';
+
+  if (!vivo || categoriaInvalida) {
+    final que = _nombreDeCategoria[categoria];
+    return EvaluacionIA(
+      rechazo: MotivoRechazo.noEsSerVivo,
+      mensaje: que == null
+          ? 'Esto no es una especie. Veridia solo registra plantas, animales '
+                'y hongos.'
+          : 'Eso es $que, no una especie. Veridia solo registra plantas, '
+                'animales y hongos.',
+    );
+  }
+
+  if (esPantalla) {
+    return const EvaluacionIA(
+      rechazo: MotivoRechazo.pantallaOImpresion,
+      mensaje:
+          'Esta foto parece tomada de una pantalla o de una impresión. '
+          'El avistamiento tiene que ser tuyo: fotografía la especie en vivo.',
+    );
+  }
+
+  if (!identificado) {
+    return EvaluacionIA(
+      rechazo: MotivoRechazo.noIdentificada,
+      mensaje:
+          motivoIA ??
+          'La IA no reconoció ninguna especie en esta foto. '
+              'Acércate más o busca mejor luz.',
+    );
+  }
+
+  return const EvaluacionIA(rechazo: MotivoRechazo.ninguno);
+}
+
+/// Motivo por el que Gemini se negó a responder, o null si respondió bien.
+///
+/// Gemini tiene DOS formas de decir que no: devolver la respuesta sin
+/// `candidates` (bloqueó la petición entera) o devolver un candidato sin
+/// `parts`, con un `finishReason` que no es STOP (SAFETY, RECITATION,
+/// MAX_TOKENS).
+///
+/// Importa aquí más que en cualquier otra app: el filtro de seguridad de
+/// Gemini salta sobre todo con **fotos de personas**, que es exactamente lo
+/// que este servicio existe para rechazar. Antes los dos casos reventaban al
+/// leer `parts` y caían en el catch genérico, así que el explorador que
+/// fotografiaba a alguien leía "no se pudo interpretar la respuesta de la IA"
+/// —un mensaje que no dice nada y que invita a reintentar en bucle— en vez de
+/// enterarse de que ahí no hay ninguna especie.
+String? motivoDeBloqueoGemini(Map<String, dynamic> respuesta) {
+  final feedback = respuesta['promptFeedback'];
+  if (feedback is Map && feedback['blockReason'] != null) {
+    return feedback['blockReason'].toString();
+  }
+
+  final candidates = respuesta['candidates'];
+  if (candidates is! List || candidates.isEmpty) return 'SIN_CANDIDATOS';
+
+  final primero = candidates.first;
+  if (primero is! Map) return 'RESPUESTA_INESPERADA';
+
+  final content = primero['content'];
+  final parts = content is Map ? content['parts'] : null;
+  if (parts is! List || parts.isEmpty) {
+    return (primero['finishReason'] ?? 'SIN_TEXTO').toString();
+  }
+
+  return null;
+}
 
 /// Palabras que no aportan nada al comparar nombres de especies.
 const _palabrasVacias = {'de', 'del', 'la', 'el', 'los', 'las', 'un', 'una'};
@@ -213,14 +392,26 @@ class EspecieIAService {
       );
     }
 
-    final huella = await calcularHuella(imageBytes);
     final perfil = UserRepository.instance.currentUser.value;
+
+    // El freno va ANTES que nada, incluso antes de calcular la huella: si el
+    // explorador está en plena racha de fotos rechazadas o agotó el cupo del
+    // día, no tiene sentido gastar CPU, una lectura de Firestore ni una
+    // petición de IA para acabar diciéndole que no.
+    if (perfil != null) {
+      await LimiteIntentosService.instance.revisar(perfil.userId);
+    }
+
+    final huella = await calcularHuella(imageBytes);
     if (perfil != null) {
       final duplicada = await HuellaFotoService.instance.buscarDuplicado(
         userId: perfil.userId,
         huella: huella,
       );
       if (duplicada != null) {
+        // Reenviar la misma foto una y otra vez es justo el patrón que el
+        // limitador existe para cortar, así que cuenta como rechazo.
+        await LimiteIntentosService.instance.registrarRechazo(perfil.userId);
         throw FotoDuplicadaException(duplicada.mensaje);
       }
     }
@@ -246,6 +437,28 @@ class EspecieIAService {
     final SpeciesIdentification resultado;
     try {
       final decoded = jsonDecode(response.body) as Map<String, dynamic>;
+
+      // Gemini se negó a responder. No es un fallo técnico que haya que
+      // reintentar: es una respuesta, y se trata como rechazo normal para que
+      // cuente en el limitador y la foto quede marcada como usada.
+      final bloqueo = motivoDeBloqueoGemini(decoded);
+      if (bloqueo != null) {
+        debugPrint('Gemini no devolvió texto (motivo: $bloqueo)');
+        return _registrarYDevolver(
+          SpeciesIdentification(
+            identified: false,
+            sha256: huella.sha256,
+            rechazo: MotivoRechazo.noIdentificada,
+            reason:
+                'La IA no pudo analizar esta foto. Suele pasar con fotos de '
+                'personas. Enfoca una planta, un animal o un hongo.',
+          ),
+          userId: perfil?.userId,
+          huella: huella,
+          origen: origen,
+        );
+      }
+
       final candidates = decoded['candidates'] as List<dynamic>;
       final content = candidates.first as Map<String, dynamic>;
       final parts =
@@ -262,15 +475,27 @@ class EspecieIAService {
 
       final json = jsonDecode(cleanedText) as Map<String, dynamic>;
 
+      final evaluacion = evaluarRespuestaIA(
+        identificado: json['identificado'] as bool? ?? false,
+        esSerVivo: json['es_ser_vivo'] as bool?,
+        categoriaNoValida: json['categoria_no_valida'] as String?,
+        esPantalla: json['es_pantalla_o_impresion'] as bool? ?? false,
+        motivoIA: json['motivo'] as String?,
+      );
+
       resultado = SpeciesIdentification(
-        identified: json['identificado'] as bool? ?? false,
+        // El veredicto manda sobre lo que diga `identificado`: si la IA
+        // reconoció un colibrí pero la foto es de la pantalla de un portátil,
+        // aquí queda en false y ya no se puede guardar ni cobrar.
+        identified: evaluacion.sirve,
         sha256: huella.sha256,
         commonName: json['nombre_comun'] as String?,
         scientificName: json['nombre_cientifico'] as String?,
         type: json['tipo'] as String?,
         confidence: json['confianza'] as String? ?? 'baja',
         description: json['descripcion'] as String?,
-        reason: json['motivo'] as String?,
+        reason: evaluacion.mensaje ?? json['motivo'] as String?,
+        rechazo: evaluacion.rechazo,
       );
     } catch (e) {
       debugPrint(
@@ -281,14 +506,47 @@ class EspecieIAService {
       );
     }
 
-    // Se marca usada YA (identifique algo o no): así una foto borrosa que
-    // Gemini rechaza tampoco se puede reintentar en bucle gastando cuota.
-    if (perfil != null) {
-      await HuellaFotoService.instance.registrar(
-        userId: perfil.userId,
-        huella: huella,
-        origen: origen ?? 'la Cámara IA',
-      );
+    return _registrarYDevolver(
+      resultado,
+      userId: perfil?.userId,
+      huella: huella,
+      origen: origen,
+    );
+  }
+
+  /// Marca la foto como usada y actualiza el limitador, identifique o no.
+  ///
+  /// Lo comparten el resultado normal y el rechazo por bloqueo de Gemini: si
+  /// el bloqueado no pasara por aquí, la misma foto se podría reenviar en
+  /// bucle sin gastar intentos ni quedar registrada, que es justo el agujero
+  /// que el limitador existe para cerrar.
+  Future<SpeciesIdentification> _registrarYDevolver(
+    SpeciesIdentification resultado, {
+    required String? userId,
+    required HuellaFoto huella,
+    String? origen,
+  }) async {
+    if (userId == null) return resultado;
+
+    // El cupo del día se gasta aquí y no al empezar: llegar hasta este punto
+    // significa que la IA respondió. Un fallo de red antes de eso no le cuesta
+    // un análisis al explorador.
+    await LimiteIntentosService.instance.contarAnalisis(userId);
+
+    // Se marca usada YA: así una foto borrosa que Gemini rechaza tampoco se
+    // puede reintentar en bucle gastando cuota.
+    await HuellaFotoService.instance.registrar(
+      userId: userId,
+      huella: huella,
+      origen: origen ?? 'la Cámara IA',
+    );
+
+    // Una foto válida borra la racha: quien está explorando de verdad nunca
+    // debería toparse con la espera, por muchas fotos que falle entre medias.
+    if (resultado.identified) {
+      await LimiteIntentosService.instance.registrarExito(userId);
+    } else {
+      await LimiteIntentosService.instance.registrarRechazo(userId);
     }
 
     return resultado;

@@ -1,0 +1,12 @@
+{
+  "name": "veridia-test-reglas",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Pruebas de firestore.rules contra el emulador de Firestore",
+  "scripts": {
+    "test": "firebase emulators:exec --only firestore --project demo-veridia \"node --test reglas.test.js\""
+  },
+  "devDependencies": {
+    "@firebase/rules-unit-testing": "^5.0.0"
+  }
+}

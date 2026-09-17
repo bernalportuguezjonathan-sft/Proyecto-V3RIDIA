@@ -9,6 +9,10 @@ const logger = require('firebase-functions/logger');
 const MODELO = 'gemini-flash-lite-latest';
 const ENDPOINT = `https://generativelanguage.googleapis.com/v1beta/models/${MODELO}:generateContent`;
 
+// IMPORTANTE: este prompt y `evaluarRespuestaIA` de abajo son el espejo exacto
+// de `lib/services/especie_ia_service.dart`. Si se cambia uno hay que cambiar
+// el otro, o el día que se despliegue este backend la app filtrará distinto de
+// como filtra hoy.
 const PROMPT = `Eres un naturalista experto en fauna y flora de Colombia, especialmente del
 departamento de Cundinamarca. Observa la imagen y responde ÚNICAMENTE con un
 JSON válido (sin texto adicional, sin marcado de código), con exactamente esta
@@ -22,8 +26,96 @@ forma:
           "aracnido", "planta", "hongo" u "otro" (o null),
   "confianza": "alta", "media" o "baja",
   "descripcion": "1 o 2 frases sobre la especie y su hábitat en Cundinamarca, o null",
-  "motivo": "si identificado es false, explica brevemente por qué (ej: no se ve un ser vivo, imagen borrosa)"
-}`;
+  "es_ser_vivo": true o false,
+  "categoria_no_valida": uno de "persona", "objeto", "comida", "vehiculo",
+          "edificacion", "texto", "ninguna",
+  "es_pantalla_o_impresion": true o false,
+  "motivo": "si identificado es false, explica brevemente por qué"
+}
+
+REGLAS ESTRICTAS, en este orden:
+
+1. "es_ser_vivo" es true SOLO si el sujeto principal de la foto es una planta,
+   un animal o un hongo reales y vivos. Es false para personas, partes del
+   cuerpo humano, objetos, muebles, ropa, comida preparada, vehículos,
+   edificaciones, pantallas, dibujos, peluches, texto y logotipos.
+   UN SER HUMANO NO CUENTA COMO ESPECIE: si lo que domina la foto es una
+   persona o un rostro, "es_ser_vivo" es false y "categoria_no_valida" es
+   "persona", aunque biológicamente sea un animal.
+
+2. "es_pantalla_o_impresion" es true si la imagen NO es una escena real
+   captada en vivo, sino la foto de otra imagen. Señales: bordes o marco de
+   un monitor, celular o televisor; patrón de moiré o rejilla de píxeles;
+   reflejos sobre un vidrio; barra de navegador, cursor, íconos o menús;
+   marcas de agua de bancos de imágenes; fotografía de una página impresa,
+   un libro o un afiche; o una captura de pantalla directa.
+
+3. "categoria_no_valida" es "ninguna" cuando "es_ser_vivo" es true. En
+   cualquier otro caso indica qué es lo que se ve.
+
+4. "identificado" es true SOLO si "es_ser_vivo" es true, la especie se
+   reconoce y "es_pantalla_o_impresion" es false.
+
+5. Si "identificado" es false, "motivo" explica en una frase corta y en
+   español qué viste realmente.`;
+
+/** Cómo se le nombra al explorador cada cosa que no es una especie. */
+const NOMBRE_DE_CATEGORIA = {
+  persona: 'una persona',
+  objeto: 'un objeto',
+  comida: 'comida',
+  vehiculo: 'un vehículo',
+  edificacion: 'una construcción',
+  texto: 'texto o un logotipo',
+};
+
+/**
+ * Decide si lo que devolvió Gemini sirve como avistamiento.
+ * Espejo de `evaluarRespuestaIA` en el lado Dart.
+ */
+function evaluarRespuestaIA({
+  identificado,
+  esSerVivo,
+  categoriaNoValida,
+  esPantalla,
+  motivoIA,
+}) {
+  const categoria = String(categoriaNoValida ?? 'ninguna')
+    .trim()
+    .toLowerCase();
+  // Si la IA omite el campo caemos a `identificado`, que siempre viene.
+  const vivo = typeof esSerVivo === 'boolean' ? esSerVivo : identificado;
+  const categoriaInvalida = categoria !== '' && categoria !== 'ninguna';
+
+  if (!vivo || categoriaInvalida) {
+    const que = NOMBRE_DE_CATEGORIA[categoria];
+    return {
+      rechazo: 'noEsSerVivo',
+      mensaje: que
+        ? `Eso es ${que}, no una especie. Veridia solo registra plantas, animales y hongos.`
+        : 'Esto no es una especie. Veridia solo registra plantas, animales y hongos.',
+    };
+  }
+
+  if (esPantalla === true) {
+    return {
+      rechazo: 'pantallaOImpresion',
+      mensaje:
+        'Esta foto parece tomada de una pantalla o de una impresión. El avistamiento tiene que ser tuyo: fotografía la especie en vivo.',
+    };
+  }
+
+  if (!identificado) {
+    return {
+      rechazo: 'noIdentificada',
+      mensaje:
+        motivoIA ??
+        'La IA no reconoció ninguna especie en esta foto. Acércate más o busca mejor luz.',
+    };
+  }
+
+  return { rechazo: 'ninguno', mensaje: null };
+}
 
 // Igual que el lado Dart: 2 intentos, cada uno hasta 20s. No tiene sentido
 // hacer esperar al explorador más de medio minuto por una foto.
@@ -145,14 +237,26 @@ function parsearIdentificacion(decoded) {
       .trim();
     const json = JSON.parse(limpio);
 
+    const evaluacion = evaluarRespuestaIA({
+      identificado: json.identificado === true,
+      esSerVivo: json.es_ser_vivo,
+      categoriaNoValida: json.categoria_no_valida,
+      esPantalla: json.es_pantalla_o_impresion === true,
+      motivoIA: json.motivo ?? null,
+    });
+
     return {
-      identified: json.identificado === true,
+      // El veredicto manda sobre lo que diga `identificado`: si la IA
+      // reconoció un colibrí pero la foto es de la pantalla de un portátil,
+      // aquí queda en false y ya no se puede guardar ni cobrar.
+      identified: evaluacion.rechazo === 'ninguno',
       commonName: json.nombre_comun ?? null,
       scientificName: json.nombre_cientifico ?? null,
       type: json.tipo ?? null,
       confidence: json.confianza ?? 'baja',
       description: json.descripcion ?? null,
-      reason: json.motivo ?? null,
+      reason: evaluacion.mensaje ?? json.motivo ?? null,
+      rechazo: evaluacion.rechazo,
     };
   } catch (e) {
     logger.error('No se pudo interpretar la respuesta de Gemini', {
@@ -171,4 +275,4 @@ async function identificarEspecie(apiKey, imageBase64, mimeType) {
   return parsearIdentificacion(decoded);
 }
 
-module.exports = { identificarEspecie, parsearIdentificacion };
+module.exports = { identificarEspecie, parsearIdentificacion, evaluarRespuestaIA };
