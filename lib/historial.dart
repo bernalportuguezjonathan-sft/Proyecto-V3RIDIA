@@ -118,16 +118,26 @@ class _HistoryScreenState extends State<HistoryScreen>
         children: [
           Container(color: VeridiaColors.background),
           SafeArea(
-            child: TabBarView(
-              controller: _tabController,
-              children: [
-                // TAB 1: TODAS
-                _buildHistorialTab(),
-                // TAB 2: ALMACENAMIENTOS
-                _buildAlmacenamientosTab(),
-                // TAB 3: LUGARES
-                _buildLugaresTab(),
-              ],
+            // El tope de ancho se pone AQUÍ, sobre el TabBarView, y no dentro
+            // de cada pestaña: así las tres comparten la misma columna de
+            // contenido y al deslizar entre ellas nada salta de sitio.
+            child: Center(
+              child: ConstrainedBox(
+                constraints: const BoxConstraints(
+                  maxWidth: VeridiaBreakpoints.anchoMaximoContenido,
+                ),
+                child: TabBarView(
+                  controller: _tabController,
+                  children: [
+                    // TAB 1: TODAS
+                    _buildHistorialTab(),
+                    // TAB 2: ALMACENAMIENTOS
+                    _buildAlmacenamientosTab(),
+                    // TAB 3: LUGARES
+                    _buildLugaresTab(),
+                  ],
+                ),
+              ),
             ),
           ),
         ],
@@ -150,7 +160,10 @@ class _HistoryScreenState extends State<HistoryScreen>
       stream: ObservationRepository.instance.streamForUser(userId),
       builder: (context, snapshot) {
         if (snapshot.connectionState == ConnectionState.waiting) {
-          return const Center(child: CircularProgressIndicator());
+          // El cargador del sistema: el resto de la app usa este y el Diario
+          // era de los pocos sitios que seguía mostrando la rueda pelada de
+          // Material, así que la espera se veía distinta según la pantalla.
+          return const VeridiaLoader();
         }
         if (snapshot.hasError) {
           return Center(

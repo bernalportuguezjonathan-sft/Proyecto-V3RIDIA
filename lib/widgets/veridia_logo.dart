@@ -10,6 +10,23 @@ import '../theme/veridia_theme.dart';
 class VeridiaLogo extends StatelessWidget {
   const VeridiaLogo({super.key, this.size = 160});
 
+  /// Proporción real del PNG (300 x 349).
+  ///
+  /// Está aquí como constante y no se deduce de la imagen a propósito. Con
+  /// solo `height`, el ancho de un `Image` no existe hasta que la imagen
+  /// DECODIFICA: en el primer pintado vale cero, y cualquier padre que se
+  /// ajuste al logo —[VeridiaMarcoLogo] en la pantalla de bienvenida— se
+  /// encoge a su propio relleno y se queda así hasta que algo fuerza otro
+  /// layout. En la web eso deja el marco convertido en una cápsula vacía en
+  /// la PRIMERA pantalla de la app, y solo se endereza al redimensionar.
+  ///
+  /// Declarando las dos medidas, el hueco está reservado desde el primer
+  /// cuadro y la imagen entra dentro cuando llega. `BoxFit.contain` sigue
+  /// puesto: si algún día el PNG se reexporta con otra proporción, se
+  /// encajará dentro del hueco en vez de deformarse.
+  static const _proporcion = 300 / 349;
+
+  /// Alto del dibujo; el ancho sale de [_proporcion].
   final double size;
 
   @override
@@ -17,6 +34,7 @@ class VeridiaLogo extends StatelessWidget {
     return Image.asset(
       'assets/images/veridia_logo_completo.png',
       height: size,
+      width: size * _proporcion,
       fit: BoxFit.contain,
       filterQuality: FilterQuality.high,
       semanticLabel: 'Logo de Veridia',

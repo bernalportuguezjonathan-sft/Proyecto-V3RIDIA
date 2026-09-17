@@ -9,6 +9,7 @@ import 'services/repositorio_u.dart';
 import 'theme/veridia_theme.dart';
 import 'widgets/mascota_vista.dart';
 import 'widgets/pixel_sprite.dart';
+import 'widgets/veridia_responsive.dart';
 import 'widgets/veridia_ui.dart';
 
 /// El Refugio: donde vive la mascota del explorador.
@@ -52,48 +53,71 @@ class RefugioScreen extends StatelessWidget {
                   final activa = repo.mascotaActiva(perfil);
                   final equipados = repo.equipados(perfil);
 
-                  return ListView(
-                    padding: const EdgeInsets.fromLTRB(16, 16, 16, 28),
-                    children: [
-                      const _AvisoInventario(),
-                      _Cabecera(
-                        perfil: perfil,
-                        mascota: activa,
-                        equipados: equipados,
-                      ),
-                      const SizedBox(height: 24),
-                      const VeridiaSectionTitle(
-                        title: 'Compañeros',
-                        subtitle:
-                            'Solo uno sale contigo: elegir mascota es elegir '
-                            'cómo explorar',
-                      ),
-                      ...catalogoMascotas.map(
-                        (mascota) => Padding(
-                          padding: const EdgeInsets.only(bottom: 12),
-                          child: _TarjetaMascota(
-                            mascota: mascota,
-                            perfil: perfil,
-                            activa: activa?.id == mascota.id,
-                            equipados: equipados,
+                  return VeridiaSegunAncho(
+                    builder: (context, ancho) => Center(
+                      child: ConstrainedBox(
+                        constraints: const BoxConstraints(
+                          maxWidth: VeridiaBreakpoints.anchoMaximoContenido,
+                        ),
+                        child: ListView(
+                          padding: EdgeInsets.fromLTRB(
+                            ancho.margen,
+                            VeridiaSpacing.lg,
+                            ancho.margen,
+                            28,
                           ),
+                          children: [
+                            const _AvisoInventario(),
+                            _Cabecera(
+                              perfil: perfil,
+                              mascota: activa,
+                              equipados: equipados,
+                            ),
+                            const SizedBox(height: VeridiaSpacing.xl),
+                            const VeridiaSectionTitle(
+                              title: 'Compañeros',
+                              subtitle:
+                                  'Solo uno sale contigo: elegir mascota es elegir '
+                                  'cómo explorar',
+                            ),
+                            // Dos columnas en cuanto hay sitio. Son cinco fichas
+                            // altas: apiladas en una sola columna obligan a
+                            // desplazarse para comparar dos mascotas, y comparar es
+                            // exactamente lo que se viene a hacer aquí. El tope de
+                            // dos es deliberado —con tres, el sprite y su ficha se
+                            // encogen hasta no distinguirse—.
+                            VeridiaRejilla(
+                              anchoComodo: 420,
+                              maximoColumnas: 2,
+                              espacio: VeridiaSpacing.md,
+                              hijos: [
+                                for (final mascota in catalogoMascotas)
+                                  _TarjetaMascota(
+                                    mascota: mascota,
+                                    perfil: perfil,
+                                    activa: activa?.id == mascota.id,
+                                    equipados: equipados,
+                                  ),
+                              ],
+                            ),
+                            const SizedBox(height: 14),
+                            const VeridiaSectionTitle(
+                              title: 'Accesorios',
+                              subtitle:
+                                  'Puro adorno: no dan Veridiums, sirven en las '
+                                  'cinco mascotas y no se pierden nunca',
+                            ),
+                            ...RanuraAccesorio.values.map(
+                              (ranura) => _BloqueRanura(
+                                ranura: ranura,
+                                perfil: perfil,
+                                equipado: equipados[ranura],
+                              ),
+                            ),
+                          ],
                         ),
                       ),
-                      const SizedBox(height: 14),
-                      const VeridiaSectionTitle(
-                        title: 'Accesorios',
-                        subtitle:
-                            'Puro adorno: no dan Veridiums, sirven en las '
-                            'cinco mascotas y no se pierden nunca',
-                      ),
-                      ...RanuraAccesorio.values.map(
-                        (ranura) => _BloqueRanura(
-                          ranura: ranura,
-                          perfil: perfil,
-                          equipado: equipados[ranura],
-                        ),
-                      ),
-                    ],
+                    ),
                   );
                 },
               );
@@ -248,103 +272,104 @@ class _TarjetaMascota extends StatelessWidget {
     // Bloqueada por nivel: la tarjeta entera baja de intensidad. Un botón
     // gris dentro de una tarjeta normal se lee como un fallo de la app; la
     // tarjeta apagada se lee como "todavía no", que es lo que es.
+    //
+    // El atenuado lo aplica ahora [EstadoPieza.bloqueado] en vez de un
+    // `Opacity` a mano: es el mismo 0.55 de antes, pero además anuncia
+    // "Bloqueado" al lector de pantalla, que con la opacidad sola no llegaba
+    // a quien no ve la diferencia. El candado visible sigue estando abajo, en
+    // el botón "Nivel N".
     final bloqueada = !tiene && nivel < mascota.nivelRequerido;
 
-    return Opacity(
-      opacity: bloqueada ? 0.55 : 1,
-      child: VeridiaCard(
-        color: _fondoFicha,
-        borderColor: activa ? mascota.color.withValues(alpha: 0.6) : null,
-        glow: activa,
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                MascotaAvatar(
-                  mascota: mascota,
-                  equipado: activa ? equipados : const {},
-                  tamano: 96,
-                  animar: tiene,
-                  apagada: !tiene,
-                ),
-                const SizedBox(width: 14),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Row(
-                        children: [
-                          Expanded(
-                            child: Text(
-                              mascota.nombre,
-                              style: texto.titleSmall,
-                            ),
-                          ),
-                          if (activa)
-                            VeridiaTag(
-                              label: 'En el mapa',
-                              icon: Icons.check_rounded,
-                              color: mascota.color,
-                              dense: true,
-                            ),
-                        ],
-                      ),
-                      Text(
-                        mascota.nombreCientifico,
-                        style: texto.bodySmall?.copyWith(
-                          fontStyle: FontStyle.italic,
-                          color: VeridiaColors.onSurfaceVariant,
+    return VeridiaCard(
+      estado: bloqueada ? EstadoPieza.bloqueado : EstadoPieza.normal,
+      color: _fondoFicha,
+      borderColor: activa ? mascota.color.withValues(alpha: 0.6) : null,
+      glow: activa,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              MascotaAvatar(
+                mascota: mascota,
+                equipado: activa ? equipados : const {},
+                tamano: 96,
+                animar: tiene,
+                apagada: !tiene,
+              ),
+              const SizedBox(width: 14),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        Expanded(
+                          child: Text(mascota.nombre, style: texto.titleSmall),
                         ),
-                      ),
-                      const SizedBox(height: 8),
-                      Wrap(
-                        spacing: 6,
-                        runSpacing: 6,
-                        children: [
+                        if (activa)
                           VeridiaTag(
-                            label: mascota.mejora,
-                            icon: Icons.auto_awesome_rounded,
+                            label: 'En el mapa',
+                            icon: Icons.check_rounded,
                             color: mascota.color,
                             dense: true,
                           ),
-                          // La rareza justifica el precio: dice de un vistazo
-                          // por qué una cuesta 160 y otra viene gratis.
-                          VeridiaTag(
-                            label:
-                                '${mascota.rareza.etiqueta} · x'
-                                '${mascota.rareza.multiplicador}',
-                            icon: Icons.workspace_premium_rounded,
-                            color: _colorRareza(mascota.rareza),
-                            dense: true,
-                          ),
-                        ],
+                      ],
+                    ),
+                    Text(
+                      mascota.nombreCientifico,
+                      style: texto.bodySmall?.copyWith(
+                        fontStyle: FontStyle.italic,
+                        color: VeridiaColors.onSurfaceVariant,
                       ),
-                      const SizedBox(height: 8),
-                      Text(mascota.descripcionMejora, style: texto.bodySmall),
-                    ],
-                  ),
+                    ),
+                    const SizedBox(height: 8),
+                    Wrap(
+                      spacing: 6,
+                      runSpacing: 6,
+                      children: [
+                        VeridiaTag(
+                          label: mascota.mejora,
+                          icon: Icons.auto_awesome_rounded,
+                          color: mascota.color,
+                          dense: true,
+                        ),
+                        // La rareza justifica el precio: dice de un vistazo
+                        // por qué una cuesta 160 y otra viene gratis.
+                        VeridiaTag(
+                          label:
+                              '${mascota.rareza.etiqueta} · x'
+                              '${mascota.rareza.multiplicador}',
+                          icon: Icons.workspace_premium_rounded,
+                          color: _colorRareza(mascota.rareza),
+                          dense: true,
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 8),
+                    Text(mascota.descripcionMejora, style: texto.bodySmall),
+                  ],
                 ),
-              ],
-            ),
-            const SizedBox(height: 10),
-            _DatoPlegable(dato: mascota.dato),
-            const SizedBox(height: 12),
-            _AccionArticulo(
-              tiene: tiene,
-              equipado: activa,
-              costo: mascota.costo,
-              nivelRequerido: mascota.nivelRequerido,
-              nivelActual: nivel,
-              saldo: perfil?.tokens ?? 0,
-              etiquetaEquipar: 'Sacar al campo',
-              etiquetaEquipado: 'Te acompaña',
-              onComprar: () => repo.comprarMascota(mascota),
-              onEquipar: () => repo.equiparMascota(mascota.id),
-            ),
-          ],
-        ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 10),
+          _DatoPlegable(dato: mascota.dato),
+          const SizedBox(height: 12),
+          _AccionArticulo(
+            tiene: tiene,
+            equipado: activa,
+            costo: mascota.costo,
+            nivelRequerido: mascota.nivelRequerido,
+            nivelActual: nivel,
+            saldo: perfil?.tokens ?? 0,
+            etiquetaEquipar: 'Sacar al campo',
+            etiquetaEquipado: 'Te acompaña',
+            onComprar: () => repo.comprarMascota(mascota),
+            onEquipar: () => repo.equiparMascota(mascota.id),
+          ),
+        ],
       ),
     );
   }

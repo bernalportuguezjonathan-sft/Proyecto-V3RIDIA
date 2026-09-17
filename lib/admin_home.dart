@@ -34,12 +34,29 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
     _loadPlayers();
   }
 
+  /// Exploradores a los que tiene sentido asignarles un desafío.
+  ///
+  /// Se excluye a los baneados: asignarle un reto a alguien que no puede
+  /// entrar crea un desafío que nadie va a completar nunca y ensucia la lista.
+  ///
+  /// Lo que esto NO puede hacer es descartar cuentas borradas desde la consola
+  /// de Firebase Authentication. Ahí desaparece el login, pero el documento de
+  /// `users` sobrevive, y desde el cliente NO hay forma de preguntar si un uid
+  /// sigue existiendo en Auth. Para limpiarlos está "Gestión de usuarios", que
+  /// borra el perfil de Firestore (`UserRepository.eliminarPerfil`).
   Future<void> _loadPlayers() async {
     final players = await UserRepository.instance.fetchAllUsers();
     if (!mounted) return;
     setState(() {
-      _players.clear();
-      _players.addAll(players.where((user) => user.role == 'Explorador'));
+      _players
+        ..clear()
+        ..addAll(
+          unoPorCorreo(
+            players.where(
+              (user) => user.role == 'Explorador' && !user.isBanned,
+            ),
+          ),
+        );
       _isLoadingPlayers = false;
     });
   }
@@ -205,6 +222,20 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
                       : DropdownButtonFormField<String>(
                           initialValue: selectedTarget,
                           dropdownColor: VeridiaColors.surfaceContainerHigh,
+                          // `isExpanded` es lo que arregla el desbordamiento
+                          // del diálogo.
+                          //
+                          // Sin él, un DropdownButton se mide por su item MÁS
+                          // ANCHO, no por el sitio que le da el padre: en
+                          // cuanto hubo un explorador con nombre largo
+                          // ("Jugador: Gabriel yesdi Aguilera diaz") el
+                          // desplegable exigió más ancho del que tiene el
+                          // diálogo y Flutter pintó la franja de
+                          // RIGHT OVERFLOWED. No era falta de scroll —el
+                          // formulario ya va en un SingleChildScrollView—,
+                          // era ancho, y por eso crecía con la lista de
+                          // jugadores en vez de con el teclado.
+                          isExpanded: true,
                           decoration: const InputDecoration(
                             labelText: 'Destino',
                           ),
@@ -216,7 +247,30 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
                             ..._players.map(
                               (player) => DropdownMenuItem(
                                 value: player.userId,
-                                child: Text('Jugador: ${player.displayName}'),
+                                // El correo debajo del nombre: en la lista
+                                // real hay cuatro exploradores llamados
+                                // igual, y por el nombre solo no se sabe a
+                                // cuál se le está asignando el desafío.
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    Text(
+                                      player.displayName,
+                                      maxLines: 1,
+                                      overflow: TextOverflow.ellipsis,
+                                    ),
+                                    Text(
+                                      player.email,
+                                      maxLines: 1,
+                                      overflow: TextOverflow.ellipsis,
+                                      style: const TextStyle(
+                                        fontSize: 11,
+                                        color: VeridiaColors.onSurfaceVariant,
+                                      ),
+                                    ),
+                                  ],
+                                ),
                               ),
                             ),
                           ],
@@ -519,15 +573,32 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
                         );
                       }
 
+                      // Los vencidos bajan al final de la lista, pero NO se
+                      // ocultan: esta es la pantalla desde la que se borran,
+                      // así que esconderlos los dejaría en la base de datos
+                      // para siempre sin forma de llegar a ellos. Lo que se
+                      // arregla es que dejen de parecer activos: van
+                      // apagados, con su etiqueta "Vencido" y al fondo. A los
+                      // exploradores ya no se les muestran, y desde hoy
+                      // tampoco aceptan fotos.
+                      final ordenados = [...challenges]
+                        ..sort((a, b) {
+                          if (a.vencido != b.vencido) return a.vencido ? 1 : -1;
+                          return b.createdDate.compareTo(a.createdDate);
+                        });
+
                       return ListView.separated(
                         shrinkWrap: true,
                         physics: const NeverScrollableScrollPhysics(),
-                        itemCount: challenges.length,
+                        itemCount: ordenados.length,
                         separatorBuilder: (_, _) => const SizedBox(height: 12),
                         itemBuilder: (context, index) {
-                          final challenge = challenges[index];
+                          final challenge = ordenados[index];
                           final isGlobal = challenge.assignedToUserId == null;
                           return VeridiaCard(
+                            estado: challenge.vencido
+                                ? EstadoPieza.bloqueado
+                                : EstadoPieza.normal,
                             child: Row(
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
@@ -567,11 +638,22 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
                                             color: VeridiaColors.secondary,
                                             dense: true,
                                           ),
+                                          // Con el ícono y el color cambiados
+                                          // cuando ya pasó la fecha: el
+                                          // atenuado de la tarjeta es una
+                                          // diferencia de color, y el color
+                                          // por sí solo no puede ser la única
+                                          // señal de que algo está cerrado.
                                           VeridiaTag(
-                                            label:
-                                                'Vence ${formatoFecha(challenge.dueDate)}',
-                                            icon: Icons.event_outlined,
-                                            color: VeridiaColors.tertiary,
+                                            label: challenge.vencido
+                                                ? 'Vencido ${formatoFecha(challenge.dueDate)}'
+                                                : 'Vence ${formatoFecha(challenge.dueDate)}',
+                                            icon: challenge.vencido
+                                                ? Icons.event_busy_outlined
+                                                : Icons.event_outlined,
+                                            color: challenge.vencido
+                                                ? VeridiaColors.error
+                                                : VeridiaColors.tertiary,
                                             dense: true,
                                           ),
                                           // El progreso es privado de cada

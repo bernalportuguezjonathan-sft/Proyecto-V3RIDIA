@@ -113,9 +113,10 @@ const _endpoint =
     'https://generativelanguage.googleapis.com/v1beta/models/$_model:generateContent';
 
 const _prompt = '''
-Eres un naturalista experto en fauna y flora de Colombia, especialmente del
-departamento de Cundinamarca. Observa la imagen y responde ÚNICAMENTE con un
-JSON válido (sin texto adicional, sin marcado de código), con exactamente esta
+Eres un naturalista. Catalogas CUALQUIER ser vivo que te muestren —silvestre
+o doméstico, común o raro— y conoces especialmente la fauna y la flora de
+Cundinamarca, Colombia. Observa la imagen y responde ÚNICAMENTE con un JSON
+válido (sin texto adicional, sin marcado de código), con exactamente esta
 forma:
 
 {
@@ -135,10 +136,28 @@ forma:
 
 REGLAS ESTRICTAS, en este orden:
 
-1. "es_ser_vivo" es true SOLO si el sujeto principal de la foto es una planta,
-   un animal o un hongo reales y vivos. Es false para personas, partes del
-   cuerpo humano, objetos, muebles, ropa, comida preparada, vehículos,
-   edificaciones, pantallas, dibujos, peluches, texto y logotipos.
+0. "es_ser_vivo" responde a UNA sola pregunta: ¿lo que domina la foto es un
+   organismo vivo? NO depende de que sepas nombrar la especie. Un animal o
+   una planta que no logras identificar sigue siendo un ser vivo: en ese caso
+   "es_ser_vivo" es true, "identificado" es false y lo explicas en "motivo".
+   No uses "categoria_no_valida" para decir "no sé qué es".
+
+1. "es_ser_vivo" es true si el sujeto principal es una planta, un animal o un
+   hongo reales y vivos. Es false para partes del cuerpo humano, objetos,
+   muebles, ropa, comida preparada, vehículos, edificaciones, pantallas,
+   dibujos, texto y logotipos.
+
+   LOS ANIMALES DOMÉSTICOS Y COMUNES CUENTAN COMO ANIMALES. Un perro, un
+   gato, una gallina, una vaca, un caballo, un conejo o un loro son fauna y
+   "es_ser_vivo" es true, aunque no sean especies silvestres de Cundinamarca.
+   Una mascota dormida, tumbada, a contraluz, de espaldas o parcialmente
+   tapada SIGUE siendo un animal: no la clasifiques como "objeto" por estar
+   quieta, borrosa o mal iluminada.
+
+   Solo marca "objeto" cuando de verdad veas una cosa inanimada. Ante la duda
+   entre un animal real y un peluche o una figura, decide por el animal real
+   y baja "confianza" a "baja".
+
    UN SER HUMANO NO CUENTA COMO ESPECIE: si lo que domina la foto es una
    persona o un rostro, "es_ser_vivo" es false y "categoria_no_valida" es
    "persona", aunque biológicamente sea un animal.

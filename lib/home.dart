@@ -17,6 +17,7 @@ import 'services/repositorio_u.dart';
 import 'theme/veridia_theme.dart';
 import 'widgets/mascota_vitrina.dart';
 import 'widgets/veridia_logo.dart';
+import 'widgets/veridia_responsive.dart';
 import 'widgets/veridia_ui.dart';
 
 class HomeScreen extends StatefulWidget {
@@ -77,159 +78,205 @@ class _HomeScreenState extends State<HomeScreen> {
       body: VeridiaBackground(
         child: SafeArea(
           top: false,
-          child: ListView(
-            padding: const EdgeInsets.fromLTRB(16, 16, 16, 24),
-            children: [
-              ValueListenableBuilder<UserProfile?>(
-                valueListenable: UserRepository.instance.currentUser,
-                builder: (context, perfil, _) {
-                  final nombre = perfil == null
-                      ? 'Explorador'
-                      : (perfil.displayName.isNotEmpty
-                            ? perfil.displayName
-                            : perfil.email.split('@').first);
-                  return Row(
-                    children: [
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text('Hola, $nombre', style: text.headlineSmall),
-                            const SizedBox(height: 4),
-                            Text(
-                              '¿Qué especie vas a descubrir hoy?',
-                              style: text.bodySmall,
-                            ),
-                          ],
-                        ),
-                      ),
-                      _MascotaSaludo(perfil: perfil),
-                    ],
-                  );
-                },
-              ),
-              const SizedBox(height: 18),
-              TextField(
-                controller: _buscarController,
-                textInputAction: TextInputAction.search,
-                onSubmitted: _buscar,
-                style: text.bodyMedium,
-                decoration: InputDecoration(
-                  hintText: 'Buscar especies, rutas, lugares...',
-                  prefixIcon: const Icon(Icons.search, size: 20),
-                  suffixIcon: IconButton(
-                    icon: const Icon(Icons.arrow_forward, size: 18),
-                    tooltip: 'Buscar en el mapa',
-                    onPressed: () => _buscar(_buscarController.text),
-                  ),
+          // El cuerpo se mide contra el ancho REAL disponible: de ahí salen
+          // tanto el margen lateral como cuántas columnas caben en los
+          // accesos rápidos. Antes el margen era 16 fijo y la cuadrícula
+          // siempre de dos columnas, así que en un navegador de escritorio
+          // Inicio eran dos tarjetas enormes estiradas de borde a borde.
+          child: VeridiaSegunAncho(
+            builder: (context, ancho) => Center(
+              child: ConstrainedBox(
+                constraints: const BoxConstraints(
+                  maxWidth: VeridiaBreakpoints.anchoMaximoContenido,
                 ),
-              ),
-              const SizedBox(height: 24),
-              const VeridiaSectionTitle(
-                title: 'Accesos rápidos',
-                subtitle: 'Lo esencial para tu expedición',
-              ),
-              GridView.count(
-                crossAxisCount: 2,
-                mainAxisSpacing: 12,
-                crossAxisSpacing: 12,
-                shrinkWrap: true,
-                physics: const NeverScrollableScrollPhysics(),
-                childAspectRatio: 1.35,
-                children:
-                    [
-                          _AccesoRapido(
-                            icon: Icons.camera_alt_rounded,
-                            titulo: 'Cámara IA',
-                            descripcion: 'Identifica especies',
-                            destacado: true,
-                            chispa: true,
-                            onTap: () => VeridiaNav.abrir(
-                              context,
-                              const IdentifySpeciesScreen(),
-                            ),
-                          ),
-                          _AccesoRapido(
-                            icon: Icons.pets_rounded,
-                            titulo: 'El Refugio',
-                            descripcion: 'Tu mascota y su mejora',
-                            destacado: true,
-                            onTap: () => abrirRefugio(context),
-                          ),
-                          _AccesoRapido(
-                            icon: Icons.map_rounded,
-                            titulo: 'Mapa',
-                            descripcion: 'Explora la zona',
-                            onTap: () =>
-                                VeridiaNav.abrir(context, const MapScreen()),
-                          ),
-                          _AccesoRapido(
-                            icon: Icons.menu_book_rounded,
-                            titulo: 'Diario',
-                            descripcion: 'Tus avistamientos',
-                            onTap: () => VeridiaNav.abrir(
-                              context,
-                              const HistoryScreen(),
-                            ),
-                          ),
-                          _AccesoRapido(
-                            icon: Icons.emoji_events_rounded,
-                            titulo: 'Desafíos',
-                            descripcion: 'Gana Veridiums',
-                            onTap: () => VeridiaNav.abrir(
-                              context,
-                              const ChallengesScreen(),
-                            ),
-                          ),
-                          _AccesoRapido(
-                            icon: Icons.card_giftcard_rounded,
-                            titulo: 'Recompensas',
-                            descripcion: 'Canjea tus Veridiums',
-                            onTap: () => abrirRecompensas(context),
-                          ),
-                          // La cuadrícula se arma en cascada al abrir Inicio, en vez
-                          // de aparecer entera de golpe.
-                        ].indexed
-                        .map((e) => VeridiaAparece(indice: e.$1, child: e.$2))
-                        .toList(),
-              ),
-              const SizedBox(height: 26),
-              VeridiaSectionTitle(
-                title: 'Últimas capturas',
-                subtitle: 'Tus avistamientos más recientes',
-                actionLabel: 'Ver todas',
-                onAction: () =>
-                    VeridiaNav.abrir(context, const HistoryScreen()),
-              ),
-              SizedBox(
-                height: 172,
-                child: uid == null
-                    ? const _CapturasVacias()
-                    : StreamBuilder<List<Observation>>(
-                        stream: ObservationRepository.instance.streamForUser(
-                          uid,
-                        ),
-                        builder: (context, snapshot) {
-                          if (snapshot.connectionState ==
-                              ConnectionState.waiting) {
-                            return const VeridiaLoader();
-                          }
-                          final capturas = snapshot.data ?? const [];
-                          if (capturas.isEmpty) return const _CapturasVacias();
-
-                          final visibles = capturas.take(8).toList();
-                          return ListView.separated(
-                            scrollDirection: Axis.horizontal,
-                            itemCount: visibles.length,
-                            separatorBuilder: (_, _) =>
-                                const SizedBox(width: 12),
-                            itemBuilder: (context, i) =>
-                                _TarjetaCaptura(observacion: visibles[i]),
+                child: ListView(
+                  // El margen va DENTRO del ListView y no envolviéndolo, para
+                  // que la barra de desplazamiento siga pegada al borde de la
+                  // pantalla y no flote a 32 px de él.
+                  padding: EdgeInsets.fromLTRB(
+                    ancho.margen,
+                    VeridiaSpacing.lg,
+                    ancho.margen,
+                    VeridiaSpacing.xl,
+                  ),
+                  children: [
+                    VeridiaAparece(
+                      child: ValueListenableBuilder<UserProfile?>(
+                        valueListenable: UserRepository.instance.currentUser,
+                        builder: (context, perfil, _) {
+                          final nombre = perfil == null
+                              ? 'Explorador'
+                              : (perfil.displayName.isNotEmpty
+                                    ? perfil.displayName
+                                    : perfil.email.split('@').first);
+                          return Row(
+                            children: [
+                              Expanded(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Text(
+                                      'Hola, $nombre',
+                                      style: text.headlineSmall,
+                                    ),
+                                    const SizedBox(height: VeridiaSpacing.xs),
+                                    Text(
+                                      '¿Qué especie vas a descubrir hoy?',
+                                      style: text.bodySmall,
+                                    ),
+                                  ],
+                                ),
+                              ),
+                              _MascotaSaludo(perfil: perfil),
+                            ],
                           );
                         },
                       ),
+                    ),
+                    const SizedBox(height: 18),
+                    VeridiaAparece(
+                      indice: 1,
+                      child: TextField(
+                        controller: _buscarController,
+                        textInputAction: TextInputAction.search,
+                        onSubmitted: _buscar,
+                        style: text.bodyMedium,
+                        decoration: InputDecoration(
+                          hintText: 'Buscar especies, rutas, lugares...',
+                          prefixIcon: const Icon(Icons.search, size: 20),
+                          suffixIcon: IconButton(
+                            icon: const Icon(Icons.arrow_forward, size: 18),
+                            tooltip: 'Buscar en el mapa',
+                            onPressed: () => _buscar(_buscarController.text),
+                          ),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: VeridiaSpacing.xl),
+                    const VeridiaSectionTitle(
+                      title: 'Accesos rápidos',
+                      subtitle: 'Lo esencial para tu expedición',
+                    ),
+                    GridView.count(
+                      // Dos columnas en un teléfono, tres en una tablet,
+                      // cuatro en escritorio. Se mantiene `GridView.count` en
+                      // lugar de la rejilla nueva porque aquí la proporción
+                      // fija (1.35) es lo que iguala el alto de las seis
+                      // tarjetas; con `Wrap` cada una mediría lo que dé su
+                      // texto y la cuadrícula quedaría dentada.
+                      crossAxisCount: switch (ancho) {
+                        VeridiaAncho.compacto => 2,
+                        VeridiaAncho.medio => 3,
+                        VeridiaAncho.amplio => 4,
+                      },
+                      mainAxisSpacing: VeridiaSpacing.md,
+                      crossAxisSpacing: VeridiaSpacing.md,
+                      shrinkWrap: true,
+                      physics: const NeverScrollableScrollPhysics(),
+                      childAspectRatio: 1.35,
+                      children:
+                          [
+                                _AccesoRapido(
+                                  icon: Icons.camera_alt_rounded,
+                                  titulo: 'Cámara IA',
+                                  descripcion: 'Identifica especies',
+                                  destacado: true,
+                                  chispa: true,
+                                  onTap: () => VeridiaNav.abrir(
+                                    context,
+                                    const IdentifySpeciesScreen(),
+                                  ),
+                                ),
+                                _AccesoRapido(
+                                  icon: Icons.pets_rounded,
+                                  titulo: 'El Refugio',
+                                  descripcion: 'Tu mascota y su mejora',
+                                  destacado: true,
+                                  onTap: () => abrirRefugio(context),
+                                ),
+                                _AccesoRapido(
+                                  icon: Icons.map_rounded,
+                                  titulo: 'Mapa',
+                                  descripcion: 'Explora la zona',
+                                  onTap: () => VeridiaNav.abrir(
+                                    context,
+                                    const MapScreen(),
+                                  ),
+                                ),
+                                _AccesoRapido(
+                                  icon: Icons.menu_book_rounded,
+                                  titulo: 'Diario',
+                                  descripcion: 'Tus avistamientos',
+                                  onTap: () => VeridiaNav.abrir(
+                                    context,
+                                    const HistoryScreen(),
+                                  ),
+                                ),
+                                _AccesoRapido(
+                                  icon: Icons.emoji_events_rounded,
+                                  titulo: 'Desafíos',
+                                  descripcion: 'Gana Veridiums',
+                                  onTap: () => VeridiaNav.abrir(
+                                    context,
+                                    const ChallengesScreen(),
+                                  ),
+                                ),
+                                _AccesoRapido(
+                                  icon: Icons.card_giftcard_rounded,
+                                  titulo: 'Recompensas',
+                                  descripcion: 'Canjea tus Veridiums',
+                                  onTap: () => abrirRecompensas(context),
+                                ),
+                                // La cuadrícula se arma en cascada al abrir Inicio, en vez
+                                // de aparecer entera de golpe.
+                              ].indexed
+                              .map(
+                                (e) =>
+                                    VeridiaAparece(indice: e.$1, child: e.$2),
+                              )
+                              .toList(),
+                    ),
+                    const SizedBox(height: VeridiaSpacing.xxl),
+                    VeridiaSectionTitle(
+                      title: 'Últimas capturas',
+                      subtitle: 'Tus avistamientos más recientes',
+                      actionLabel: 'Ver todas',
+                      onAction: () =>
+                          VeridiaNav.abrir(context, const HistoryScreen()),
+                    ),
+                    SizedBox(
+                      height: 172,
+                      child: uid == null
+                          ? const _CapturasVacias()
+                          : StreamBuilder<List<Observation>>(
+                              stream: ObservationRepository.instance
+                                  .streamForUser(uid),
+                              builder: (context, snapshot) {
+                                if (snapshot.connectionState ==
+                                    ConnectionState.waiting) {
+                                  return const VeridiaLoader();
+                                }
+                                final capturas = snapshot.data ?? const [];
+                                if (capturas.isEmpty) {
+                                  return const _CapturasVacias();
+                                }
+
+                                final visibles = capturas.take(8).toList();
+                                return ListView.separated(
+                                  scrollDirection: Axis.horizontal,
+                                  itemCount: visibles.length,
+                                  separatorBuilder: (_, _) =>
+                                      const SizedBox(width: VeridiaSpacing.md),
+                                  itemBuilder: (context, i) =>
+                                      _TarjetaCaptura(observacion: visibles[i]),
+                                );
+                              },
+                            ),
+                    ),
+                  ],
+                ),
               ),
-            ],
+            ),
           ),
         ),
       ),

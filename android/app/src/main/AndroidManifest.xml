@@ -17,7 +17,7 @@
     <!-- La cámara es opcional: el explorador también puede subir de galería. -->
     <uses-feature android:name="android.hardware.camera" android:required="false" />
     <application
-        android:label="veridia_app"
+        android:label="Veridia"
         android:name="${applicationName}"
         android:icon="@mipmap/ic_launcher">
         <activity

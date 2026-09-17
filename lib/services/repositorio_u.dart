@@ -61,6 +61,8 @@ class UserRepository {
       isBanned: data['isBanned'] as bool? ?? false,
       mascotaActiva: data['mascotaActiva'] as String?,
       accesorios: leerAccesorios(data),
+      marcoEquipado: data['marcoEquipado'] as String?,
+      tituloEquipado: data['tituloEquipado'] as String?,
       banExpires: banExpires,
       banReason: data['banReason'] as String?,
     );
@@ -288,6 +290,8 @@ class UserRepository {
           isBanned: currentIsBanned,
           mascotaActiva: data?['mascotaActiva'] as String?,
           accesorios: leerAccesorios(data),
+          marcoEquipado: data?['marcoEquipado'] as String?,
+          tituloEquipado: data?['tituloEquipado'] as String?,
           banExpires: banExpires,
           banReason: banReason,
         );

@@ -316,3 +316,79 @@ test('challenges: un explorador no puede cambiar el titulo', async () => {
   );
 });
 
+
+// --- Marco y titulo equipados ---------------------------------------------
+// Guardan CUAL de las recompensas ya compradas lleva puesta el explorador.
+// Son cosmeticos y no mueven Veridiums, pero van en el mismo documento que
+// el saldo, asi que lo que hay que comprobar es que no sirvan de puerta
+// trasera para tocar `tokens` en la misma escritura.
+
+async function sembrarUsuario(uid, extra = {}) {
+  await env.withSecurityRulesDisabled(async (ctx) => {
+    await setDoc(doc(ctx.firestore(), 'users', uid), {
+      email: `${uid}@ejemplo.com`,
+      displayName: uid,
+      role: 'Explorador',
+      tokens: 100,
+      tokensTotales: 100,
+      isBanned: false,
+      ...extra,
+    });
+  });
+}
+
+test('equipar: el dueno elige su marco', async () => {
+  await sembrarUsuario(ANA);
+  await assertSucceeds(
+    updateDoc(doc(comoAna(), 'users', ANA), {
+      marcoEquipado: 'marco_esmeralda',
+    })
+  );
+});
+
+test('equipar: el dueno elige su titulo', async () => {
+  await sembrarUsuario(ANA);
+  await assertSucceeds(
+    updateDoc(doc(comoAna(), 'users', ANA), {
+      tituloEquipado: 'titulo_naturalista',
+    })
+  );
+});
+
+test('equipar: se puede quitar (valor "ninguno")', async () => {
+  await sembrarUsuario(ANA, { marcoEquipado: 'marco_dorado' });
+  await assertSucceeds(
+    updateDoc(doc(comoAna(), 'users', ANA), { marcoEquipado: 'ninguno' })
+  );
+});
+
+test('equipar: nadie toca el marco de otro', async () => {
+  await sembrarUsuario(ANA);
+  await assertFails(
+    updateDoc(doc(comoBeto(), 'users', ANA), {
+      marcoEquipado: 'marco_dorado',
+    })
+  );
+});
+
+test('equipar: no sirve para colar Veridiums en la misma escritura', async () => {
+  // El limite de +1000 por escritura sigue aplicando aunque el cambio venga
+  // acompanado de un campo cosmetico.
+  await sembrarUsuario(ANA);
+  await assertFails(
+    updateDoc(doc(comoAna(), 'users', ANA), {
+      marcoEquipado: 'marco_dorado',
+      tokens: 99999,
+    })
+  );
+});
+
+test('equipar: no sirve para cambiarse el rol', async () => {
+  await sembrarUsuario(ANA);
+  await assertFails(
+    updateDoc(doc(comoAna(), 'users', ANA), {
+      marcoEquipado: 'marco_dorado',
+      role: 'Administrador',
+    })
+  );
+});

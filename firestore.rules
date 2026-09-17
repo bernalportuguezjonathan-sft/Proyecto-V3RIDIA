@@ -75,10 +75,17 @@ service cloud.firestore {
       // `mascotaActiva` y `accesorios` son cosmeticos y no mueven dinero, asi
       // que el dueno los escribe libremente. Lo unico que hay que impedir es
       // que se cuelen en la misma escritura que toca los Veridiums.
+      //
+      // `marcoEquipado` y `tituloEquipado` son igual de cosmeticos: guardan
+      // CUAL de las recompensas ya compradas lleva puesta. No dan nada que no
+      // se tenga —el perfil solo pinta lo que aparezca en sus canjes—, asi
+      // que escribir aqui un id que no se ha comprado no regala nada: la app
+      // lo ignora al resolver que mostrar.
       function soloEditaSuPerfil() {
         return camposTocados().hasOnly([
             'displayName', 'photoURL', 'tokens', 'tokensTotales',
-            'mascotaActiva', 'accesorios'
+            'mascotaActiva', 'accesorios',
+            'marcoEquipado', 'tituloEquipado'
           ]) &&
           (!camposTocados().hasAny(['tokens']) ||
             (request.resource.data.tokens is int &&

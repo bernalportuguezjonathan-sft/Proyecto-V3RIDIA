@@ -1196,20 +1196,27 @@ class _MapScreenState extends State<MapScreen> {
                             onTap: () => _abrirPanel(_PanelMapa.zonas),
                           ),
                         ),
-                        const SizedBox(width: 6),
-                        // No despliega el panel: abre la galería propia a
-                        // pantalla completa. En la franja de 200 px las
-                        // miniaturas eran ilegibles y encima se mezclaban con
-                        // las fotos de todos los demás.
-                        Flexible(
-                          child: _ChipPanel(
-                            etiqueta: 'Mis fotos',
-                            cantidad: _misFotos.length,
-                            icono: Icons.photo_camera_rounded,
-                            activo: false,
-                            onTap: () => abrirMisFotos(context, _birdZones),
+                        // "Mis fotos" es del EXPLORADOR y solo suyo: un
+                        // administrador no captura especies, así que ese chip
+                        // le abría siempre una galería vacía y le quitaba
+                        // ancho a los dos que sí usa. Al ocultarlo, los
+                        // chips restantes reparten el sitio entre ellos.
+                        if (!UserRepository.instance.esAdmin) ...[
+                          const SizedBox(width: 6),
+                          // No despliega el panel: abre la galería propia a
+                          // pantalla completa. En la franja de 200 px las
+                          // miniaturas eran ilegibles y encima se mezclaban
+                          // con las fotos de todos los demás.
+                          Flexible(
+                            child: _ChipPanel(
+                              etiqueta: 'Mis fotos',
+                              cantidad: _misFotos.length,
+                              icono: Icons.photo_camera_rounded,
+                              activo: false,
+                              onTap: () => abrirMisFotos(context, _birdZones),
+                            ),
                           ),
-                        ),
+                        ],
                         const SizedBox(width: 6),
                         Flexible(
                           child: _ChipPanel(
@@ -1849,27 +1856,51 @@ class _MapScreenState extends State<MapScreen> {
               ],
             ),
           ),
+          // Lo que flota ENCIMA del mapa se acota; el mapa no.
+          //
+          // El mapa tiene que ocupar toda la pantalla —es información, y
+          // cuanto más territorio se ve, mejor sirve—. Lo que no tiene
+          // sentido a lo ancho de un monitor es el buscador y el panel
+          // inferior estirados de borde a borde: son controles, y un control
+          // de dos metros de largo no se usa mejor por ser más grande.
+          //
+          // Por debajo de [_anchoControlesMapa] no cambia absolutamente nada,
+          // así que en cualquier teléfono esto es una operación nula.
           Positioned(
             top: 10,
             left: 12,
             right: 12,
-            child: _buscadorFlotante(speciesList),
+            child: Center(
+              child: ConstrainedBox(
+                constraints: const BoxConstraints(
+                  maxWidth: _anchoControlesMapa,
+                ),
+                child: _buscadorFlotante(speciesList),
+              ),
+            ),
           ),
           Positioned(
             left: 12,
             right: 12,
             bottom: 12,
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.end,
-              children: [
-                _tarjetaConsejo(),
-                _controlesMapa(),
-                const SizedBox(height: 8),
-                _atribucion(),
-                const SizedBox(height: 6),
-                _panelInferior(),
-              ],
+            child: Center(
+              child: ConstrainedBox(
+                constraints: const BoxConstraints(
+                  maxWidth: _anchoControlesMapa,
+                ),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.end,
+                  children: [
+                    _tarjetaConsejo(),
+                    _controlesMapa(),
+                    const SizedBox(height: 8),
+                    _atribucion(),
+                    const SizedBox(height: 6),
+                    _panelInferior(),
+                  ],
+                ),
+              ),
             ),
           ),
         ],
@@ -2037,6 +2068,11 @@ class _PanelVacio extends StatelessWidget {
 }
 
 /// Pestaña del panel inferior con su contador.
+/// Ancho maximo de los controles que flotan sobre el mapa (buscador, panel
+/// inferior, atribucion). Mas ancho que la hoja inferior porque el panel de
+/// abajo lleva tres chips en fila y a 560 se aprietan.
+const double _anchoControlesMapa = 620;
+
 class _ChipPanel extends StatelessWidget {
   const _ChipPanel({
     required this.etiqueta,

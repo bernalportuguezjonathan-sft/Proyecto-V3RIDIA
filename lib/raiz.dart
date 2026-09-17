@@ -374,20 +374,36 @@ class WelcomeScreen extends StatelessWidget {
                         ),
                       ),
                       const SizedBox(height: 44),
-                      SizedBox(
-                        width: double.infinity,
-                        child: VeridiaBotonTactil(
-                          child: FilledButton.icon(
-                            onPressed: () => Navigator.push(
-                              context,
-                              MaterialPageRoute(
-                                builder: (_) => const LoginScreen(),
+                      // El tope va SOLO sobre el botón, no sobre la
+                      // columna entera. Acotar la columna dejaba su ancho
+                      // SUELTO, y [VeridiaLogo] solo declara alto: sin un
+                      // ancho ajustado del padre, la imagen colapsaba a
+                      // cero y el marco del logo se encogía a su relleno.
+                      // Aquí lo único que se estiraba de borde a borde en
+                      // escritorio era este botón, así que es lo único
+                      // que hay que acotar.
+                      ConstrainedBox(
+                        constraints: const BoxConstraints(
+                          maxWidth: VeridiaBreakpoints.anchoMaximoFormulario,
+                        ),
+                        child: SizedBox(
+                          width: double.infinity,
+                          child: VeridiaBotonTactil(
+                            child: FilledButton.icon(
+                              onPressed: () => Navigator.push(
+                                context,
+                                MaterialPageRoute(
+                                  builder: (_) => const LoginScreen(),
+                                ),
                               ),
-                            ),
-                            icon: const Icon(Icons.explore_outlined, size: 20),
-                            label: const Text('Conocer Veridia'),
-                            style: FilledButton.styleFrom(
-                              minimumSize: const Size(double.infinity, 54),
+                              icon: const Icon(
+                                Icons.explore_outlined,
+                                size: 20,
+                              ),
+                              label: const Text('Conocer Veridia'),
+                              style: FilledButton.styleFrom(
+                                minimumSize: const Size(double.infinity, 54),
+                              ),
                             ),
                           ),
                         ),

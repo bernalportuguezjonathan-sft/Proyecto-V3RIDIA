@@ -147,6 +147,119 @@ abstract final class VeridiaRadii {
   static const pill = 999.0;
 }
 
+/// Escala de espaciado de base 4, densidad "cómoda".
+///
+/// Existe porque hasta ahora cada pantalla escribía sus propios márgenes a
+/// mano —`EdgeInsets.all(16)` aquí, `12` allá, `14` en la de más allá— y dos
+/// tarjetas vecinas respiraban distinto sin que hubiera una razón. Con una
+/// escala fija el ritmo vertical es el mismo en toda la app y un valor suelto
+/// se detecta a simple vista.
+///
+/// No hay valores intermedios a propósito: si una pieza "necesita 14", lo que
+/// necesita casi siempre es [sm] o [lg], y la duda se resuelve mirando la
+/// escala en vez de inventando un número.
+abstract final class VeridiaSpacing {
+  /// Separación mínima: entre un ícono y su etiqueta.
+  static const xs = 4.0;
+
+  /// Entre elementos de una misma fila o chip.
+  static const sm = 8.0;
+
+  /// Entre líneas de texto relacionadas dentro de una tarjeta.
+  static const md = 12.0;
+
+  /// Padding interior estándar de tarjeta y separación entre tarjetas.
+  static const lg = 16.0;
+
+  /// Entre bloques distintos de una pantalla.
+  static const xl = 24.0;
+
+  /// Entre secciones con encabezado propio.
+  static const xxl = 32.0;
+
+  /// Respiro grande: cabecera de pantalla, estados vacíos.
+  static const xxxl = 48.0;
+}
+
+/// Las cuatro duraciones de animación de la app.
+///
+/// Una animación no se mide en milisegundos sino en INTENCIÓN: cuánto tiene
+/// que tardar el usuario en entender qué pasó. Tener cuatro nombres en vez de
+/// un número libre evita que una transición de pantalla dure lo mismo que un
+/// rebote de botón, que es lo que hace que una interfaz se sienta lenta en un
+/// sitio y nerviosa en otro.
+///
+/// [recompensa] es la única que se permite pasar del medio segundo, y solo
+/// porque ahí la espera ES el premio: ver subir el contador de Veridiums es
+/// parte de lo que se ganó.
+abstract final class VeridiaDuraciones {
+  /// Respuesta al dedo: hundir un botón, marcar un chip.
+  static const micro = Duration(milliseconds: 140);
+
+  /// Cambio de estado visible: aparece un mensaje, se abre un panel.
+  static const normal = Duration(milliseconds: 220);
+
+  /// Transición entre pantallas.
+  static const pantalla = Duration(milliseconds: 320);
+
+  /// Celebración: barra que se llena, contador que sube, logro desbloqueado.
+  static const recompensa = Duration(milliseconds: 560);
+}
+
+/// Las curvas permitidas, con su sitio ya decidido.
+///
+/// El motivo de fijarlas: [celebracion] (elasticOut) es adictiva de escribir
+/// y arruina una interfaz si se usa en todas partes —un botón que rebota cada
+/// vez que lo tocas cansa en diez minutos—. Aquí queda acotada a lo que se
+/// gana, que es donde un rebote se lee como alegría y no como ruido.
+abstract final class VeridiaCurvas {
+  /// Algo que entra o crece. Arranca rápido y frena: se siente ligero.
+  static const entrada = Curves.easeOutCubic;
+
+  /// Algo que sale o se cierra.
+  static const salida = Curves.easeInCubic;
+
+  /// Un valor que se mueve de A a B sin entrar ni salir.
+  static const suave = Curves.easeInOut;
+
+  /// Un paso más de carácter: se pasa un poco y vuelve. Para lo que aparece
+  /// por primera vez.
+  static const rebote = Curves.easeOutBack;
+
+  /// SOLO para recompensas: logro desbloqueado, desafío completado, mascota
+  /// nueva. Nunca en navegación ni en botones comunes.
+  static const celebracion = Curves.elasticOut;
+}
+
+/// Puntos de quiebre del diseño adaptable.
+///
+/// La regla del proyecto es que se miden contra el ESPACIO DISPONIBLE, no
+/// contra el tamaño del dispositivo: una tablet en vertical con un panel
+/// lateral abierto tiene el ancho útil de un teléfono, y tratarla como tablet
+/// deja el contenido aplastado. Por eso lo que consulta estos umbrales es
+/// `VeridiaAncho` (widgets/veridia_responsive.dart), que lee los constraints
+/// del padre y solo cae a `MediaQuery` cuando no hay constraints acotados.
+abstract final class VeridiaBreakpoints {
+  /// Por debajo de esto, una sola columna y navegación al alcance del pulgar.
+  static const tablet = 600.0;
+
+  /// Por encima de esto se puede dividir el contenido en dos paneles.
+  static const escritorio = 1024.0;
+
+  /// Tope del contenido en pantallas grandes.
+  ///
+  /// Sin esto, en un monitor de 2560 px una tarjeta de desafío se estira dos
+  /// metros y el texto queda en líneas de 300 caracteres, que es ilegible por
+  /// mucho que "quepa". Es el mismo tope que usan las referencias de diseño
+  /// editorial y el que trae DESIGN.md.
+  static const anchoMaximoContenido = 1200.0;
+
+  /// Tope más estrecho para lo que se LEE o se RELLENA: formularios de login
+  /// y registro, fichas de especie, textos largos. Una línea cómoda ronda los
+  /// 60-75 caracteres y a 480 px eso se cumple sin forzar.
+  static const anchoMaximoFormulario = 480.0;
+}
+
 const _colorScheme = ColorScheme(
   brightness: Brightness.dark,
   primary: VeridiaColors.primary,
@@ -270,6 +383,49 @@ const veridiaLabelCaps = TextStyle(
   color: VeridiaColors.onSurfaceVariant,
 );
 
+/// Transición entre pantallas: desvanecido + un empuje corto desde abajo.
+///
+/// Reemplaza a la de Material por defecto, que en Android desliza la pantalla
+/// entera desde el borde derecho y en escritorio hace un zoom pronunciado.
+/// Ninguna de las dos encaja con una app de piezas moldeadas: el deslizamiento
+/// lateral sugiere "otra hoja del mismo cuaderno" y el zoom sugiere "entré
+/// dentro de algo". Aquí la pantalla nueva simplemente APARECE subiendo un
+/// poco, que es el mismo gesto de [VeridiaAparece] en las tarjetas —el mismo
+/// vocabulario de movimiento en toda la app, solo que a escala de pantalla.
+///
+/// El recorrido es de apenas un 3.5% del alto: lo justo para que se lea como
+/// movimiento y no como un salto. `MaterialPageRoute` lo corre en 300 ms, que
+/// cae dentro de la banda de [VeridiaDuraciones.pantalla].
+class _TransicionVeridia extends PageTransitionsBuilder {
+  const _TransicionVeridia();
+
+  @override
+  Widget buildTransitions<T>(
+    PageRoute<T> route,
+    BuildContext context,
+    Animation<double> animation,
+    Animation<double> secondaryAnimation,
+    Widget child,
+  ) {
+    final curva = CurvedAnimation(
+      parent: animation,
+      curve: VeridiaCurvas.entrada,
+      reverseCurve: VeridiaCurvas.salida,
+    );
+
+    return FadeTransition(
+      opacity: curva,
+      child: SlideTransition(
+        position: Tween<Offset>(
+          begin: const Offset(0, 0.035),
+          end: Offset.zero,
+        ).animate(curva),
+        child: child,
+      ),
+    );
+  }
+}
+
 ThemeData buildVeridiaTheme() {
   final textTheme = _buildTextTheme();
 
@@ -283,6 +439,19 @@ ThemeData buildVeridiaTheme() {
     textTheme: textTheme,
     primaryTextTheme: textTheme,
     splashFactory: InkSparkle.splashFactory,
+
+    // La MISMA transición en las seis plataformas: la app se ve igual en el
+    // celular y en el navegador, y deja de depender de en qué sistema corra.
+    pageTransitionsTheme: const PageTransitionsTheme(
+      builders: <TargetPlatform, PageTransitionsBuilder>{
+        TargetPlatform.android: _TransicionVeridia(),
+        TargetPlatform.iOS: _TransicionVeridia(),
+        TargetPlatform.windows: _TransicionVeridia(),
+        TargetPlatform.macOS: _TransicionVeridia(),
+        TargetPlatform.linux: _TransicionVeridia(),
+        TargetPlatform.fuchsia: _TransicionVeridia(),
+      },
+    ),
 
     appBarTheme: AppBarTheme(
       backgroundColor: VeridiaColors.surfaceContainerLow,
@@ -490,6 +659,16 @@ ThemeData buildVeridiaTheme() {
           top: Radius.circular(VeridiaRadii.xl),
         ),
       ),
+      // Una hoja inferior nace de un gesto del pulgar, así que a lo ancho de
+      // un monitor deja de tener sentido: el contenido queda en una franja de
+      // dos metros pegada al borde de abajo. Acotada y centrada se sigue
+      // leyendo como lo que es. En un teléfono no cambia nada, porque
+      // ninguno llega a este ancho.
+      //
+      // Va en el tema y no en cada `showModalBottomSheet`: solo en mapa.dart
+      // hay cuatro, y repartir el mismo número por los sitios de uso es cómo
+      // se desincronizan.
+      constraints: const BoxConstraints(maxWidth: 560),
     ),
 
     bottomNavigationBarTheme: BottomNavigationBarThemeData(

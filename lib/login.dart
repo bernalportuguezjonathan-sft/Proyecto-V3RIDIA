@@ -6,8 +6,6 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'services/auth_google.dart';
 import 'services/repositorio_u.dart';
 import 'models/user.dart';
-import 'admin_home.dart';
-import 'home.dart';
 import 'register.dart';
 import 'theme/veridia_theme.dart';
 import 'widgets/animated_visibility.dart';
@@ -413,17 +411,20 @@ class _LoginScreenState extends State<LoginScreen>
       return;
     }
 
-    final nextPage = userProfile.role == 'Administrador'
-        ? const AdminHomeScreen()
-        : const HomeScreen();
-
     if (!mounted) return;
-    unawaited(
-      Navigator.pushReplacement(
-        context,
-        MaterialPageRoute(builder: (context) => nextPage),
-      ),
-    );
+    // Vaciar la pila, NO empujar la pantalla de destino.
+    //
+    // [RaizVeridia] es la primera ruta y ya escucha `authStateChanges`: en
+    // cuanto hay sesión dibuja ella sola el panel de administración o el
+    // inicio del explorador. Empujar aquí otra encima dejaba DOS iguales
+    // apiladas —la de arriba con flecha de retroceso, la de abajo sin ella—,
+    // así que tocar la flecha "volvía" a la misma pantalla y la flecha
+    // desaparecía, sin forma evidente de salir.
+    //
+    // Es el mismo criterio que ya usan `VeridiaNav.ir` para Inicio y
+    // `VeridiaNav.cerrarSesion`: la raíz decide qué se ve, y navegar es
+    // dejarla a ella sola.
+    Navigator.popUntil(context, (route) => route.isFirst);
   }
 
   /// Avisa de que la cuenta de Google elegida no está registrada en Veridia.
@@ -467,7 +468,11 @@ class _LoginScreenState extends State<LoginScreen>
           ),
           TextButton(
             onPressed: () => Navigator.pop(dialogContext, true),
-            child: const Text('Crear cuenta nueva'),
+            // "aquí" y no "Crear cuenta nueva": la cuenta de Google ya
+            // existe, lo que falta es el perfil de explorador en Veridia.
+            // Con el texto anterior parecía que iba a abrir un formulario de
+            // registro, y lo que hace es entrar.
+            child: const Text('Crear mi cuenta aquí'),
           ),
         ],
       ),
@@ -484,6 +489,7 @@ class _LoginScreenState extends State<LoginScreen>
   /// misma cuenta en silencio y la persona no puede corregir su error.
   Future<void> _descartarCuentaNoRegistrada({
     required bool borrarDeAuth,
+    bool avisar = true,
   }) async {
     final user = FirebaseAuth.instance.currentUser;
     if (borrarDeAuth && user != null) {
@@ -500,6 +506,10 @@ class _LoginScreenState extends State<LoginScreen>
     }
     await cerrarSesionGoogle();
 
+    // El aviso sobra cuando quien llama va a reabrir el selector de Google
+    // acto seguido: se quedaría tapado por la ventana de Google, o peor, se
+    // leería después de haber elegido ya la cuenta correcta.
+    if (!avisar) return;
     if (!mounted) return;
     _mostrarAlerta('Elige la cuenta con la que te registraste en Veridia.');
   }
@@ -555,9 +565,50 @@ class _LoginScreenState extends State<LoginScreen>
           cuentaGoogle.email ?? 'esta cuenta',
         );
         if (!quiereRegistrarse) {
-          await _descartarCuentaNoRegistrada(borrarDeAuth: esCuentaNueva);
+          await _descartarCuentaNoRegistrada(
+            borrarDeAuth: esCuentaNueva,
+            avisar: false,
+          );
+          // Y se vuelve a abrir el selector de Google en el acto.
+          //
+          // Antes solo se limpiaba la sesión y se dejaba al explorador en la
+          // pantalla de login con un aviso: tenía que volver a tocar "Iniciar
+          // sesión con Google" él mismo, y como no había pasado nada visible
+          // parecía que el botón no hacía nada. "Usar otra cuenta" tiene que
+          // llevar a elegir otra cuenta, no a leer instrucciones.
+          //
+          // Se lanza SIN await y después de que esta llamada termine: así el
+          // intento nuevo arranca limpio en vez de anidarse dentro del que lo
+          // provocó, que dejaría dos diálogos de carga apilados.
+          if (mounted) unawaited(_signInWithGoogle());
           return;
         }
+
+        // "Crear mi cuenta aquí": se va al formulario de registro con el
+        // correo y el nombre de Google ya puestos.
+        //
+        // ANTES hay que SOLTAR la sesión a medias. Google ya autenticó, así
+        // que ese correo está ocupado en Firebase Auth: si se entrara al
+        // formulario sin deshacerlo, registrarse con contraseña reventaría
+        // con `email-already-in-use` sobre un correo que la propia app acaba
+        // de crear. Soltándola, el formulario funciona por las dos vías —con
+        // contraseña o con el botón "Registrarse con Google" de esa misma
+        // pantalla—.
+        final correo = cuentaGoogle.email;
+        final nombre = cuentaGoogle.displayName;
+        await _descartarCuentaNoRegistrada(
+          borrarDeAuth: esCuentaNueva,
+          avisar: false,
+        );
+        if (!mounted) return;
+        await Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (_) =>
+                RegisterScreen(correoInicial: correo, nombreInicial: nombre),
+          ),
+        );
+        return;
       }
 
       await UserRepository.instance.initializeUser();
@@ -779,23 +830,54 @@ class _LoginScreenState extends State<LoginScreen>
                                         ),
                                       ),
                                     ),
+                                    // Registrarse va DENTRO de la tarjeta y
+                                    // con el mismo cuerpo que los otros dos.
+                                    //
+                                    // Suelto abajo y en letra pequeña se leía
+                                    // como un pie de página, no como la
+                                    // tercera forma de entrar que es. Mismo
+                                    // alto (52) y mismo ancho completo que
+                                    // "Entrar" y el de Google: las tres
+                                    // maneras de pasar de esta pantalla se
+                                    // ven como tres piezas del mismo tipo.
+                                    //
+                                    // Sigue siendo `OutlinedButton` y no
+                                    // relleno: el relleno es de "Entrar", que
+                                    // es lo que viene a hacer casi todo el
+                                    // mundo aquí. Igualar el tamaño no es
+                                    // igualar la jerarquía.
+                                    const SizedBox(height: 12),
+                                    VeridiaBotonTactil(
+                                      child: OutlinedButton.icon(
+                                        onPressed: () {
+                                          Navigator.push(
+                                            context,
+                                            MaterialPageRoute(
+                                              builder: (context) =>
+                                                  const RegisterScreen(),
+                                            ),
+                                          );
+                                        },
+                                        icon: const Icon(
+                                          Icons.person_add_alt_1_outlined,
+                                          size: 20,
+                                        ),
+                                        label: const Text('Crear una cuenta'),
+                                        style: OutlinedButton.styleFrom(
+                                          minimumSize: const Size(
+                                            double.infinity,
+                                            52,
+                                          ),
+                                          foregroundColor:
+                                              VeridiaColors.primary,
+                                        ),
+                                      ),
+                                    ),
                                   ],
                                 ),
                               ),
                             ],
                           ),
-                        ),
-                        const SizedBox(height: 20),
-                        TextButton(
-                          onPressed: () {
-                            Navigator.push(
-                              context,
-                              MaterialPageRoute(
-                                builder: (context) => const RegisterScreen(),
-                              ),
-                            );
-                          },
-                          child: const Text('¿No tienes cuenta? Regístrate'),
                         ),
                       ],
                     ),

@@ -198,7 +198,10 @@ class ObservationRepository {
     // Red de seguridad: si el stream de desafios todavia no emitio, esta
     // lista estaria vacia y la foto no sumaria a ningun desafio en silencio.
     await repo.asegurarCargado();
-    final coincidencias = repo.challengesForUser(perfil.userId).where((c) {
+    // VIGENTES, no todos: una foto no puede hacer avanzar un desafío cuya
+    // fecha límite ya pasó. Antes sí sumaba, así que la fecha no limitaba
+    // nada y un reto de hace meses seguía pagando Veridiums.
+    final coincidencias = repo.challengesVigentesPara(perfil.userId).where((c) {
       if (repo.progreso(c.id).completado) return false;
       return especieCoincide(c.targetSpecies, identificacion);
     }).toList();

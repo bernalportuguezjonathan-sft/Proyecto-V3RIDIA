@@ -189,11 +189,25 @@ class ChallengeRepository {
 
   /// Desafíos que le corresponden a un usuario: los globales más los que un
   /// administrador le asignó personalmente.
+  ///
+  /// Incluye los VENCIDOS a propósito. Lo usan las estadísticas ("llevas 3 de
+  /// 7 completados") y ahí un desafío que cerraste antes de que expirara
+  /// sigue contando: filtrarlo aquí te borraría retos que sí completaste.
+  /// Para lo que el explorador puede hacer AHORA está
+  /// [challengesVigentesPara].
   List<Challenge> challengesForUser(String? userId) {
     return challenges.value
         .where((c) => c.isGlobal || c.assignedToUserId == userId)
         .toList();
   }
+
+  /// Los suyos que además siguen abiertos: la fecha límite no ha pasado.
+  ///
+  /// Es la lista que se le enseña y la que decide si una foto suma. Un
+  /// desafío vencido seguía apareciendo como activo y seguía aceptando
+  /// fotos, así que la "fecha límite" no limitaba nada.
+  List<Challenge> challengesVigentesPara(String? userId) =>
+      challengesForUser(userId).where((c) => !c.vencido).toList();
 
   /// Progreso propio en un desafío. Nunca null: quien no ha empezado va en 0.
   ProgresoDesafio progreso(String challengeId) =>

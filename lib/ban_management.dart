@@ -163,6 +163,69 @@ class _BanManagementScreenState extends State<BanManagementScreen> {
     }
   }
 
+  /// Muestra las cuentas sobrantes de un correo para poder borrarlas.
+  ///
+  /// Se enseña de cada una el saldo, el acumulado y la fecha de creación,
+  /// que son los tres datos con los que se distingue un duplicado vacío del
+  /// que tiene el progreso de la persona. Borrar el equivocado se lleva por
+  /// delante sus Veridiums y sus insignias, y eso no se deshace.
+  Future<void> _mostrarDuplicados(GrupoDeCorreo grupo) async {
+    final aBorrar = await showDialog<UserProfile>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        icon: const Icon(
+          Icons.copy_all_outlined,
+          color: VeridiaColors.error,
+          size: 26,
+        ),
+        title: Text('${grupo.cuantas} cuentas con este correo'),
+        content: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                grupo.principal.email,
+                style: const TextStyle(
+                  fontWeight: FontWeight.bold,
+                  color: VeridiaColors.primary,
+                ),
+              ),
+              const SizedBox(height: 10),
+              const Text(
+                'En la lista se muestra solo la que tiene más recorrido. '
+                'Estas son las demás: comprueba que están vacías antes de '
+                'borrarlas.',
+              ),
+              const SizedBox(height: 16),
+              _LineaDuplicado(
+                perfil: grupo.principal,
+                esPrincipal: true,
+                onBorrar: null,
+              ),
+              for (final duplicado in grupo.duplicados)
+                _LineaDuplicado(
+                  perfil: duplicado,
+                  esPrincipal: false,
+                  onBorrar: () => Navigator.pop(dialogContext, duplicado),
+                ),
+            ],
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext),
+            child: const Text('Cerrar'),
+          ),
+        ],
+      ),
+    );
+
+    // Se reutiliza el borrado normal, con su propia confirmación: no hay una
+    // vía rápida que se salte el aviso solo por venir de aquí.
+    if (aBorrar != null && mounted) await _eliminarUsuario(aBorrar);
+  }
+
   /// Borra el perfil de Firestore.
   ///
   /// Existe porque eliminar la cuenta en Firebase Authentication NO borra su
@@ -246,14 +309,30 @@ class _BanManagementScreenState extends State<BanManagementScreen> {
                 );
               }
 
+              // UNA tarjeta por correo. En `users` conviven documentos
+              // distintos con el mismo correo —registrarse con contraseña y
+              // luego entrar con Google da otro uid, así que es otro
+              // documento—, y la lista mostraba cuatro "Daniel Mahecha"
+              // idénticos.
+              //
+              // Los sobrantes NO se esconden y ya está: cuelgan de su
+              // principal y se pueden borrar desde ahí. Esta es la única
+              // pantalla desde la que se borra un perfil; ocultarlos dejaría
+              // la lista limpia y los documentos atrapados para siempre.
+              final grupos = agruparPorCorreo(todos);
+
               final consulta = _filtro.trim().toLowerCase();
               final visibles = consulta.isEmpty
-                  ? todos
-                  : todos
+                  ? grupos
+                  : grupos
                         .where(
-                          (u) =>
-                              u.displayName.toLowerCase().contains(consulta) ||
-                              u.email.toLowerCase().contains(consulta),
+                          (g) =>
+                              g.principal.displayName.toLowerCase().contains(
+                                consulta,
+                              ) ||
+                              g.principal.email.toLowerCase().contains(
+                                consulta,
+                              ),
                         )
                         .toList();
               final suspendidos = todos.where((u) => u.isBanned).length;
@@ -310,15 +389,19 @@ class _BanManagementScreenState extends State<BanManagementScreen> {
                       ),
                     )
                   else
-                    for (final user in visibles) ...[
+                    for (final grupo in visibles) ...[
                       _FilaUsuario(
-                        user: user,
+                        user: grupo.principal,
                         esYo:
-                            user.userId ==
+                            grupo.principal.userId ==
                             UserRepository.instance.currentUser.value?.userId,
-                        onBan: () => _showBanDialog(user),
-                        onUnban: () => _unbanUser(user),
-                        onEliminar: () => _eliminarUsuario(user),
+                        onBan: () => _showBanDialog(grupo.principal),
+                        onUnban: () => _unbanUser(grupo.principal),
+                        onEliminar: () => _eliminarUsuario(grupo.principal),
+                        duplicados: grupo.duplicados.length,
+                        onVerDuplicados: grupo.hayDuplicados
+                            ? () => _mostrarDuplicados(grupo)
+                            : null,
                       ),
                       const SizedBox(height: 12),
                     ],
@@ -339,6 +422,8 @@ class _FilaUsuario extends StatelessWidget {
     required this.onBan,
     required this.onUnban,
     required this.onEliminar,
+    this.duplicados = 0,
+    this.onVerDuplicados,
   });
 
   final UserProfile user;
@@ -350,6 +435,12 @@ class _FilaUsuario extends StatelessWidget {
   final VoidCallback onBan;
   final VoidCallback onUnban;
   final VoidCallback onEliminar;
+
+  /// Cuántas cuentas MÁS comparten este correo. 0 en el caso normal.
+  final int duplicados;
+
+  /// Abre la lista de esas cuentas para poder borrarlas.
+  final VoidCallback? onVerDuplicados;
 
   @override
   Widget build(BuildContext context) {
@@ -431,6 +522,22 @@ class _FilaUsuario extends StatelessWidget {
                 color: VeridiaColors.veridium,
                 dense: true,
               ),
+              // Aviso de que este correo tiene más de una cuenta. Se toca
+              // para ver cuáles y borrarlas: el duplicado se esconde de la
+              // lista, pero sigue existiendo en la base de datos y hay que
+              // poder llegar a él.
+              if (duplicados > 0)
+                GestureDetector(
+                  onTap: onVerDuplicados,
+                  child: VeridiaTag(
+                    label: duplicados == 1
+                        ? '1 duplicado'
+                        : '$duplicados duplicados',
+                    icon: Icons.copy_all_outlined,
+                    color: VeridiaColors.error,
+                    dense: true,
+                  ),
+                ),
             ],
           ),
           if (user.isBanned && user.banReason != null) ...[
@@ -504,6 +611,66 @@ class _ErrorModeracion extends StatelessWidget {
       message:
           'Firestore rechazó la lectura de usuarios. Revisa tu conexión y '
           'que tu cuenta tenga rol Administrador.\n\n$error',
+    );
+  }
+}
+
+/// Una cuenta dentro del diálogo de duplicados.
+class _LineaDuplicado extends StatelessWidget {
+  const _LineaDuplicado({
+    required this.perfil,
+    required this.esPrincipal,
+    required this.onBorrar,
+  });
+
+  final UserProfile perfil;
+  final bool esPrincipal;
+
+  /// null en la principal: esa no se borra desde aquí, se borra con la
+  /// papelera de su tarjeta y con el aviso completo.
+  final VoidCallback? onBorrar;
+
+  @override
+  Widget build(BuildContext context) {
+    final text = Theme.of(context).textTheme;
+
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 10),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  esPrincipal ? 'Esta es la que se muestra' : 'Duplicada',
+                  style: text.labelSmall?.copyWith(
+                    color: esPrincipal
+                        ? VeridiaColors.secondary
+                        : VeridiaColors.onSurfaceVariant,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  '${perfil.tokens} V · ${perfil.tokensTotales} ganados · '
+                  'creada ${formatoFecha(perfil.createdDate)}',
+                  style: text.bodySmall,
+                ),
+              ],
+            ),
+          ),
+          if (onBorrar != null)
+            IconButton(
+              onPressed: onBorrar,
+              icon: const Icon(Icons.delete_outline, size: 20),
+              color: VeridiaColors.error,
+              tooltip: 'Borrar esta cuenta duplicada',
+              visualDensity: VisualDensity.compact,
+            ),
+        ],
+      ),
     );
   }
 }

@@ -5,8 +5,6 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'services/auth_google.dart';
 import 'services/repositorio_u.dart';
 import 'models/user.dart';
-import 'home.dart';
-import 'admin_home.dart';
 import 'theme/veridia_theme.dart';
 import 'widgets/animated_visibility.dart';
 import 'widgets/google_logo_icon.dart';
@@ -15,7 +13,18 @@ import 'widgets/veridia_montanas.dart';
 import 'widgets/veridia_ui.dart';
 
 class RegisterScreen extends StatefulWidget {
-  const RegisterScreen({super.key});
+  const RegisterScreen({super.key, this.correoInicial, this.nombreInicial});
+
+  /// Correo con el que llega la pantalla ya rellenado.
+  ///
+  /// Lo usa el login cuando alguien entró con una cuenta de Google que no
+  /// estaba registrada y eligió crearse la cuenta: escribir otra vez a mano un
+  /// correo que la app ACABA de leer es trabajo tonto, y además invita a
+  /// teclearlo distinto y acabar con dos cuentas.
+  final String? correoInicial;
+
+  /// Nombre que trae la cuenta de Google, si lo trae.
+  final String? nombreInicial;
 
   @override
   State<RegisterScreen> createState() => _RegisterScreenState();
@@ -56,6 +65,11 @@ class _RegisterScreenState extends State<RegisterScreen>
   @override
   void initState() {
     super.initState();
+    final correo = widget.correoInicial?.trim() ?? '';
+    if (correo.isNotEmpty) _emailController.text = correo;
+    final nombre = widget.nombreInicial?.trim() ?? '';
+    if (nombre.isNotEmpty) _nameController.text = nombre;
+
     _passwordFocusNode.addListener(() {
       setState(() => _passwordEnfocado = _passwordFocusNode.hasFocus);
     });
@@ -63,6 +77,82 @@ class _RegisterScreenState extends State<RegisterScreen>
 
   void _mostrarAlerta(String mensaje) {
     mostrarMensajeVeridia(context, mensaje, esError: true);
+  }
+
+  /// Ventana emergente cuando el correo ya tiene cuenta.
+  ///
+  /// La comprobación la hace FIREBASE AUTH, no la app: `createUser...` falla
+  /// con `email-already-in-use` y esa respuesta es la única fiable. Preguntar
+  /// antes con `fetchSignInMethodsForEmail` ya no sirve —Firebase lo desactiva
+  /// por defecto para que nadie pueda sondear qué correos existen— y mirar la
+  /// colección `users` tampoco: ahí no están las cuentas de Auth sin perfil.
+  ///
+  /// Da igual si la cuenta existente es de Explorador, de Administrador o de
+  /// Google: para Auth un correo es uno solo, y esa es justamente la
+  /// duplicidad que hay que impedir.
+  ///
+  /// Va en diálogo y no en un aviso pasajero porque el registro se ha
+  /// detenido: hay que decidir algo —cambiar el correo o ir a iniciar
+  /// sesión—, y un mensaje que se va solo a los cinco segundos deja a la
+  /// persona mirando un formulario lleno sin saber qué pasó.
+  Future<void> _avisarCorreoYaRegistrado(String correo) async {
+    if (!mounted) return;
+    final irAlLogin = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        icon: const Icon(
+          Icons.person_off_outlined,
+          color: VeridiaColors.error,
+          size: 28,
+        ),
+        title: const Text('Ese correo ya tiene cuenta'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              correo,
+              style: const TextStyle(
+                fontWeight: FontWeight.bold,
+                color: VeridiaColors.primary,
+              ),
+            ),
+            const SizedBox(height: 10),
+            const Text(
+              'Ya existe una cuenta de Veridia con este correo, así que no se '
+              'puede crear otra. Usa un correo distinto, o inicia sesión con '
+              'este si es tuyo.',
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext, false),
+            child: const Text('Usar otro correo'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext, true),
+            child: const Text('Iniciar sesión'),
+          ),
+        ],
+      ),
+    );
+
+    if (!mounted) return;
+    if (irAlLogin == true) {
+      // Se RETROCEDE a la pantalla anterior, que es de donde se llega aquí
+      // (el login). Empujar otro LoginScreen encima apilaría dos iguales, que
+      // es lo que dejaba la flecha de retroceso llevando a sí misma.
+      //
+      // `maybePop` y no `pop`: si algún día se llegara a esta pantalla sin
+      // nada debajo, un `pop` cerraría la app.
+      await Navigator.maybePop(context);
+      return;
+    }
+
+    // Se limpia el correo y se deja el cursor ahí: lo que hay que cambiar es
+    // justo ese campo, y así no hay que borrarlo a mano.
+    _emailController.clear();
   }
 
   // Función principal de registro con tus validaciones
@@ -281,9 +371,7 @@ class _RegisterScreenState extends State<RegisterScreen>
       if (mounted) Navigator.pop(context);
 
       if (e.code == 'email-already-in-use') {
-        _mostrarAlerta(
-          'Este correo ya está registrado. Por favor, inicia sesión.',
-        );
+        await _avisarCorreoYaRegistrado(email);
       } else {
         _mostrarAlerta('Ocurrió un error al registrarse. Intenta de nuevo.');
       }
@@ -355,17 +443,11 @@ class _RegisterScreenState extends State<RegisterScreen>
       return;
     }
 
-    final nextPage = userProfile.role == 'Administrador'
-        ? const AdminHomeScreen()
-        : const HomeScreen();
-
     if (!mounted) return;
-    unawaited(
-      Navigator.pushReplacement(
-        context,
-        MaterialPageRoute(builder: (context) => nextPage),
-      ),
-    );
+    // Igual que en el login: la pila se vacía y decide [RaizVeridia].
+    // Empujar el destino aquí dejaba dos pantallas iguales apiladas y la
+    // flecha de retroceso llevaba a sí misma.
+    Navigator.popUntil(context, (route) => route.isFirst);
   }
 
   Future<void> _registrarseConGoogle() async {
@@ -411,8 +493,17 @@ class _RegisterScreenState extends State<RegisterScreen>
         'Intenta de nuevo.',
       );
     } on FirebaseAuthException catch (e) {
-      if (e.code == 'account-exists-with-different-credential') {
-        _mostrarAlerta('Esta cuenta ya existe con otro método de acceso.');
+      if (e.code == 'account-exists-with-different-credential' ||
+          e.code == 'email-already-in-use') {
+        // El mismo caso por la otra puerta: ese correo ya tiene cuenta, solo
+        // que creada con contraseña. Se avisa con la misma ventana que en el
+        // registro normal, para que no haya dos explicaciones distintas de lo
+        // mismo según por dónde se entre.
+        if (!dialogClosed && mounted) {
+          Navigator.pop(context);
+          dialogClosed = true;
+        }
+        await _avisarCorreoYaRegistrado(e.email ?? 'ese correo');
       } else {
         _mostrarAlerta('Error al registrarse con Google. Intenta de nuevo.');
       }
@@ -667,17 +758,41 @@ class _RegisterScreenState extends State<RegisterScreen>
                                         ),
                                       ),
                                     ),
+                                    // Volver entra en la tarjeta con los
+                                    // otros dos y con su mismo cuerpo (ancho
+                                    // completo, alto 52). Fuera y en letra
+                                    // pequeña parecía un pie de página.
+                                    //
+                                    // `maybePop` y no `pop`: si algún día se
+                                    // llegara aquí sin nada debajo, un `pop`
+                                    // cerraría la app.
+                                    const SizedBox(height: 12),
+                                    VeridiaBotonTactil(
+                                      child: OutlinedButton.icon(
+                                        onPressed: () =>
+                                            Navigator.maybePop(context),
+                                        icon: const Icon(
+                                          Icons.arrow_back,
+                                          size: 20,
+                                        ),
+                                        label: const Text(
+                                          'Volver al inicio de sesión',
+                                        ),
+                                        style: OutlinedButton.styleFrom(
+                                          minimumSize: const Size(
+                                            double.infinity,
+                                            52,
+                                          ),
+                                          foregroundColor:
+                                              VeridiaColors.primary,
+                                        ),
+                                      ),
+                                    ),
                                   ],
                                 ),
                               ),
                             ],
                           ),
-                        ),
-                        const SizedBox(height: 18),
-                        TextButton.icon(
-                          onPressed: () => Navigator.pop(context),
-                          icon: const Icon(Icons.arrow_back, size: 18),
-                          label: const Text('Volver al inicio de sesión'),
                         ),
                       ],
                     ),

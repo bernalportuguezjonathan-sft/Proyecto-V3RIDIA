@@ -5,12 +5,33 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/foundation.dart';
 
 import '../models/recompensa.dart';
+import '../models/user.dart';
 import '../theme/veridia_theme.dart';
 import 'economia.dart';
 import 'repositorio_u.dart';
 
 /// Resultado de intentar canjear una recompensa.
 enum ResultadoCanje { exito, sinSaldo, yaLaTienes, sinSesion, error }
+
+/// Resultado de ponerse o quitarse un marco o un título.
+enum ResultadoEquipar {
+  exito,
+
+  /// Firestore rechazó la escritura.
+  ///
+  /// En la práctica solo significa una cosa: las reglas desplegadas todavía
+  /// no permiten `marcoEquipado`/`tituloEquipado`. Merece un caso propio
+  /// porque el consejo correcto es "hay que desplegar las reglas", y decirle
+  /// a alguien "intenta de nuevo" cuando reintentar no puede funcionar es
+  /// mandarlo a golpear un botón muerto.
+  sinPermiso,
+
+  /// No es equipable o no la tiene comprada.
+  noAplica,
+
+  /// Falló por otra cosa (red, sesión caída): reintentar sí tiene sentido.
+  error,
+}
 
 /// Tienda de Veridiums: qué se puede canjear y qué ha canjeado cada quien.
 ///
@@ -170,23 +191,88 @@ class RewardRepository {
         .toList();
   }
 
-  /// Título comprado más caro (el que se muestra junto al nombre).
-  String? tituloActivo() {
-    final titulos = desbloqueadas()
-        .where((r) => r.tipo == TipoRecompensa.titulo)
-        .toList();
-    if (titulos.isEmpty) return null;
-    titulos.sort((a, b) => b.costo.compareTo(a.costo));
-    return titulos.first.valor;
+  /// Lo que el explorador tiene comprado de un tipo concreto.
+  List<Recompensa> desbloqueadasDeTipo(TipoRecompensa tipo) =>
+      desbloqueadas().where((r) => r.tipo == tipo).toList();
+
+  /// La recompensa de [tipo] que lleva puesta ahora mismo.
+  ///
+  /// Respeta lo que haya ELEGIDO (ver [equipadoEntre]); si nunca eligió, cae
+  /// en la más cara, que es lo que la app hacía antes de que se pudiera
+  /// elegir.
+  Recompensa? equipadaDeTipo(TipoRecompensa tipo) {
+    final perfil = UserRepository.instance.currentUser.value;
+    final elegido = switch (tipo) {
+      TipoRecompensa.marco => perfil?.marcoEquipado,
+      TipoRecompensa.titulo => perfil?.tituloEquipado,
+      _ => null,
+    };
+    return equipadoEntre<Recompensa>(
+      elegido,
+      desbloqueadasDeTipo(tipo),
+      idDe: (r) => r.id,
+      costoDe: (r) => r.costo,
+    );
   }
 
-  /// Marco comprado más caro (null si no tiene ninguno).
-  Recompensa? marcoActivo() {
-    final marcos = desbloqueadas()
-        .where((r) => r.tipo == TipoRecompensa.marco)
-        .toList();
-    if (marcos.isEmpty) return null;
-    marcos.sort((a, b) => b.costo.compareTo(a.costo));
-    return marcos.first;
+  /// Título que se muestra junto al nombre.
+  String? tituloActivo() => equipadaDeTipo(TipoRecompensa.titulo)?.valor;
+
+  /// Marco puesto en la foto de perfil (null si no lleva ninguno).
+  Recompensa? marcoActivo() => equipadaDeTipo(TipoRecompensa.marco);
+
+  /// true si esa recompensa concreta es la que lleva puesta.
+  bool estaEquipada(Recompensa recompensa) =>
+      equipadaDeTipo(recompensa.tipo)?.id == recompensa.id;
+
+  /// Pone o quita un marco o un título.
+  ///
+  /// Pasar la que ya lleva puesta la QUITA: es el mismo gesto para las dos
+  /// cosas, como el de una prenda que se toca para ponérsela y se vuelve a
+  /// tocar para quitársela. Con un botón aparte de "quitar" habría dos
+  /// controles por tarjeta para algo que solo tiene dos estados.
+  ///
+  /// Devuelve false si la recompensa no es equipable o no la tiene comprada.
+  Future<ResultadoEquipar> alternarEquipada(Recompensa recompensa) async {
+    if (recompensa.tipo != TipoRecompensa.marco &&
+        recompensa.tipo != TipoRecompensa.titulo) {
+      return ResultadoEquipar.noAplica;
+    }
+    if (!yaCanjeada(recompensa.id)) return ResultadoEquipar.noAplica;
+
+    final quitar = estaEquipada(recompensa);
+    final valor = quitar ? UserProfile.ningunoEquipado : recompensa.id;
+    final campo = recompensa.tipo == TipoRecompensa.marco
+        ? 'marcoEquipado'
+        : 'tituloEquipado';
+
+    final perfil = UserRepository.instance.currentUser.value;
+    final uid = FirebaseAuth.instance.currentUser?.uid;
+    if (perfil == null || uid == null) return ResultadoEquipar.error;
+
+    // Se refleja en memoria antes de escribir, igual que al equipar una
+    // mascota: si no, el aro de la foto tarda en cambiar lo que tarde
+    // Firestore en devolver el eco. Si la escritura falla se deshace.
+    UserRepository.instance.currentUser.value =
+        recompensa.tipo == TipoRecompensa.marco
+        ? perfil.copyWith(marcoEquipado: valor)
+        : perfil.copyWith(tituloEquipado: valor);
+
+    try {
+      await FirebaseFirestore.instance.collection('users').doc(uid).update({
+        campo: valor,
+      });
+      return ResultadoEquipar.exito;
+    } on FirebaseException catch (e) {
+      debugPrint('RewardRepository.alternarEquipada error: $e');
+      UserRepository.instance.currentUser.value = perfil;
+      return e.code == 'permission-denied'
+          ? ResultadoEquipar.sinPermiso
+          : ResultadoEquipar.error;
+    } catch (e) {
+      debugPrint('RewardRepository.alternarEquipada error: $e');
+      UserRepository.instance.currentUser.value = perfil;
+      return ResultadoEquipar.error;
+    }
   }
 }

@@ -6,6 +6,7 @@ import 'navegacion.dart';
 import 'services/repositorio_r.dart';
 import 'services/repositorio_u.dart';
 import 'theme/veridia_theme.dart';
+import 'widgets/veridia_responsive.dart';
 import 'widgets/veridia_ui.dart';
 
 /// Tienda de Veridiums: responde a "¿para qué sirven las monedas?".
@@ -37,48 +38,62 @@ class RewardsScreen extends StatelessWidget {
               final saldo = perfil?.tokens ?? 0;
               return ValueListenableBuilder<List<Canje>>(
                 valueListenable: RewardRepository.instance.misCanjes,
-                builder: (context, canjes, _) => ListView(
-                  padding: const EdgeInsets.fromLTRB(16, 16, 16, 28),
-                  children: [
-                    _CabeceraSaldo(saldo: saldo, canjes: canjes.length),
-                    const SizedBox(height: 24),
-                    const VeridiaSectionTitle(
-                      title: 'Catálogo',
-                      subtitle: 'Cambia tus Veridiums por reconocimientos',
-                    ),
-                    ...catalogoRecompensas.map(
-                      (recompensa) => Padding(
-                        padding: const EdgeInsets.only(bottom: 12),
-                        child: _TarjetaRecompensa(
-                          recompensa: recompensa,
-                          saldo: saldo,
-                          yaCanjeada: RewardRepository.instance.yaCanjeada(
-                            recompensa.id,
+                builder: (context, canjes, _) => VeridiaSegunAncho(
+                  builder: (context, ancho) => Center(
+                    child: ConstrainedBox(
+                      constraints: const BoxConstraints(
+                        maxWidth: VeridiaBreakpoints.anchoMaximoContenido,
+                      ),
+                      child: ListView(
+                        padding: EdgeInsets.fromLTRB(
+                          ancho.margen,
+                          VeridiaSpacing.lg,
+                          ancho.margen,
+                          28,
+                        ),
+                        children: [
+                          _CabeceraSaldo(saldo: saldo, canjes: canjes.length),
+                          const SizedBox(height: 24),
+                          const VeridiaSectionTitle(
+                            title: 'Catálogo',
+                            subtitle:
+                                'Cambia tus Veridiums por reconocimientos',
                           ),
-                        ),
+                          ...catalogoRecompensas.map(
+                            (recompensa) => Padding(
+                              padding: const EdgeInsets.only(bottom: 12),
+                              child: _TarjetaRecompensa(
+                                recompensa: recompensa,
+                                saldo: saldo,
+                                yaCanjeada: RewardRepository.instance
+                                    .yaCanjeada(recompensa.id),
+                              ),
+                            ),
+                          ),
+                          const SizedBox(height: 14),
+                          const VeridiaSectionTitle(
+                            title: 'Mis canjes',
+                            subtitle: 'Historial de lo que has reclamado',
+                          ),
+                          if (canjes.isEmpty)
+                            const VeridiaEmptyState(
+                              icon: Icons.card_giftcard_outlined,
+                              title: 'Todavía no has canjeado nada',
+                              message:
+                                  'Verifica fotos con la IA y completa desafíos para '
+                                  'ganar Veridiums.',
+                            )
+                          else
+                            ...canjes.map(
+                              (canje) => Padding(
+                                padding: const EdgeInsets.only(bottom: 12),
+                                child: _FilaCanje(canje: canje),
+                              ),
+                            ),
+                        ],
                       ),
                     ),
-                    const SizedBox(height: 14),
-                    const VeridiaSectionTitle(
-                      title: 'Mis canjes',
-                      subtitle: 'Historial de lo que has reclamado',
-                    ),
-                    if (canjes.isEmpty)
-                      const VeridiaEmptyState(
-                        icon: Icons.card_giftcard_outlined,
-                        title: 'Todavía no has canjeado nada',
-                        message:
-                            'Verifica fotos con la IA y completa desafíos para '
-                            'ganar Veridiums.',
-                      )
-                    else
-                      ...canjes.map(
-                        (canje) => Padding(
-                          padding: const EdgeInsets.only(bottom: 12),
-                          child: _FilaCanje(canje: canje),
-                        ),
-                      ),
-                  ],
+                  ),
                 ),
               );
             },
@@ -214,6 +229,56 @@ class _TarjetaRecompensa extends StatefulWidget {
 class _TarjetaRecompensaState extends State<_TarjetaRecompensa> {
   bool _procesando = false;
 
+  /// Un marco o un título se pueden poner y quitar; una insignia no (se
+  /// muestran todas a la vez) y una experiencia física tampoco.
+  bool get _esEquipable =>
+      widget.recompensa.tipo == TipoRecompensa.marco ||
+      widget.recompensa.tipo == TipoRecompensa.titulo;
+
+  Future<void> _alternarEquipada() async {
+    final messenger = ScaffoldMessenger.of(context);
+    final recompensa = widget.recompensa;
+    final iba = RewardRepository.instance.estaEquipada(recompensa);
+
+    setState(() => _procesando = true);
+    final resultado = await RewardRepository.instance.alternarEquipada(
+      recompensa,
+    );
+    if (!mounted) return;
+    setState(() => _procesando = false);
+
+    switch (resultado) {
+      case ResultadoEquipar.exito:
+        messenger.showSnackBar(
+          SnackBar(
+            backgroundColor: VeridiaColors.primaryContainer,
+            content: Text(
+              iba
+                  ? 'Te quitaste "${recompensa.nombre}".'
+                  : '"${recompensa.nombre}" ya se ve en tu perfil.',
+            ),
+          ),
+        );
+      case ResultadoEquipar.sinPermiso:
+        // Reintentar no puede funcionar: falta desplegar las reglas de
+        // Firestore, que son las que autorizan estos dos campos.
+        messenger.showSnackBar(
+          veridiaSnackBarError(
+            'Los permisos del servidor todavía no admiten cambiar de marco. '
+            'Avisa a quien administra la app.',
+          ),
+        );
+      case ResultadoEquipar.noAplica:
+        messenger.showSnackBar(
+          veridiaSnackBarError('Esta recompensa no se puede poner ni quitar.'),
+        );
+      case ResultadoEquipar.error:
+        messenger.showSnackBar(
+          veridiaSnackBarError('No se pudo cambiar. Intenta de nuevo.'),
+        );
+    }
+  }
+
   Future<void> _confirmarCanje() async {
     final recompensa = widget.recompensa;
     final confirmado = await showDialog<bool>(
@@ -288,11 +353,18 @@ class _TarjetaRecompensaState extends State<_TarjetaRecompensa> {
     final recompensa = widget.recompensa;
     final alcanza = widget.saldo >= recompensa.costo;
     final bloqueada = widget.yaCanjeada;
+    final equipada =
+        bloqueada &&
+        _esEquipable &&
+        RewardRepository.instance.estaEquipada(recompensa);
 
     return VeridiaCard(
-      borderColor: bloqueada
+      // Lo que se lleva puesto se marca como conseguido de verdad; lo
+      // comprado pero guardado queda en el contorno normal.
+      estado: equipada ? EstadoPieza.completado : EstadoPieza.normal,
+      borderColor: bloqueada && !equipada
           ? VeridiaColors.primary.withValues(alpha: 0.45)
-          : alcanza
+          : !bloqueada && alcanza
           ? recompensa.color.withValues(alpha: 0.4)
           : null,
       child: Column(
@@ -341,7 +413,36 @@ class _TarjetaRecompensaState extends State<_TarjetaRecompensa> {
               const SizedBox(width: 8),
               VeridiaTokenBadge(tokens: recompensa.costo),
               const Spacer(),
-              if (bloqueada)
+              // Lo comprado que se puede LLEVAR PUESTO (marcos y títulos)
+              // muestra un botón para ponérselo o quitárselo, no una etiqueta
+              // muerta de "Obtenida". Antes el perfil elegía solo el más caro
+              // de los comprados, así que quien compraba el marco dorado
+              // después del esmeralda perdía el esmeralda sin haberlo pedido
+              // y no tenía dónde cambiarlo.
+              if (bloqueada && _esEquipable)
+                VeridiaBotonTactil(
+                  child: OutlinedButton.icon(
+                    onPressed: _procesando ? null : _alternarEquipada,
+                    icon: Icon(
+                      equipada
+                          ? Icons.check_circle_rounded
+                          : Icons.circle_outlined,
+                      size: 18,
+                    ),
+                    label: Text(equipada ? 'Puesto' : 'Ponérmelo'),
+                    style: OutlinedButton.styleFrom(
+                      foregroundColor: equipada
+                          ? VeridiaColors.secondary
+                          : VeridiaColors.onSurfaceVariant,
+                      side: BorderSide(
+                        color: equipada
+                            ? VeridiaColors.secondary.withValues(alpha: 0.6)
+                            : VeridiaColors.outline.withValues(alpha: 0.5),
+                      ),
+                    ),
+                  ),
+                )
+              else if (bloqueada)
                 const VeridiaTag(
                   label: 'Obtenida',
                   icon: Icons.check_rounded,

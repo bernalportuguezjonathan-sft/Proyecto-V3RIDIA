@@ -13,6 +13,7 @@ import 'services/repositorio_u.dart';
 import 'services/ubicacion_foto.dart';
 import 'theme/veridia_theme.dart';
 import 'navegacion.dart';
+import 'widgets/veridia_responsive.dart';
 import 'widgets/veridia_ui.dart';
 
 class ChallengesScreen extends StatefulWidget {
@@ -429,10 +430,14 @@ class _ChallengesScreenState extends State<ChallengesScreen> {
           valueListenable: ChallengeRepository.instance.challenges,
           builder: (context, allChallenges, child) {
             final profile = UserRepository.instance.currentUser.value;
-            // Un explorador solo ve los desafíos globales y los suyos.
+            // Un explorador solo ve los desafíos globales y los suyos, y solo
+            // los que siguen abiertos: uno vencido ya no acepta fotos, así
+            // que enseñarlo aquí es ofrecer algo que no se puede hacer. El
+            // administrador sí los ve todos —es su lista de gestión y desde
+            // ahí los borra—.
             final challenges = profile?.role == 'Administrador'
                 ? allChallenges
-                : ChallengeRepository.instance.challengesForUser(
+                : ChallengeRepository.instance.challengesVigentesPara(
                     profile?.userId,
                   );
             return Stack(
@@ -466,294 +471,333 @@ class _ChallengesScreenState extends State<ChallengesScreen> {
                             ],
                           ),
                         )
-                      : ListView.builder(
-                          padding: const EdgeInsets.all(16),
-                          itemCount: challenges.length,
-                          itemBuilder: (context, index) {
-                            final challenge = challenges[index];
-                            final avance = ChallengeRepository.instance
-                                .progreso(challenge.id);
-                            final completado = avance.completado;
-
-                            return Container(
-                              margin: const EdgeInsets.only(bottom: 12),
-                              decoration: BoxDecoration(
-                                gradient: veridiaCaraClay(
-                                  VeridiaColors.surfaceContainer,
-                                ),
-                                borderRadius: BorderRadius.circular(
-                                  VeridiaRadii.lg,
-                                ),
-                                border: Border.all(
-                                  color: VeridiaCard.bordePorDefecto,
-                                ),
-                                boxShadow: veridiaRelieve(),
+                      : VeridiaSegunAncho(
+                          builder: (context, ancho) => Center(
+                            child: ConstrainedBox(
+                              constraints: const BoxConstraints(
+                                maxWidth:
+                                    VeridiaBreakpoints.anchoMaximoContenido,
                               ),
-                              child: Padding(
-                                padding: const EdgeInsets.all(16),
-                                child: Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: [
-                                    Row(
+                              child: ListView.builder(
+                                padding: EdgeInsets.all(ancho.margen),
+                                itemCount: challenges.length,
+                                itemBuilder: (context, index) {
+                                  final challenge = challenges[index];
+                                  final avance = ChallengeRepository.instance
+                                      .progreso(challenge.id);
+                                  final completado = avance.completado;
+
+                                  // La tarjeta del sistema en vez de un panel clay
+                                  // dibujado a mano: así el estado "completado" se
+                                  // marca solo -contorno jade y halo- en lugar de
+                                  // depender únicamente de la medallita de arriba
+                                  // a la derecha.
+                                  final tarjeta = VeridiaCard(
+                                    estado: completado
+                                        ? EstadoPieza.completado
+                                        : EstadoPieza.normal,
+                                    child: Column(
+                                      crossAxisAlignment:
+                                          CrossAxisAlignment.start,
                                       children: [
-                                        Expanded(
-                                          child: Column(
-                                            crossAxisAlignment:
-                                                CrossAxisAlignment.start,
-                                            children: [
-                                              Text(
-                                                challenge.title,
-                                                style: const TextStyle(
-                                                  fontSize: 16,
-                                                  fontWeight: FontWeight.bold,
-                                                  color:
-                                                      VeridiaColors.onSurface,
-                                                ),
-                                              ),
-                                              const SizedBox(height: 4),
-                                              Text(
-                                                'Objetivo: ${challenge.targetSpecies}',
-                                                style: TextStyle(
-                                                  fontSize: 12,
-                                                  color: VeridiaColors
-                                                      .onSurfaceVariant,
-                                                ),
-                                              ),
-                                            ],
-                                          ),
-                                        ),
-                                        if (completado)
-                                          Container(
-                                            padding: const EdgeInsets.symmetric(
-                                              horizontal: 8,
-                                              vertical: 4,
-                                            ),
-                                            decoration: BoxDecoration(
-                                              color: VeridiaColors
-                                                  .primaryContainer,
-                                              borderRadius:
-                                                  BorderRadius.circular(8),
-                                            ),
-                                            child: Row(
-                                              children: [
-                                                const Icon(
-                                                  Icons.emoji_events,
-                                                  size: 12,
-                                                  color:
-                                                      VeridiaColors.secondary,
-                                                ),
-                                                const SizedBox(width: 4),
-                                                Text(
-                                                  '+${challenge.tokensReward}',
-                                                  style: const TextStyle(
-                                                    fontSize: 11,
-                                                    color: VeridiaColors
-                                                        .onPrimaryContainer,
-                                                    fontWeight: FontWeight.bold,
+                                        Row(
+                                          children: [
+                                            Expanded(
+                                              child: Column(
+                                                crossAxisAlignment:
+                                                    CrossAxisAlignment.start,
+                                                children: [
+                                                  Text(
+                                                    challenge.title,
+                                                    style: const TextStyle(
+                                                      fontSize: 16,
+                                                      fontWeight:
+                                                          FontWeight.bold,
+                                                      color: VeridiaColors
+                                                          .onSurface,
+                                                    ),
                                                   ),
-                                                ),
-                                              ],
+                                                  const SizedBox(height: 4),
+                                                  Text(
+                                                    'Objetivo: ${challenge.targetSpecies}',
+                                                    style: TextStyle(
+                                                      fontSize: 12,
+                                                      color: VeridiaColors
+                                                          .onSurfaceVariant,
+                                                    ),
+                                                  ),
+                                                ],
+                                              ),
                                             ),
-                                          ),
-                                      ],
-                                    ),
-                                    const SizedBox(height: 12),
-                                    Text(
-                                      challenge.description,
-                                      style: TextStyle(
-                                        fontSize: 12,
-                                        color: VeridiaColors.onSurfaceVariant,
-                                      ),
-                                    ),
-                                    const SizedBox(height: 12),
-                                    Row(
-                                      children: [
-                                        Text(
-                                          'Mi progreso: ${avance.progreso}/${challenge.targetGoal}',
-                                          style: const TextStyle(
-                                            fontSize: 11,
-                                            fontWeight: FontWeight.w600,
-                                          ),
+                                            if (completado)
+                                              Container(
+                                                padding:
+                                                    const EdgeInsets.symmetric(
+                                                      horizontal: 8,
+                                                      vertical: 4,
+                                                    ),
+                                                decoration: BoxDecoration(
+                                                  color: VeridiaColors
+                                                      .primaryContainer,
+                                                  borderRadius:
+                                                      BorderRadius.circular(8),
+                                                ),
+                                                child: Row(
+                                                  children: [
+                                                    const Icon(
+                                                      Icons.emoji_events,
+                                                      size: 12,
+                                                      color: VeridiaColors
+                                                          .secondary,
+                                                    ),
+                                                    const SizedBox(width: 4),
+                                                    Text(
+                                                      '+${challenge.tokensReward}',
+                                                      style: const TextStyle(
+                                                        fontSize: 11,
+                                                        color: VeridiaColors
+                                                            .onPrimaryContainer,
+                                                        fontWeight:
+                                                            FontWeight.bold,
+                                                      ),
+                                                    ),
+                                                  ],
+                                                ),
+                                              ),
+                                          ],
                                         ),
-                                        const Spacer(),
+                                        const SizedBox(height: 12),
                                         Text(
-                                          'Vence: ${formatoFecha(challenge.dueDate)}',
+                                          challenge.description,
                                           style: TextStyle(
-                                            fontSize: 11,
+                                            fontSize: 12,
                                             color:
                                                 VeridiaColors.onSurfaceVariant,
                                           ),
                                         ),
-                                      ],
-                                    ),
-                                    const SizedBox(height: 8),
-                                    ClipRRect(
-                                      borderRadius: BorderRadius.circular(8),
-                                      child: LinearProgressIndicator(
-                                        value: challenge.targetGoal <= 0
-                                            ? 0
-                                            : (avance.progreso /
-                                                      challenge.targetGoal)
-                                                  .clamp(0.0, 1.0),
-                                        minHeight: 6,
-                                        backgroundColor: VeridiaColors
-                                            .surfaceContainerHighest,
-                                        valueColor:
-                                            AlwaysStoppedAnimation<Color>(
-                                              completado
-                                                  ? VeridiaColors.secondary
-                                                  : VeridiaColors.primary,
+                                        const SizedBox(height: 12),
+                                        Row(
+                                          children: [
+                                            Text(
+                                              'Mi progreso: ${avance.progreso}/${challenge.targetGoal}',
+                                              style: const TextStyle(
+                                                fontSize: 11,
+                                                fontWeight: FontWeight.w600,
+                                              ),
                                             ),
-                                      ),
-                                    ),
-                                    const SizedBox(height: 12),
-                                    Row(
-                                      mainAxisAlignment:
-                                          MainAxisAlignment.spaceBetween,
-                                      children: [
-                                        // El administrador modera: no captura
-                                        // fotos ni gana Veridiums.
-                                        if (UserRepository
-                                                .instance
-                                                .currentUser
-                                                .value
-                                                ?.role !=
-                                            'Administrador')
-                                          Expanded(
-                                            child: VeridiaBotonTactil(
-                                              child: completado
-                                                  ? OutlinedButton.icon(
-                                                      onPressed: () =>
-                                                          abrirRecompensas(
-                                                            context,
+                                            const Spacer(),
+                                            Text(
+                                              'Vence: ${formatoFecha(challenge.dueDate)}',
+                                              style: TextStyle(
+                                                fontSize: 11,
+                                                color: VeridiaColors
+                                                    .onSurfaceVariant,
+                                              ),
+                                            ),
+                                          ],
+                                        ),
+                                        const SizedBox(
+                                          height: VeridiaSpacing.sm,
+                                        ),
+                                        // La barra del sistema, no un
+                                        // `LinearProgressIndicator` crudo: la de
+                                        // Veridia RECORRE el camino hasta su
+                                        // nuevo valor en vez de saltar, y va en
+                                        // un canal excavado que la hace leerse
+                                        // como algo que brilla dentro del hueco.
+                                        // Aquí importa más que en ningún otro
+                                        // sitio: subir una foto que cuenta para
+                                        // un desafío es el momento en que el
+                                        // avance se gana, y verlo avanzar ES la
+                                        // recompensa.
+                                        VeridiaProgressBar(
+                                          value: challenge.targetGoal <= 0
+                                              ? 0
+                                              : (avance.progreso /
+                                                        challenge.targetGoal)
+                                                    .clamp(0.0, 1.0),
+                                          height: 8,
+                                          color: completado
+                                              ? VeridiaColors.secondary
+                                              : VeridiaColors.primary,
+                                        ),
+                                        const SizedBox(height: 12),
+                                        Row(
+                                          mainAxisAlignment:
+                                              MainAxisAlignment.spaceBetween,
+                                          children: [
+                                            // El administrador modera: no captura
+                                            // fotos ni gana Veridiums.
+                                            if (UserRepository
+                                                    .instance
+                                                    .currentUser
+                                                    .value
+                                                    ?.role !=
+                                                'Administrador')
+                                              Expanded(
+                                                child: VeridiaBotonTactil(
+                                                  child: completado
+                                                      ? OutlinedButton.icon(
+                                                          onPressed: () =>
+                                                              abrirRecompensas(
+                                                                context,
+                                                              ),
+                                                          icon: const Icon(
+                                                            Icons
+                                                                .card_giftcard_rounded,
+                                                            size: 18,
                                                           ),
-                                                      icon: const Icon(
-                                                        Icons
-                                                            .card_giftcard_rounded,
-                                                        size: 18,
-                                                      ),
-                                                      label: const Text(
-                                                        'Canjear Veridiums',
-                                                      ),
-                                                      style: OutlinedButton.styleFrom(
-                                                        foregroundColor:
-                                                            VeridiaColors
-                                                                .veridium,
-                                                        side: const BorderSide(
-                                                          color: VeridiaColors
-                                                              .veridium,
-                                                        ),
-                                                        shape: RoundedRectangleBorder(
-                                                          borderRadius:
-                                                              BorderRadius.circular(
-                                                                16,
-                                                              ),
-                                                        ),
-                                                        padding:
-                                                            const EdgeInsets.symmetric(
-                                                              vertical: 14,
+                                                          label: const Text(
+                                                            'Canjear Veridiums',
+                                                          ),
+                                                          style: OutlinedButton.styleFrom(
+                                                            foregroundColor:
+                                                                VeridiaColors
+                                                                    .veridium,
+                                                            side: const BorderSide(
+                                                              color:
+                                                                  VeridiaColors
+                                                                      .veridium,
                                                             ),
-                                                      ),
-                                                    )
-                                                  : ElevatedButton.icon(
-                                                      onPressed:
-                                                          _analizando.contains(
-                                                            challenge.id,
-                                                          )
-                                                          ? null
-                                                          : () =>
-                                                                _capturarParaDesafio(
-                                                                  challenge,
+                                                            shape: RoundedRectangleBorder(
+                                                              borderRadius:
+                                                                  BorderRadius.circular(
+                                                                    16,
+                                                                  ),
+                                                            ),
+                                                            padding:
+                                                                const EdgeInsets.symmetric(
+                                                                  vertical: 14,
                                                                 ),
-                                                      icon:
-                                                          _analizando.contains(
-                                                            challenge.id,
-                                                          )
-                                                          ? const SizedBox(
-                                                              width: 16,
-                                                              height: 16,
-                                                              child: CircularProgressIndicator(
-                                                                strokeWidth: 2,
-                                                                color: VeridiaColors
-                                                                    .onSurface,
-                                                              ),
-                                                            )
-                                                          : const Icon(
-                                                              Icons
-                                                                  .add_a_photo_outlined,
-                                                              size: 18,
+                                                          ),
+                                                        )
+                                                      : ElevatedButton.icon(
+                                                          onPressed:
+                                                              _analizando
+                                                                  .contains(
+                                                                    challenge
+                                                                        .id,
+                                                                  )
+                                                              ? null
+                                                              : () =>
+                                                                    _capturarParaDesafio(
+                                                                      challenge,
+                                                                    ),
+                                                          icon:
+                                                              _analizando
+                                                                  .contains(
+                                                                    challenge
+                                                                        .id,
+                                                                  )
+                                                              ? const SizedBox(
+                                                                  width: 16,
+                                                                  height: 16,
+                                                                  child: CircularProgressIndicator(
+                                                                    strokeWidth:
+                                                                        2,
+                                                                    color: VeridiaColors
+                                                                        .onSurface,
+                                                                  ),
+                                                                )
+                                                              : const Icon(
+                                                                  Icons
+                                                                      .add_a_photo_outlined,
+                                                                  size: 18,
+                                                                ),
+                                                          label: Text(
+                                                            _analizando
+                                                                    .contains(
+                                                                      challenge
+                                                                          .id,
+                                                                    )
+                                                                ? 'Analizando...'
+                                                                : 'Registrar foto',
+                                                          ),
+                                                          style: ElevatedButton.styleFrom(
+                                                            backgroundColor:
+                                                                VeridiaColors
+                                                                    .primary,
+                                                            foregroundColor:
+                                                                VeridiaColors
+                                                                    .onPrimary,
+                                                            shape: RoundedRectangleBorder(
+                                                              borderRadius:
+                                                                  BorderRadius.circular(
+                                                                    16,
+                                                                  ),
                                                             ),
-                                                      label: Text(
-                                                        _analizando.contains(
-                                                              challenge.id,
-                                                            )
-                                                            ? 'Analizando...'
-                                                            : 'Registrar foto',
-                                                      ),
-                                                      style: ElevatedButton.styleFrom(
-                                                        backgroundColor:
-                                                            VeridiaColors
-                                                                .primary,
-                                                        foregroundColor:
-                                                            VeridiaColors
-                                                                .onPrimary,
-                                                        shape: RoundedRectangleBorder(
-                                                          borderRadius:
-                                                              BorderRadius.circular(
-                                                                16,
-                                                              ),
+                                                            padding:
+                                                                const EdgeInsets.symmetric(
+                                                                  vertical: 14,
+                                                                ),
+                                                          ),
                                                         ),
-                                                        padding:
-                                                            const EdgeInsets.symmetric(
-                                                              vertical: 14,
-                                                            ),
-                                                      ),
-                                                    ),
-                                            ),
-                                          ),
-                                        if (UserRepository
-                                                .instance
-                                                .currentUser
-                                                .value
-                                                ?.role ==
-                                            'Administrador')
-                                          Row(
-                                            children: [
-                                              IconButton(
-                                                onPressed: () =>
-                                                    _showChallengeForm(
-                                                      challenge: challenge,
-                                                    ),
-                                                icon: const Icon(
-                                                  Icons.edit,
-                                                  size: 18,
                                                 ),
-                                                color: VeridiaColors.primary,
-                                                visualDensity:
-                                                    VisualDensity.compact,
                                               ),
-                                              IconButton(
-                                                onPressed: () =>
-                                                    _showDeleteConfirm(
-                                                      challenge.id,
+                                            if (UserRepository
+                                                    .instance
+                                                    .currentUser
+                                                    .value
+                                                    ?.role ==
+                                                'Administrador')
+                                              Row(
+                                                children: [
+                                                  IconButton(
+                                                    onPressed: () =>
+                                                        _showChallengeForm(
+                                                          challenge: challenge,
+                                                        ),
+                                                    icon: const Icon(
+                                                      Icons.edit,
+                                                      size: 18,
                                                     ),
-                                                icon: const Icon(
-                                                  Icons.delete,
-                                                  size: 18,
-                                                ),
-                                                color: VeridiaColors.error,
-                                                visualDensity:
-                                                    VisualDensity.compact,
+                                                    color:
+                                                        VeridiaColors.primary,
+                                                    visualDensity:
+                                                        VisualDensity.compact,
+                                                  ),
+                                                  IconButton(
+                                                    onPressed: () =>
+                                                        _showDeleteConfirm(
+                                                          challenge.id,
+                                                        ),
+                                                    icon: const Icon(
+                                                      Icons.delete,
+                                                      size: 18,
+                                                    ),
+                                                    color: VeridiaColors.error,
+                                                    visualDensity:
+                                                        VisualDensity.compact,
+                                                  ),
+                                                ],
                                               ),
-                                            ],
-                                          ),
+                                          ],
+                                        ),
                                       ],
                                     ),
-                                  ],
-                                ),
+                                  );
+
+                                  return Padding(
+                                    padding: const EdgeInsets.only(
+                                      bottom: VeridiaSpacing.md,
+                                    ),
+                                    // Solo las primeras tarjetas entran en cascada.
+                                    // `VeridiaAparece` monta un AnimationController
+                                    // y un Future por elemento: aplicarlo a una
+                                    // lista larga cobraría ese precio en cada fila
+                                    // que entra al desplazarse, justo lo que hay
+                                    // que evitar en una lista.
+                                    child: index < 4
+                                        ? VeridiaAparece(
+                                            indice: index,
+                                            child: tarjeta,
+                                          )
+                                        : tarjeta,
+                                  );
+                                },
                               ),
-                            );
-                          },
+                            ),
+                          ),
                         ),
                 ),
               ],

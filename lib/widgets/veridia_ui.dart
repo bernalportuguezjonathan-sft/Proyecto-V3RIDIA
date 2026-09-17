@@ -1,3 +1,5 @@
+import 'dart:math' as math;
+
 import 'package:flutter/material.dart';
 import '../models/user.dart';
 import '../services/repositorio_u.dart';
@@ -110,6 +112,29 @@ class VeridiaBackground extends StatelessWidget {
   }
 }
 
+/// En qué estado está una pieza del juego: disponible, aún por desbloquear, o
+/// ya conseguida.
+///
+/// Es un enum y no dos booleanos sueltos porque los tres estados se excluyen
+/// entre sí: una mascota no puede estar bloqueada y completada a la vez, y
+/// con `bool bloqueado, bool completado` esa combinación imposible se puede
+/// escribir sin que nada se queje.
+///
+/// Solo cubre lo que PERSISTE en el contenido. Los estados momentáneos del
+/// dedo —presionado, hover— ya los resuelve el relieve clay, y los de una
+/// operación en curso —cargando, éxito, error— son de la pantalla, no de la
+/// tarjeta.
+enum EstadoPieza {
+  /// Disponible. El aspecto normal de la app.
+  normal,
+
+  /// Todavía no se ha ganado o no alcanza el nivel. Se atenúa.
+  bloqueado,
+
+  /// Ya conseguido. Se subraya con el contorno jade.
+  completado,
+}
+
 /// Tarjeta de superficie translúcida con borde fino (nivel 1 de elevación).
 class VeridiaCard extends StatelessWidget {
   const VeridiaCard({
@@ -122,6 +147,7 @@ class VeridiaCard extends StatelessWidget {
     this.radius = VeridiaRadii.lg,
     this.glow = false,
     this.animarPresion = true,
+    this.estado = EstadoPieza.normal,
   });
 
   final Widget child;
@@ -131,6 +157,18 @@ class VeridiaCard extends StatelessWidget {
   final Color? color;
   final double radius;
   final bool glow;
+
+  /// Estado del contenido de la tarjeta (ver [EstadoPieza]).
+  ///
+  /// Cambia el contorno y la opacidad, y añade la etiqueta correspondiente
+  /// para el lector de pantalla. Lo que NO hace es poner un candado ni un
+  /// visto: la tarjeta no sabe qué contiene. **Quien la usa tiene que añadir
+  /// ese ícono**, porque atenuar es una diferencia de color y el color no
+  /// puede ser la única señal de que algo está bloqueado.
+  ///
+  /// Si se pasa [borderColor] a mano, ese color manda: hay tarjetas con
+  /// contorno propio (rechazo de la IA, avisos) que no deben retenirse.
+  final EstadoPieza estado;
 
   /// Apaga la animación de "prensado" en tarjetas tocables cuyo contenido YA
   /// es una mascota o un accesorio (ver identify_species.dart y
@@ -150,6 +188,17 @@ class VeridiaCard extends StatelessWidget {
     final animada = onTap != null && animarPresion;
     final base = color ?? VeridiaColors.surfaceContainer;
 
+    // Una pieza conseguida se subraya con el contorno jade a plena fuerza; una
+    // por desbloquear pierde el contorno de color y se queda en el gris verde
+    // del sistema, para que no compita con lo que sí está disponible.
+    final borde =
+        borderColor ??
+        switch (estado) {
+          EstadoPieza.normal => bordePorDefecto,
+          EstadoPieza.bloqueado => VeridiaColors.outlineVariant,
+          EstadoPieza.completado => VeridiaColors.primary,
+        };
+
     final content = Container(
       padding: padding,
       decoration: BoxDecoration(
@@ -158,16 +207,19 @@ class VeridiaCard extends StatelessWidget {
         // esquina superior izquierda. Ver [_caraClay].
         gradient: _caraClay(base),
         borderRadius: BorderRadius.circular(radius),
-        border: Border.all(color: borderColor ?? bordePorDefecto),
-        boxShadow: animada ? null : _relieveClay(glow: glow),
+        border: Border.all(color: borde),
+        boxShadow: animada
+            ? null
+            : _relieveClay(glow: glow || estado == EstadoPieza.completado),
       ),
       child: child,
     );
 
-    if (onTap == null) return content;
-
-    if (!animarPresion) {
-      return Material(
+    Widget pieza;
+    if (onTap == null) {
+      pieza = content;
+    } else if (!animarPresion) {
+      pieza = Material(
         color: Colors.transparent,
         borderRadius: BorderRadius.circular(radius),
         child: InkWell(
@@ -178,13 +230,31 @@ class VeridiaCard extends StatelessWidget {
           child: content,
         ),
       );
+    } else {
+      pieza = _VeridiaCardTocable(
+        onTap: onTap!,
+        radius: radius,
+        glow: glow || estado == EstadoPieza.completado,
+        content: content,
+      );
     }
 
-    return _VeridiaCardTocable(
-      onTap: onTap!,
-      radius: radius,
-      glow: glow,
-      content: content,
+    if (estado == EstadoPieza.normal) return pieza;
+
+    // 0.55 y no menos: por debajo de ahí el texto de la tarjeta baja de la
+    // relación de contraste mínima y "bloqueado" pasa a significar
+    // "ilegible". Una pieza bloqueada tiene que poder leerse -para eso está,
+    // para que se vea lo que falta por conseguir-.
+    if (estado == EstadoPieza.bloqueado) {
+      pieza = Opacity(opacity: 0.55, child: pieza);
+    }
+
+    // La etiqueta para el lector de pantalla: el atenuado y el contorno son
+    // señales visuales, y por sí solas no llegan a quien no las ve.
+    return Semantics(
+      enabled: estado != EstadoPieza.bloqueado,
+      label: estado == EstadoPieza.bloqueado ? 'Bloqueado' : 'Completado',
+      child: pieza,
     );
   }
 }
@@ -872,6 +942,94 @@ class VeridiaEmptyState extends StatelessWidget {
 
 /// Píldora de Veridiums para el AppBar. Fondo dorado translúcido y borde:
 /// legible sobre el fondo negro/verde (antes el icono se perdía).
+/// Un número que RECORRE el camino hasta su nuevo valor en vez de saltar.
+///
+/// Es la pieza que faltaba para que ganar se sintiera como ganar. Un saldo
+/// que pasa de 24 a 27 de golpe no se percibe: el ojo lee "27" y no registra
+/// que subió. Viéndolo contar, la recompensa existe.
+///
+/// Solo celebra cuando SUBE. Al gastar, el número baja sin pulso ni adorno,
+/// porque en Veridia la moneda compra expansión y nunca rescate: subrayar el
+/// gasto con la misma fanfarria que el premio enseñaría a no gastar, que es
+/// justo el comportamiento que el ranking por acumulado ya corrigió una vez.
+///
+/// No crea `AnimationController` propio: la escala sale del mismo recorrido
+/// del número, como un arco de seno que sube y vuelve. Un contador en la
+/// AppBar está presente en casi toda la app y no puede permitirse un
+/// controlador por pantalla.
+class VeridiaContador extends StatefulWidget {
+  const VeridiaContador({
+    super.key,
+    required this.valor,
+    this.estilo,
+    this.duracion = VeridiaDuraciones.recompensa,
+  });
+
+  final int valor;
+  final TextStyle? estilo;
+  final Duration duracion;
+
+  @override
+  State<VeridiaContador> createState() => _VeridiaContadorState();
+}
+
+class _VeridiaContadorState extends State<VeridiaContador> {
+  /// De dónde viene el número. Arranca igual al valor actual para que la
+  /// primera aparición NO cuente desde cero: al abrir una pantalla el saldo
+  /// ya estaba ahí, y verlo subir desde 0 sería contar un premio que no se
+  /// acaba de ganar.
+  late int _desde = widget.valor;
+  late int _hasta = widget.valor;
+
+  @override
+  void didUpdateWidget(covariant VeridiaContador anterior) {
+    super.didUpdateWidget(anterior);
+    if (anterior.valor != widget.valor) {
+      setState(() {
+        _desde = anterior.valor;
+        _hasta = widget.valor;
+      });
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final estilo = widget.estilo;
+
+    // Nada que animar todavía: un Text normal, sin widget de animación
+    // montado. Importa porque este contador vive en la AppBar de casi todas
+    // las pantallas.
+    if (_desde == _hasta) {
+      return Text('$_hasta', style: estilo);
+    }
+
+    final sube = _hasta > _desde;
+
+    return TweenAnimationBuilder<double>(
+      tween: Tween<double>(begin: _desde.toDouble(), end: _hasta.toDouble()),
+      duration: widget.duracion,
+      curve: VeridiaCurvas.entrada,
+      builder: (context, valor, _) {
+        final recorrido = (_hasta - _desde).abs();
+        // 0 al empezar, 1 al llegar. El guardia del divisor nunca debería
+        // dispararse -si no hay recorrido no se llega aquí-, pero una
+        // división por cero en un widget de AppBar tumbaría la app entera.
+        final t = recorrido == 0
+            ? 1.0
+            : ((valor - _desde) / (_hasta - _desde)).clamp(0.0, 1.0);
+
+        // Un solo arco: crece hasta 1.08 a mitad de camino y vuelve a 1.
+        final escala = sube ? 1 + 0.08 * math.sin(math.pi * t) : 1.0;
+
+        return Transform.scale(
+          scale: escala,
+          child: Text('${valor.round()}', style: estilo),
+        );
+      },
+    );
+  }
+}
+
 class VeridiaTokenBadge extends StatelessWidget {
   const VeridiaTokenBadge({super.key, required this.tokens, this.onTap});
 
@@ -916,9 +1074,12 @@ class VeridiaTokenBadge extends StatelessWidget {
             ),
           ),
           const SizedBox(width: 6),
-          Text(
-            '$tokens',
-            style: const TextStyle(
+          // El saldo CUENTA hacia su nuevo valor. Como esta píldora es la que
+          // aparece en la AppBar de casi todas las pantallas, cambiarla aquí
+          // basta para que ganar Veridiums se note en toda la app.
+          VeridiaContador(
+            valor: tokens,
+            estilo: const TextStyle(
               fontFamily: VeridiaFonts.headline,
               fontSize: 14,
               fontWeight: FontWeight.w700,
@@ -1026,9 +1187,28 @@ class VeridiaBottomNav extends StatelessWidget {
           // hace ese papel, y las dos juntas dibujaban una pastilla dentro de
           // otra.
           indicatorColor: Colors.transparent,
-          overlayColor: WidgetStatePropertyAll(
-            VeridiaColors.primary.withValues(alpha: 0.10),
-          ),
+          // SOLO al presionar.
+          //
+          // Antes era un `WidgetStatePropertyAll`, que devuelve el mismo
+          // color en TODOS los estados —incluidos hover y foco—. El resultado
+          // era una pastilla de jade al 10% con la forma exacta de la cápsula
+          // de selección, que se quedaba pegada en la pestaña por la que
+          // había pasado el cursor o que había recibido el foco tras un clic.
+          // Con el indicador de Material en transparente, esa pastilla era lo
+          // único redondeado que podía dibujarse sobre una pestaña NO
+          // seleccionada: se veía "Diario" marcado estando en Inicio.
+          //
+          // Devolver transparente en el resto de estados lo cierra de raíz:
+          // el único resalte que queda es el del dedo, y ese dura lo que dura
+          // el toque. Quien navegue con teclado pierde el anillo de foco
+          // aquí; a cambio, la barra deja de mentir sobre en qué sección
+          // estás, que es la información que esta barra existe para dar.
+          overlayColor: WidgetStateProperty.resolveWith((estados) {
+            if (estados.contains(WidgetState.pressed)) {
+              return VeridiaColors.primary.withValues(alpha: 0.12);
+            }
+            return Colors.transparent;
+          }),
           labelBehavior: NavigationDestinationLabelBehavior.alwaysShow,
           destinations: [
             NavigationDestination(

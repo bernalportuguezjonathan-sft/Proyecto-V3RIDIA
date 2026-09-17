@@ -450,517 +450,557 @@ class _ProfileScreenState extends State<ProfileScreen> {
         children: [
           Container(color: VeridiaColors.background),
           SafeArea(
-            child: SingleChildScrollView(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  // Tarjeta de perfil
-                  Container(
-                    margin: const EdgeInsets.all(16),
-                    padding: const EdgeInsets.all(20),
-                    decoration: BoxDecoration(
-                      // Esmeralda PROFUNDO, no el jade brillante de antes.
-                      // La cabecera arrancaba en `primary` puro, el color mas
-                      // claro de la paleta, y contra el se perdian las tres
-                      // cosas que esta tarjeta existe para ensenar: el retrato,
-                      // las insignias -que son translucidas- y el correo. Un
-                      // fondo oscuro les devuelve el contraste sin sacarla de
-                      // la paleta; lo que la mantiene como la pieza principal
-                      // de la pantalla es el halo, no el brillo del relleno.
-                      gradient: const LinearGradient(
-                        begin: Alignment.topLeft,
-                        end: Alignment.bottomRight,
-                        colors: [Color(0xFF0A5741), Color(0xFF03211A)],
-                      ),
-                      border: Border.all(
-                        color: VeridiaColors.primary.withValues(alpha: 0.30),
-                      ),
-                      borderRadius: BorderRadius.circular(VeridiaRadii.lg),
-                      // Con halo: es la cabecera del perfil, la pieza que
-                      // manda en esa pantalla. La sombra que tenía antes era
-                      // un verde oliva (30,86,49) de la paleta anterior.
-                      boxShadow: veridiaRelieve(glow: true),
-                    ),
-                    child: Column(
-                      children: [
-                        Stack(
-                          alignment: Alignment.bottomRight,
+            // Tope de ancho sobre el scroll entero: la tarjeta de perfil, las
+            // insignias y las opciones comparten una sola columna centrada.
+            // Sin esto, en escritorio el retrato quedaba en la esquina
+            // izquierda con dos palmos de vacío a la derecha.
+            child: Center(
+              child: ConstrainedBox(
+                constraints: const BoxConstraints(
+                  maxWidth: VeridiaBreakpoints.anchoMaximoContenido,
+                ),
+                child: SingleChildScrollView(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      // Tarjeta de perfil
+                      Container(
+                        margin: const EdgeInsets.all(16),
+                        padding: const EdgeInsets.all(20),
+                        decoration: BoxDecoration(
+                          // Esmeralda PROFUNDO, no el jade brillante de antes.
+                          // La cabecera arrancaba en `primary` puro, el color mas
+                          // claro de la paleta, y contra el se perdian las tres
+                          // cosas que esta tarjeta existe para ensenar: el retrato,
+                          // las insignias -que son translucidas- y el correo. Un
+                          // fondo oscuro les devuelve el contraste sin sacarla de
+                          // la paleta; lo que la mantiene como la pieza principal
+                          // de la pantalla es el halo, no el brillo del relleno.
+                          gradient: const LinearGradient(
+                            begin: Alignment.topLeft,
+                            end: Alignment.bottomRight,
+                            colors: [Color(0xFF0A5741), Color(0xFF03211A)],
+                          ),
+                          border: Border.all(
+                            color: VeridiaColors.primary.withValues(
+                              alpha: 0.30,
+                            ),
+                          ),
+                          borderRadius: BorderRadius.circular(VeridiaRadii.lg),
+                          // Con halo: es la cabecera del perfil, la pieza que
+                          // manda en esa pantalla. La sombra que tenía antes era
+                          // un verde oliva (30,86,49) de la paleta anterior.
+                          boxShadow: veridiaRelieve(glow: true),
+                        ),
+                        child: Column(
                           children: [
-                            Container(
-                              width: 80,
-                              height: 80,
-                              decoration: BoxDecoration(
-                                color: VeridiaColors.surfaceContainer,
-                                shape: BoxShape.circle,
-                                // El marco es una recompensa canjeada: si no
-                                // tiene ninguno, el avatar va sin borde.
-                                border: _marco == null
-                                    ? null
-                                    : Border.all(
-                                        color: _marco!.color,
-                                        width: 3,
-                                      ),
-                                boxShadow: [
-                                  BoxShadow(
-                                    color:
-                                        _marco?.color.withValues(alpha: 0.35) ??
-                                        const Color.fromRGBO(0, 0, 0, 0.2),
-                                    blurRadius: _marco == null ? 8 : 16,
-                                  ),
-                                ],
-                              ),
-                              child: ClipOval(
-                                child: _selectedProfileImageBytes != null
-                                    ? Image.memory(
-                                        _selectedProfileImageBytes!,
-                                        fit: BoxFit.cover,
-                                      )
-                                    : (_cachedProfileImageBytes != null)
-                                    ? Image.memory(
-                                        _cachedProfileImageBytes!,
-                                        fit: BoxFit.cover,
-                                      )
-                                    : (_photoURL != null &&
-                                          _photoURL!.isNotEmpty)
-                                    ? Image.network(
-                                        _photoURL!,
-                                        fit: BoxFit.cover,
-                                        errorBuilder:
-                                            (context, error, stackTrace) =>
-                                                const Center(
-                                                  child: Icon(
-                                                    Icons.person,
-                                                    size: 48,
-                                                    color:
-                                                        VeridiaColors.primary,
-                                                  ),
-                                                ),
-                                      )
-                                    : const Center(
-                                        child: Icon(
-                                          Icons.person,
-                                          size: 48,
-                                          color: VeridiaColors.primary,
-                                        ),
-                                      ),
-                              ),
-                            ),
-                            GestureDetector(
-                              onTap: _isEditingProfile
-                                  ? _showPhotoSourceOptions
-                                  : null,
-                              child: Container(
-                                width: 32,
-                                height: 32,
-                                decoration: BoxDecoration(
-                                  color: _isEditingProfile
-                                      ? VeridiaColors.onSurface
-                                      : VeridiaColors.onSurfaceVariant,
-                                  shape: BoxShape.circle,
-                                  border: Border.all(
-                                    color: VeridiaColors.primary,
-                                    width: 1.5,
-                                  ),
-                                ),
-                                child: Icon(
-                                  Icons.camera_alt,
-                                  size: 18,
-                                  color: _isEditingProfile
-                                      ? VeridiaColors.primary
-                                      : VeridiaColors.onSurfaceVariant,
-                                ),
-                              ),
-                            ),
-                          ],
-                        ),
-                        const SizedBox(height: 16),
-                        Text(
-                          _userName,
-                          style: const TextStyle(
-                            fontSize: 20,
-                            fontWeight: FontWeight.bold,
-                            color: VeridiaColors.onSurface,
-                          ),
-                        ),
-                        // Logros e insignias van pegados al nombre: son
-                        // parte de cómo se presenta el explorador, no un dato
-                        // más de la cuenta. Debajo del nivel quedaban tan
-                        // abajo que en un celular había que bajar para verlos.
-                        //
-                        // Primero los LOGROS, que se ganan, y después las
-                        // insignias compradas: lo que acredita algo va antes
-                        // que lo que solo costó Veridiums.
-                        ConEstadisticas(
-                          builder: (context, stats) {
-                            final ganados = logrosConseguidos(stats);
-                            if (ganados.isEmpty) return const SizedBox.shrink();
-                            return Padding(
-                              padding: const EdgeInsets.only(top: 10),
-                              child: Wrap(
-                                spacing: 8,
-                                runSpacing: 8,
-                                alignment: WrapAlignment.center,
-                                children: ganados
-                                    .map((l) => LogroInsignia(logro: l))
-                                    .toList(),
-                              ),
-                            );
-                          },
-                        ),
-                        if (_insignias.isNotEmpty) ...[
-                          const SizedBox(height: 10),
-                          Wrap(
-                            spacing: 8,
-                            runSpacing: 8,
-                            alignment: WrapAlignment.center,
-                            children: _insignias
-                                .map(
-                                  (insignia) => VeridiaTag(
-                                    label:
-                                        '${insignia.valor ?? ''} ${insignia.nombre}'
-                                            .trim(),
-                                    color: insignia.color,
-                                    dense: true,
-                                  ),
-                                )
-                                .toList(),
-                          ),
-                        ],
-                        if (_titulo != null) ...[
-                          const SizedBox(height: 6),
-                          VeridiaTag(
-                            label: _titulo!,
-                            icon: Icons.workspace_premium_rounded,
-                            color: VeridiaColors.veridium,
-                            dense: true,
-                          ),
-                        ],
-                        const SizedBox(height: 4),
-                        Text(
-                          _currentUser?.email ?? 'email@example.com',
-                          style: const TextStyle(
-                            fontSize: 14,
-                            color: VeridiaColors.onSurfaceVariant,
-                          ),
-                        ),
-                        const SizedBox(height: 12),
-                        const _FilaNivel(),
-                        const SizedBox(height: 16),
-                        if (_isEditingProfile) ...[
-                          TextField(
-                            controller: _nameController,
-                            style: const TextStyle(
-                              color: VeridiaColors.onSurface,
-                            ),
-                            decoration: InputDecoration(
-                              filled: true,
-                              fillColor: VeridiaColors.surfaceContainerHighest,
-                              hintText: 'Nombre de usuario',
-                              hintStyle: const TextStyle(
-                                color: VeridiaColors.onSurfaceVariant,
-                              ),
-                              border: OutlineInputBorder(
-                                borderRadius: BorderRadius.circular(12),
-                                borderSide: BorderSide.none,
-                              ),
-                              contentPadding: const EdgeInsets.symmetric(
-                                horizontal: 16,
-                                vertical: 12,
-                              ),
-                            ),
-                          ),
-                          const SizedBox(height: 12),
-                          Row(
-                            children: [
-                              Expanded(
-                                child: VeridiaBotonTactil(
-                                  // Sin `backgroundColor` propio: hereda el
-                                  // jade del tema. Antes se pintaba en
-                                  // `surfaceContainer`, o sea del mismo verde
-                                  // que la tarjeta que lo contiene, y la
-                                  // accion principal de la pantalla quedaba
-                                  // mas apagada que el boton de Cancelar.
-                                  //
-                                  // Y sin `horizontal: 24`: dentro de un
-                                  // Expanded ese relleno robaba 48 px al
-                                  // ancho y partia "Guardar cambios" en dos
-                                  // lineas. El alto ya lo pone el tema.
-                                  child: ElevatedButton(
-                                    onPressed: _isSaving
+                            Stack(
+                              alignment: Alignment.bottomRight,
+                              children: [
+                                Container(
+                                  width: 80,
+                                  height: 80,
+                                  decoration: BoxDecoration(
+                                    color: VeridiaColors.surfaceContainer,
+                                    shape: BoxShape.circle,
+                                    // El marco es una recompensa canjeada: si no
+                                    // tiene ninguno, el avatar va sin borde.
+                                    border: _marco == null
                                         ? null
-                                        : _saveProfileChanges,
-                                    style: ElevatedButton.styleFrom(
-                                      minimumSize: const Size(0, 50),
-                                      padding: const EdgeInsets.symmetric(
-                                        horizontal: 12,
+                                        : Border.all(
+                                            color: _marco!.color,
+                                            width: 3,
+                                          ),
+                                    boxShadow: [
+                                      BoxShadow(
+                                        color:
+                                            _marco?.color.withValues(
+                                              alpha: 0.35,
+                                            ) ??
+                                            const Color.fromRGBO(0, 0, 0, 0.2),
+                                        blurRadius: _marco == null ? 8 : 16,
                                       ),
-                                      shape: const StadiumBorder(),
-                                    ),
-                                    child: _isSaving
-                                        ? const SizedBox(
-                                            width: 18,
-                                            height: 18,
-                                            child: CircularProgressIndicator(
-                                              color: VeridiaColors.onPrimary,
-                                              strokeWidth: 2,
-                                            ),
+                                    ],
+                                  ),
+                                  child: ClipOval(
+                                    child: _selectedProfileImageBytes != null
+                                        ? Image.memory(
+                                            _selectedProfileImageBytes!,
+                                            fit: BoxFit.cover,
                                           )
-                                        // FittedBox por si el idioma o el
-                                        // tamanio de fuente del sistema lo
-                                        // hacen crecer: encoge antes que
-                                        // partirse en dos lineas.
-                                        : const FittedBox(
-                                            fit: BoxFit.scaleDown,
-                                            child: Text('Guardar cambios'),
+                                        : (_cachedProfileImageBytes != null)
+                                        ? Image.memory(
+                                            _cachedProfileImageBytes!,
+                                            fit: BoxFit.cover,
+                                          )
+                                        : (_photoURL != null &&
+                                              _photoURL!.isNotEmpty)
+                                        ? Image.network(
+                                            _photoURL!,
+                                            fit: BoxFit.cover,
+                                            errorBuilder:
+                                                (context, error, stackTrace) =>
+                                                    const Center(
+                                                      child: Icon(
+                                                        Icons.person,
+                                                        size: 48,
+                                                        color: VeridiaColors
+                                                            .primary,
+                                                      ),
+                                                    ),
+                                          )
+                                        : const Center(
+                                            child: Icon(
+                                              Icons.person,
+                                              size: 48,
+                                              color: VeridiaColors.primary,
+                                            ),
                                           ),
                                   ),
                                 ),
+                                GestureDetector(
+                                  onTap: _isEditingProfile
+                                      ? _showPhotoSourceOptions
+                                      : null,
+                                  child: Container(
+                                    width: 32,
+                                    height: 32,
+                                    decoration: BoxDecoration(
+                                      color: _isEditingProfile
+                                          ? VeridiaColors.onSurface
+                                          : VeridiaColors.onSurfaceVariant,
+                                      shape: BoxShape.circle,
+                                      border: Border.all(
+                                        color: VeridiaColors.primary,
+                                        width: 1.5,
+                                      ),
+                                    ),
+                                    child: Icon(
+                                      Icons.camera_alt,
+                                      size: 18,
+                                      color: _isEditingProfile
+                                          ? VeridiaColors.primary
+                                          : VeridiaColors.onSurfaceVariant,
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ),
+                            const SizedBox(height: 16),
+                            Text(
+                              _userName,
+                              style: const TextStyle(
+                                fontSize: 20,
+                                fontWeight: FontWeight.bold,
+                                color: VeridiaColors.onSurface,
                               ),
-                              const SizedBox(width: 12),
-                              Expanded(
-                                child: VeridiaBotonTactil(
-                                  child: OutlinedButton(
-                                    onPressed: _isSaving
-                                        ? null
-                                        : () {
-                                            setState(() {
-                                              _isEditingProfile = false;
-                                              _selectedProfileImageBytes = null;
-                                              _selectedProfileImageName = null;
-                                              _nameController.text = _userName;
-                                            });
-                                          },
-                                    // Contorno visible: `outlineVariant` es
-                                    // ahora un verde muy oscuro y el boton
-                                    // quedaba sin borde perceptible, como un
-                                    // texto suelto flotando en la tarjeta.
-                                    style: OutlinedButton.styleFrom(
-                                      foregroundColor:
-                                          VeridiaColors.onSurfaceVariant,
-                                      side: BorderSide(
-                                        color: VeridiaColors.onSurfaceVariant
-                                            .withValues(alpha: 0.55),
-                                        width: 1.4,
+                            ),
+                            // Logros e insignias van pegados al nombre: son
+                            // parte de cómo se presenta el explorador, no un dato
+                            // más de la cuenta. Debajo del nivel quedaban tan
+                            // abajo que en un celular había que bajar para verlos.
+                            //
+                            // Primero los LOGROS, que se ganan, y después las
+                            // insignias compradas: lo que acredita algo va antes
+                            // que lo que solo costó Veridiums.
+                            ConEstadisticas(
+                              builder: (context, stats) {
+                                final ganados = logrosConseguidos(stats);
+                                if (ganados.isEmpty) {
+                                  return const SizedBox.shrink();
+                                }
+                                return Padding(
+                                  padding: const EdgeInsets.only(top: 10),
+                                  child: Wrap(
+                                    spacing: 8,
+                                    runSpacing: 8,
+                                    alignment: WrapAlignment.center,
+                                    children: ganados
+                                        .map((l) => LogroInsignia(logro: l))
+                                        .toList(),
+                                  ),
+                                );
+                              },
+                            ),
+                            if (_insignias.isNotEmpty) ...[
+                              const SizedBox(height: 10),
+                              Wrap(
+                                spacing: 8,
+                                runSpacing: 8,
+                                alignment: WrapAlignment.center,
+                                children: _insignias
+                                    .map(
+                                      (insignia) => VeridiaTag(
+                                        label:
+                                            '${insignia.valor ?? ''} ${insignia.nombre}'
+                                                .trim(),
+                                        color: insignia.color,
+                                        dense: true,
                                       ),
-                                      minimumSize: const Size(0, 50),
-                                      padding: const EdgeInsets.symmetric(
-                                        horizontal: 12,
+                                    )
+                                    .toList(),
+                              ),
+                            ],
+                            if (_titulo != null) ...[
+                              const SizedBox(height: 6),
+                              VeridiaTag(
+                                label: _titulo!,
+                                icon: Icons.workspace_premium_rounded,
+                                color: VeridiaColors.veridium,
+                                dense: true,
+                              ),
+                            ],
+                            const SizedBox(height: 4),
+                            Text(
+                              _currentUser?.email ?? 'email@example.com',
+                              style: const TextStyle(
+                                fontSize: 14,
+                                color: VeridiaColors.onSurfaceVariant,
+                              ),
+                            ),
+                            const SizedBox(height: 12),
+                            const _FilaNivel(),
+                            const SizedBox(height: 16),
+                            if (_isEditingProfile) ...[
+                              TextField(
+                                controller: _nameController,
+                                style: const TextStyle(
+                                  color: VeridiaColors.onSurface,
+                                ),
+                                decoration: InputDecoration(
+                                  filled: true,
+                                  fillColor:
+                                      VeridiaColors.surfaceContainerHighest,
+                                  hintText: 'Nombre de usuario',
+                                  hintStyle: const TextStyle(
+                                    color: VeridiaColors.onSurfaceVariant,
+                                  ),
+                                  border: OutlineInputBorder(
+                                    borderRadius: BorderRadius.circular(12),
+                                    borderSide: BorderSide.none,
+                                  ),
+                                  contentPadding: const EdgeInsets.symmetric(
+                                    horizontal: 16,
+                                    vertical: 12,
+                                  ),
+                                ),
+                              ),
+                              const SizedBox(height: 12),
+                              Row(
+                                children: [
+                                  Expanded(
+                                    child: VeridiaBotonTactil(
+                                      // Sin `backgroundColor` propio: hereda el
+                                      // jade del tema. Antes se pintaba en
+                                      // `surfaceContainer`, o sea del mismo verde
+                                      // que la tarjeta que lo contiene, y la
+                                      // accion principal de la pantalla quedaba
+                                      // mas apagada que el boton de Cancelar.
+                                      //
+                                      // Y sin `horizontal: 24`: dentro de un
+                                      // Expanded ese relleno robaba 48 px al
+                                      // ancho y partia "Guardar cambios" en dos
+                                      // lineas. El alto ya lo pone el tema.
+                                      child: ElevatedButton(
+                                        onPressed: _isSaving
+                                            ? null
+                                            : _saveProfileChanges,
+                                        style: ElevatedButton.styleFrom(
+                                          minimumSize: const Size(0, 50),
+                                          padding: const EdgeInsets.symmetric(
+                                            horizontal: 12,
+                                          ),
+                                          shape: const StadiumBorder(),
+                                        ),
+                                        child: _isSaving
+                                            ? const SizedBox(
+                                                width: 18,
+                                                height: 18,
+                                                child:
+                                                    CircularProgressIndicator(
+                                                      color: VeridiaColors
+                                                          .onPrimary,
+                                                      strokeWidth: 2,
+                                                    ),
+                                              )
+                                            // FittedBox por si el idioma o el
+                                            // tamanio de fuente del sistema lo
+                                            // hacen crecer: encoge antes que
+                                            // partirse en dos lineas.
+                                            : const FittedBox(
+                                                fit: BoxFit.scaleDown,
+                                                child: Text('Guardar cambios'),
+                                              ),
                                       ),
-                                      shape: const StadiumBorder(),
                                     ),
-                                    child: const FittedBox(
-                                      fit: BoxFit.scaleDown,
-                                      child: Text('Cancelar'),
+                                  ),
+                                  const SizedBox(width: 12),
+                                  Expanded(
+                                    child: VeridiaBotonTactil(
+                                      child: OutlinedButton(
+                                        onPressed: _isSaving
+                                            ? null
+                                            : () {
+                                                setState(() {
+                                                  _isEditingProfile = false;
+                                                  _selectedProfileImageBytes =
+                                                      null;
+                                                  _selectedProfileImageName =
+                                                      null;
+                                                  _nameController.text =
+                                                      _userName;
+                                                });
+                                              },
+                                        // Contorno visible: `outlineVariant` es
+                                        // ahora un verde muy oscuro y el boton
+                                        // quedaba sin borde perceptible, como un
+                                        // texto suelto flotando en la tarjeta.
+                                        style: OutlinedButton.styleFrom(
+                                          foregroundColor:
+                                              VeridiaColors.onSurfaceVariant,
+                                          side: BorderSide(
+                                            color: VeridiaColors
+                                                .onSurfaceVariant
+                                                .withValues(alpha: 0.55),
+                                            width: 1.4,
+                                          ),
+                                          minimumSize: const Size(0, 50),
+                                          padding: const EdgeInsets.symmetric(
+                                            horizontal: 12,
+                                          ),
+                                          shape: const StadiumBorder(),
+                                        ),
+                                        child: const FittedBox(
+                                          fit: BoxFit.scaleDown,
+                                          child: Text('Cancelar'),
+                                        ),
+                                      ),
                                     ),
+                                  ),
+                                ],
+                              ),
+                            ] else ...[
+                              VeridiaBotonTactil(
+                                child: ElevatedButton(
+                                  onPressed: () {
+                                    setState(() {
+                                      _isEditingProfile = true;
+                                    });
+                                  },
+                                  // Un solo relleno. Antes llevaba DOS -el del
+                                  // `style` y el del `Padding` hijo-, que se
+                                  // sumaban a 26 px por lado y convertian el
+                                  // boton en una losa. Y hereda el jade del tema
+                                  // en vez de pintarse del mismo verde que la
+                                  // tarjeta que lo contiene.
+                                  style: ElevatedButton.styleFrom(
+                                    shape: const StadiumBorder(),
+                                    elevation: 0,
+                                    minimumSize: const Size(
+                                      double.infinity,
+                                      52,
+                                    ),
+                                    padding: const EdgeInsets.symmetric(
+                                      horizontal: 20,
+                                    ),
+                                  ),
+                                  child: const FittedBox(
+                                    fit: BoxFit.scaleDown,
+                                    child: Text('Modificar perfil'),
                                   ),
                                 ),
                               ),
                             ],
-                          ),
-                        ] else ...[
-                          VeridiaBotonTactil(
-                            child: ElevatedButton(
-                              onPressed: () {
-                                setState(() {
-                                  _isEditingProfile = true;
-                                });
-                              },
-                              // Un solo relleno. Antes llevaba DOS -el del
-                              // `style` y el del `Padding` hijo-, que se
-                              // sumaban a 26 px por lado y convertian el
-                              // boton en una losa. Y hereda el jade del tema
-                              // en vez de pintarse del mismo verde que la
-                              // tarjeta que lo contiene.
-                              style: ElevatedButton.styleFrom(
-                                shape: const StadiumBorder(),
-                                elevation: 0,
-                                minimumSize: const Size(double.infinity, 52),
-                                padding: const EdgeInsets.symmetric(
-                                  horizontal: 20,
-                                ),
-                              ),
-                              child: const FittedBox(
-                                fit: BoxFit.scaleDown,
-                                child: Text('Modificar perfil'),
+                          ],
+                        ),
+                      ),
+
+                      // Estadísticas
+                      ConEstadisticas(
+                        builder: (context, stats) => Padding(
+                          padding: const EdgeInsets.symmetric(horizontal: 16),
+                          child: PanelLogros(stats: stats),
+                        ),
+                      ),
+                      const SizedBox(height: 24),
+                      Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 16),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            const Text(
+                              'Mi actividad',
+                              style: TextStyle(
+                                fontSize: 16,
+                                fontWeight: FontWeight.bold,
+                                color: VeridiaColors.onSurface,
                               ),
                             ),
-                          ),
-                        ],
-                      ],
-                    ),
-                  ),
-
-                  // Estadísticas
-                  ConEstadisticas(
-                    builder: (context, stats) => Padding(
-                      padding: const EdgeInsets.symmetric(horizontal: 16),
-                      child: PanelLogros(stats: stats),
-                    ),
-                  ),
-                  const SizedBox(height: 24),
-                  Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 16),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        const Text(
-                          'Mi actividad',
-                          style: TextStyle(
-                            fontSize: 16,
-                            fontWeight: FontWeight.bold,
-                            color: VeridiaColors.onSurface,
-                          ),
-                        ),
-                        const SizedBox(height: 12),
-                        StreamBuilder<List<Observation>>(
-                          stream: ObservationRepository.instance.streamForUser(
-                            UserRepository.instance.currentUser.value?.userId ??
-                                '',
-                          ),
-                          builder: (context, snapshot) {
-                            final observations = snapshot.data ?? [];
-                            final especies = observations
-                                .map((o) => o.commonName.toLowerCase())
-                                .toSet()
-                                .length;
-                            final lugares = observations
-                                .map((o) => o.location)
-                                .where((l) => l.isNotEmpty)
-                                .toSet()
-                                .length;
-                            return ValueListenableBuilder<UserProfile?>(
-                              valueListenable:
-                                  UserRepository.instance.currentUser,
-                              builder: (context, profile, child) {
-                                return Row(
-                                  mainAxisAlignment:
-                                      MainAxisAlignment.spaceEvenly,
-                                  children: [
-                                    _crearEstadistica('$especies', 'Especies'),
-                                    _crearEstadistica('$lugares', 'Lugares'),
-                                    _crearEstadistica(
-                                      '${profile?.tokens ?? 0}',
-                                      'Veridiums',
-                                    ),
-                                  ],
+                            const SizedBox(height: 12),
+                            StreamBuilder<List<Observation>>(
+                              stream: ObservationRepository.instance
+                                  .streamForUser(
+                                    UserRepository
+                                            .instance
+                                            .currentUser
+                                            .value
+                                            ?.userId ??
+                                        '',
+                                  ),
+                              builder: (context, snapshot) {
+                                final observations = snapshot.data ?? [];
+                                final especies = observations
+                                    .map((o) => o.commonName.toLowerCase())
+                                    .toSet()
+                                    .length;
+                                final lugares = observations
+                                    .map((o) => o.location)
+                                    .where((l) => l.isNotEmpty)
+                                    .toSet()
+                                    .length;
+                                return ValueListenableBuilder<UserProfile?>(
+                                  valueListenable:
+                                      UserRepository.instance.currentUser,
+                                  builder: (context, profile, child) {
+                                    return Row(
+                                      mainAxisAlignment:
+                                          MainAxisAlignment.spaceEvenly,
+                                      children: [
+                                        _crearEstadistica(
+                                          '$especies',
+                                          'Especies',
+                                        ),
+                                        _crearEstadistica(
+                                          '$lugares',
+                                          'Lugares',
+                                        ),
+                                        _crearEstadistica(
+                                          '${profile?.tokens ?? 0}',
+                                          'Veridiums',
+                                        ),
+                                      ],
+                                    );
+                                  },
                                 );
                               },
-                            );
-                          },
+                            ),
+                          ],
                         ),
-                      ],
-                    ),
-                  ),
-                  const SizedBox(height: 24),
+                      ),
+                      const SizedBox(height: 24),
 
-                  // Opciones del perfil
-                  Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 16),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        const Text(
-                          'Cuenta',
-                          style: TextStyle(
-                            fontSize: 14,
-                            fontWeight: FontWeight.bold,
-                            color: VeridiaColors.onSurface,
-                          ),
-                        ),
-                        const SizedBox(height: 12),
-                        _crearOpcionPerfil(
-                          icon: Icons.person_outline,
-                          titulo: 'Mi actividad',
-                          onTap: () {
-                            Navigator.push(
-                              context,
-                              MaterialPageRoute(
-                                builder: (context) => const ActivityScreen(),
+                      // Opciones del perfil
+                      Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 16),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            const Text(
+                              'Cuenta',
+                              style: TextStyle(
+                                fontSize: 14,
+                                fontWeight: FontWeight.bold,
+                                color: VeridiaColors.onSurface,
                               ),
-                            );
-                          },
+                            ),
+                            const SizedBox(height: 12),
+                            _crearOpcionPerfil(
+                              icon: Icons.person_outline,
+                              titulo: 'Mi actividad',
+                              onTap: () {
+                                Navigator.push(
+                                  context,
+                                  MaterialPageRoute(
+                                    builder: (context) =>
+                                        const ActivityScreen(),
+                                  ),
+                                );
+                              },
+                            ),
+                            _crearOpcionPerfil(
+                              icon: Icons.bookmark_outline,
+                              titulo: 'Mis publicaciones',
+                              onTap: () {
+                                Navigator.push(
+                                  context,
+                                  MaterialPageRoute(
+                                    builder: (context) =>
+                                        const PublicationsScreen(),
+                                  ),
+                                );
+                              },
+                            ),
+                            _crearOpcionPerfil(
+                              icon: Icons.badge_outlined,
+                              titulo: 'Mi carnet de explorador',
+                              onTap: () => abrirCarnet(context),
+                            ),
+                            _crearOpcionPerfil(
+                              icon: Icons.pets_outlined,
+                              titulo: 'El Refugio',
+                              onTap: () => abrirRefugio(context),
+                            ),
+                            _crearOpcionPerfil(
+                              icon: Icons.card_giftcard_outlined,
+                              titulo: 'Recompensas y canjes',
+                              onTap: () => abrirRecompensas(context),
+                            ),
+                          ],
                         ),
-                        _crearOpcionPerfil(
-                          icon: Icons.bookmark_outline,
-                          titulo: 'Mis publicaciones',
-                          onTap: () {
-                            Navigator.push(
-                              context,
-                              MaterialPageRoute(
-                                builder: (context) =>
-                                    const PublicationsScreen(),
-                              ),
-                            );
-                          },
-                        ),
-                        _crearOpcionPerfil(
-                          icon: Icons.badge_outlined,
-                          titulo: 'Mi carnet de explorador',
-                          onTap: () => abrirCarnet(context),
-                        ),
-                        _crearOpcionPerfil(
-                          icon: Icons.pets_outlined,
-                          titulo: 'El Refugio',
-                          onTap: () => abrirRefugio(context),
-                        ),
-                        _crearOpcionPerfil(
-                          icon: Icons.card_giftcard_outlined,
-                          titulo: 'Recompensas y canjes',
-                          onTap: () => abrirRecompensas(context),
-                        ),
-                      ],
-                    ),
-                  ),
-                  const SizedBox(height: 24),
+                      ),
+                      const SizedBox(height: 24),
 
-                  // Configuración
-                  Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 16),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        const Text(
-                          'Más',
-                          style: TextStyle(
-                            fontSize: 14,
-                            fontWeight: FontWeight.bold,
-                            color: VeridiaColors.onSurface,
-                          ),
-                        ),
-                        const SizedBox(height: 12),
-                        _crearOpcionPerfil(
-                          icon: Icons.settings_outlined,
-                          titulo: 'Configuración',
-                          onTap: () {
-                            Navigator.push(
-                              context,
-                              MaterialPageRoute(
-                                builder: (context) => const SettingsScreen(),
+                      // Configuración
+                      Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 16),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            const Text(
+                              'Más',
+                              style: TextStyle(
+                                fontSize: 14,
+                                fontWeight: FontWeight.bold,
+                                color: VeridiaColors.onSurface,
                               ),
-                            );
-                          },
+                            ),
+                            const SizedBox(height: 12),
+                            _crearOpcionPerfil(
+                              icon: Icons.settings_outlined,
+                              titulo: 'Configuración',
+                              onTap: () {
+                                Navigator.push(
+                                  context,
+                                  MaterialPageRoute(
+                                    builder: (context) =>
+                                        const SettingsScreen(),
+                                  ),
+                                );
+                              },
+                            ),
+                            _crearOpcionPerfil(
+                              icon: Icons.info_outline,
+                              titulo: 'Acerca de Veridia',
+                              onTap: () {
+                                Navigator.push(
+                                  context,
+                                  MaterialPageRoute(
+                                    builder: (context) =>
+                                        const AboutVeridiaScreen(),
+                                  ),
+                                );
+                              },
+                            ),
+                          ],
                         ),
-                        _crearOpcionPerfil(
-                          icon: Icons.info_outline,
-                          titulo: 'Acerca de Veridia',
-                          onTap: () {
-                            Navigator.push(
-                              context,
-                              MaterialPageRoute(
-                                builder: (context) =>
-                                    const AboutVeridiaScreen(),
-                              ),
-                            );
-                          },
-                        ),
-                      ],
-                    ),
-                  ),
-                  const SizedBox(height: 24),
+                      ),
+                      const SizedBox(height: 24),
 
-                  // Botón de cerrar sesión (ahora en AppBar superior)
-                  const SizedBox(height: 20),
-                ],
+                      // Botón de cerrar sesión (ahora en AppBar superior)
+                      const SizedBox(height: 20),
+                    ],
+                  ),
+                ),
               ),
             ),
           ),

@@ -418,455 +418,484 @@ class _IdentifySpeciesScreenState extends State<IdentifySpeciesScreen> {
         children: [
           Container(color: VeridiaColors.background),
           SafeArea(
-            child: SingleChildScrollView(
-              padding: const EdgeInsets.only(bottom: 90),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Padding(
-                    padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
-                    child: VeridiaCard(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Row(
+            // Tope de ancho sobre el scroll entero. Los márgenes de 16 que
+            // lleva cada bloque por dentro se dejan como están a propósito:
+            // esta pantalla tiene la vista previa de la foto y el resultado
+            // de la IA encima, y es la que más cuidado pide de tocar, así
+            // que el cambio se queda en lo que arregla el estirado en
+            // escritorio y nada más.
+            child: Center(
+              child: ConstrainedBox(
+                constraints: const BoxConstraints(
+                  maxWidth: VeridiaBreakpoints.anchoMaximoContenido,
+                ),
+                child: SingleChildScrollView(
+                  padding: const EdgeInsets.only(bottom: 90),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Padding(
+                        padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
+                        child: VeridiaCard(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
-                              const Icon(
-                                Icons.my_location,
-                                size: 18,
-                                color: VeridiaColors.primary,
+                              Row(
+                                children: [
+                                  const Icon(
+                                    Icons.my_location,
+                                    size: 18,
+                                    color: VeridiaColors.primary,
+                                  ),
+                                  const SizedBox(width: 8),
+                                  Text(
+                                    'Ubicación del avistamiento',
+                                    style: Theme.of(
+                                      context,
+                                    ).textTheme.titleSmall,
+                                  ),
+                                ],
                               ),
-                              const SizedBox(width: 8),
+                              const SizedBox(height: 8),
                               Text(
-                                'Ubicación del avistamiento',
-                                style: Theme.of(context).textTheme.titleSmall,
+                                _mensajeUbicacion,
+                                style: Theme.of(context).textTheme.bodySmall,
+                              ),
+                              const SizedBox(height: 10),
+                              Text(
+                                'Enfoca una planta o un animal y la IA te dirá '
+                                'qué especie es. Cada identificación queda en tu '
+                                'diario y suma para tus desafíos.',
+                                style: Theme.of(context).textTheme.bodySmall,
                               ),
                             ],
                           ),
-                          const SizedBox(height: 8),
-                          Text(
-                            _mensajeUbicacion,
-                            style: Theme.of(context).textTheme.bodySmall,
-                          ),
-                          const SizedBox(height: 10),
-                          Text(
-                            'Enfoca una planta o un animal y la IA te dirá '
-                            'qué especie es. Cada identificación queda en tu '
-                            'diario y suma para tus desafíos.',
-                            style: Theme.of(context).textTheme.bodySmall,
-                          ),
-                        ],
+                        ),
                       ),
-                    ),
-                  ),
-                  if (_contextoMascota != null) ...[
-                    const SizedBox(height: 12),
-                    Padding(
-                      padding: const EdgeInsets.symmetric(horizontal: 16),
-                      child: _PreviaMascota(contexto: _contextoMascota!),
-                    ),
-                  ],
-                  const SizedBox(height: 8),
-                  Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 16),
-                    child: VeridiaSectionTitle(
-                      title: 'Tus identificaciones',
-                      subtitle: 'Especies que ya registraste con la IA',
-                      actionLabel: 'Ver diario',
-                      onAction: () =>
-                          VeridiaNav.abrir(context, const HistoryScreen()),
-                    ),
-                  ),
-                  const _MisIdentificaciones(),
-                  const SizedBox(height: 20),
-                  Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 16),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
+                      if (_contextoMascota != null) ...[
                         const SizedBox(height: 12),
-                        Row(
-                          children: [
-                            Expanded(
-                              child: _captureOption(
-                                icon: Icons.photo_library,
-                                label: 'Galería',
-                                onTap: _pickPhotoFromGallery,
-                              ),
-                            ),
-                            const SizedBox(width: 10),
-                            Expanded(
-                              child: _captureOption(
-                                icon: Icons.camera_alt,
-                                label: 'Cámara',
-                                onTap: _takePhotoFromCamera,
-                              ),
-                            ),
-                          ],
+                        Padding(
+                          padding: const EdgeInsets.symmetric(horizontal: 16),
+                          child: _PreviaMascota(contexto: _contextoMascota!),
                         ),
                       ],
-                    ),
-                  ),
-                  const SizedBox(height: 20),
-                  if (!_photoTaken)
-                    Padding(
-                      padding: const EdgeInsets.symmetric(horizontal: 16),
-                      child: Container(
-                        width: double.infinity,
-                        padding: const EdgeInsets.all(16),
-                        decoration: BoxDecoration(
-                          gradient: veridiaCaraClay(
-                            VeridiaColors.surfaceContainer,
-                          ),
-                          borderRadius: BorderRadius.circular(VeridiaRadii.md),
-                          border: Border.all(
-                            color: VeridiaCard.bordePorDefecto,
-                          ),
-                          boxShadow: veridiaRelieve(),
+                      const SizedBox(height: 8),
+                      Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 16),
+                        child: VeridiaSectionTitle(
+                          title: 'Tus identificaciones',
+                          subtitle: 'Especies que ya registraste con la IA',
+                          actionLabel: 'Ver diario',
+                          onAction: () =>
+                              VeridiaNav.abrir(context, const HistoryScreen()),
                         ),
+                      ),
+                      const _MisIdentificaciones(),
+                      const SizedBox(height: 20),
+                      Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 16),
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            const Text(
-                              'Sugerencia de ruta',
-                              style: TextStyle(
-                                fontSize: 14,
-                                fontWeight: FontWeight.bold,
-                              ),
-                            ),
-                            const SizedBox(height: 8),
-                            Text(
-                              'Ve hacia el humedal en la mañana si buscas garzas y patos. Para otras aves, recorre el bosque y el sendero ecológico.',
-                              style: TextStyle(
-                                fontSize: 12,
-                                color: VeridiaColors.onSurfaceVariant,
-                              ),
+                            const SizedBox(height: 12),
+                            Row(
+                              children: [
+                                Expanded(
+                                  child: _captureOption(
+                                    icon: Icons.photo_library,
+                                    label: 'Galería',
+                                    onTap: _pickPhotoFromGallery,
+                                  ),
+                                ),
+                                const SizedBox(width: 10),
+                                Expanded(
+                                  child: _captureOption(
+                                    icon: Icons.camera_alt,
+                                    label: 'Cámara',
+                                    onTap: _takePhotoFromCamera,
+                                  ),
+                                ),
+                              ],
                             ),
                           ],
                         ),
                       ),
-                    ),
-                  if (_photoTaken)
-                    Padding(
-                      padding: const EdgeInsets.symmetric(horizontal: 16),
-                      child: Column(
-                        children: [
-                          Container(
+                      const SizedBox(height: 20),
+                      if (!_photoTaken)
+                        Padding(
+                          padding: const EdgeInsets.symmetric(horizontal: 16),
+                          child: Container(
                             width: double.infinity,
-                            height: 220,
+                            padding: const EdgeInsets.all(16),
                             decoration: BoxDecoration(
-                              color: VeridiaColors.outlineVariant,
-                              borderRadius: BorderRadius.circular(20),
+                              gradient: veridiaCaraClay(
+                                VeridiaColors.surfaceContainer,
+                              ),
+                              borderRadius: BorderRadius.circular(
+                                VeridiaRadii.md,
+                              ),
+                              border: Border.all(
+                                color: VeridiaCard.bordePorDefecto,
+                              ),
+                              boxShadow: veridiaRelieve(),
                             ),
-                            child: _selectedImageBytes != null
-                                ? ClipRRect(
-                                    borderRadius: BorderRadius.circular(20),
-                                    child: Image.memory(
-                                      _selectedImageBytes!,
-                                      fit: BoxFit.cover,
-                                      width: double.infinity,
-                                      height: double.infinity,
-                                    ),
-                                  )
-                                : _selectedImageFile != null
-                                ? ClipRRect(
-                                    borderRadius: BorderRadius.circular(20),
-                                    child: Image.file(
-                                      _selectedImageFile!,
-                                      fit: BoxFit.cover,
-                                      width: double.infinity,
-                                      height: double.infinity,
-                                    ),
-                                  )
-                                : const Center(
-                                    child: Icon(
-                                      Icons.image,
-                                      size: 64,
-                                      color: VeridiaColors.onSurfaceVariant,
-                                    ),
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                const Text(
+                                  'Sugerencia de ruta',
+                                  style: TextStyle(
+                                    fontSize: 14,
+                                    fontWeight: FontWeight.bold,
                                   ),
+                                ),
+                                const SizedBox(height: 8),
+                                Text(
+                                  'Ve hacia el humedal en la mañana si buscas garzas y patos. Para otras aves, recorre el bosque y el sendero ecológico.',
+                                  style: TextStyle(
+                                    fontSize: 12,
+                                    color: VeridiaColors.onSurfaceVariant,
+                                  ),
+                                ),
+                              ],
+                            ),
                           ),
-                          const SizedBox(height: 16),
-                          SizedBox(
-                            width: double.infinity,
-                            child: VeridiaBotonTactil(
-                              // El único botón de la app con destello
-                              // permanente: es la acción estrella (la IA) y
-                              // en la referencia el botón "premium" es
-                              // justamente el que brilla solo.
-                              destelloContinuo: !_isAnalyzing,
-                              radius: VeridiaRadii.pill,
-                              child: OutlinedButton.icon(
-                                onPressed: _isAnalyzing ? null : _analizarConIA,
-                                icon: _isAnalyzing
-                                    ? const SizedBox(
-                                        width: 16,
-                                        height: 16,
-                                        child: CircularProgressIndicator(
-                                          strokeWidth: 2,
-                                          color: VeridiaColors.primary,
+                        ),
+                      if (_photoTaken)
+                        Padding(
+                          padding: const EdgeInsets.symmetric(horizontal: 16),
+                          child: Column(
+                            children: [
+                              Container(
+                                width: double.infinity,
+                                height: 220,
+                                decoration: BoxDecoration(
+                                  color: VeridiaColors.outlineVariant,
+                                  borderRadius: BorderRadius.circular(20),
+                                ),
+                                child: _selectedImageBytes != null
+                                    ? ClipRRect(
+                                        borderRadius: BorderRadius.circular(20),
+                                        child: Image.memory(
+                                          _selectedImageBytes!,
+                                          fit: BoxFit.cover,
+                                          width: double.infinity,
+                                          height: double.infinity,
                                         ),
                                       )
-                                    : const VeridiaChispaIA(
+                                    : _selectedImageFile != null
+                                    ? ClipRRect(
+                                        borderRadius: BorderRadius.circular(20),
+                                        child: Image.file(
+                                          _selectedImageFile!,
+                                          fit: BoxFit.cover,
+                                          width: double.infinity,
+                                          height: double.infinity,
+                                        ),
+                                      )
+                                    : const Center(
                                         child: Icon(
-                                          Icons.auto_awesome,
-                                          color: VeridiaColors.primary,
-                                        ),
-                                      ),
-                                label: Text(
-                                  _isAnalyzing
-                                      ? 'Analizando foto...'
-                                      : _aiResult == null
-                                      ? 'Analizar con IA'
-                                      : 'Analizar de nuevo',
-                                ),
-                                style: OutlinedButton.styleFrom(
-                                  foregroundColor: VeridiaColors.primary,
-                                  side: const BorderSide(
-                                    color: VeridiaColors.primary,
-                                  ),
-                                  padding: const EdgeInsets.symmetric(
-                                    vertical: 12,
-                                  ),
-                                  // Píldora, como el resto de botones. El
-                                  // radio fijo de 10 que había aquí anulaba
-                                  // la forma del tema y dejaba este botón
-                                  // rectangular en medio de puras píldoras.
-                                  shape: const StadiumBorder(),
-                                ),
-                              ),
-                            ),
-                          ),
-                          if (_aiError != null) ...[
-                            const SizedBox(height: 12),
-                            Container(
-                              width: double.infinity,
-                              padding: const EdgeInsets.all(12),
-                              decoration: BoxDecoration(
-                                color: VeridiaColors.errorContainer,
-                                borderRadius: BorderRadius.circular(12),
-                                border: Border.all(color: VeridiaColors.error),
-                              ),
-                              child: Text(
-                                _aiError!,
-                                style: TextStyle(
-                                  color: VeridiaColors.error,
-                                  fontSize: 12,
-                                ),
-                              ),
-                            ),
-                          ],
-                          if (_aiResult != null) ...[
-                            const SizedBox(height: 12),
-                            Container(
-                              width: double.infinity,
-                              padding: const EdgeInsets.all(14),
-                              decoration: BoxDecoration(
-                                // Verde solo cuando la foto sirve. Un rechazo
-                                // pintado del mismo color que un acierto se
-                                // lee como si hubiera funcionado.
-                                color:
-                                    (_aiResult!.identified
-                                            ? VeridiaColors.primary
-                                            : VeridiaColors.error)
-                                        .withValues(alpha: 0.10),
-                                borderRadius: BorderRadius.circular(14),
-                                border: _aiResult!.identified
-                                    ? null
-                                    : Border.all(
-                                        color: VeridiaColors.error.withValues(
-                                          alpha: 0.6,
+                                          Icons.image,
+                                          size: 64,
+                                          color: VeridiaColors.onSurfaceVariant,
                                         ),
                                       ),
                               ),
-                              child: _aiResult!.identified
-                                  ? Column(
-                                      crossAxisAlignment:
-                                          CrossAxisAlignment.start,
-                                      children: [
-                                        Row(
-                                          children: [
-                                            const Icon(
-                                              Icons.auto_awesome,
-                                              size: 18,
+                              const SizedBox(height: 16),
+                              SizedBox(
+                                width: double.infinity,
+                                child: VeridiaBotonTactil(
+                                  // El único botón de la app con destello
+                                  // permanente: es la acción estrella (la IA) y
+                                  // en la referencia el botón "premium" es
+                                  // justamente el que brilla solo.
+                                  destelloContinuo: !_isAnalyzing,
+                                  radius: VeridiaRadii.pill,
+                                  child: OutlinedButton.icon(
+                                    onPressed: _isAnalyzing
+                                        ? null
+                                        : _analizarConIA,
+                                    icon: _isAnalyzing
+                                        ? const SizedBox(
+                                            width: 16,
+                                            height: 16,
+                                            child: CircularProgressIndicator(
+                                              strokeWidth: 2,
                                               color: VeridiaColors.primary,
                                             ),
-                                            const SizedBox(width: 6),
-                                            Expanded(
-                                              child: Text(
-                                                _aiResult!.commonName ??
-                                                    'Especie identificada',
-                                                style: const TextStyle(
-                                                  fontWeight: FontWeight.bold,
+                                          )
+                                        : const VeridiaChispaIA(
+                                            child: Icon(
+                                              Icons.auto_awesome,
+                                              color: VeridiaColors.primary,
+                                            ),
+                                          ),
+                                    label: Text(
+                                      _isAnalyzing
+                                          ? 'Analizando foto...'
+                                          : _aiResult == null
+                                          ? 'Analizar con IA'
+                                          : 'Analizar de nuevo',
+                                    ),
+                                    style: OutlinedButton.styleFrom(
+                                      foregroundColor: VeridiaColors.primary,
+                                      side: const BorderSide(
+                                        color: VeridiaColors.primary,
+                                      ),
+                                      padding: const EdgeInsets.symmetric(
+                                        vertical: 12,
+                                      ),
+                                      // Píldora, como el resto de botones. El
+                                      // radio fijo de 10 que había aquí anulaba
+                                      // la forma del tema y dejaba este botón
+                                      // rectangular en medio de puras píldoras.
+                                      shape: const StadiumBorder(),
+                                    ),
+                                  ),
+                                ),
+                              ),
+                              if (_aiError != null) ...[
+                                const SizedBox(height: 12),
+                                Container(
+                                  width: double.infinity,
+                                  padding: const EdgeInsets.all(12),
+                                  decoration: BoxDecoration(
+                                    color: VeridiaColors.errorContainer,
+                                    borderRadius: BorderRadius.circular(12),
+                                    border: Border.all(
+                                      color: VeridiaColors.error,
+                                    ),
+                                  ),
+                                  child: Text(
+                                    _aiError!,
+                                    style: TextStyle(
+                                      color: VeridiaColors.error,
+                                      fontSize: 12,
+                                    ),
+                                  ),
+                                ),
+                              ],
+                              if (_aiResult != null) ...[
+                                const SizedBox(height: 12),
+                                Container(
+                                  width: double.infinity,
+                                  padding: const EdgeInsets.all(14),
+                                  decoration: BoxDecoration(
+                                    // Verde solo cuando la foto sirve. Un rechazo
+                                    // pintado del mismo color que un acierto se
+                                    // lee como si hubiera funcionado.
+                                    color:
+                                        (_aiResult!.identified
+                                                ? VeridiaColors.primary
+                                                : VeridiaColors.error)
+                                            .withValues(alpha: 0.10),
+                                    borderRadius: BorderRadius.circular(14),
+                                    border: _aiResult!.identified
+                                        ? null
+                                        : Border.all(
+                                            color: VeridiaColors.error
+                                                .withValues(alpha: 0.6),
+                                          ),
+                                  ),
+                                  child: _aiResult!.identified
+                                      ? Column(
+                                          crossAxisAlignment:
+                                              CrossAxisAlignment.start,
+                                          children: [
+                                            Row(
+                                              children: [
+                                                const Icon(
+                                                  Icons.auto_awesome,
+                                                  size: 18,
                                                   color: VeridiaColors.primary,
                                                 ),
-                                              ),
+                                                const SizedBox(width: 6),
+                                                Expanded(
+                                                  child: Text(
+                                                    _aiResult!.commonName ??
+                                                        'Especie identificada',
+                                                    style: const TextStyle(
+                                                      fontWeight:
+                                                          FontWeight.bold,
+                                                      color:
+                                                          VeridiaColors.primary,
+                                                    ),
+                                                  ),
+                                                ),
+                                                Text(
+                                                  'Confianza: ${_aiResult!.confidence}',
+                                                  style: TextStyle(
+                                                    fontSize: 11,
+                                                    color: VeridiaColors
+                                                        .onSurfaceVariant,
+                                                  ),
+                                                ),
+                                              ],
                                             ),
-                                            Text(
-                                              'Confianza: ${_aiResult!.confidence}',
-                                              style: TextStyle(
-                                                fontSize: 11,
-                                                color: VeridiaColors
-                                                    .onSurfaceVariant,
+                                            if (_aiResult!.scientificName !=
+                                                null)
+                                              Padding(
+                                                padding: const EdgeInsets.only(
+                                                  top: 4,
+                                                ),
+                                                child: Text(
+                                                  _aiResult!.scientificName!,
+                                                  style: TextStyle(
+                                                    fontStyle: FontStyle.italic,
+                                                    fontSize: 12,
+                                                    color: VeridiaColors
+                                                        .onSurfaceVariant,
+                                                  ),
+                                                ),
+                                              ),
+                                            if (_aiResult!.description != null)
+                                              Padding(
+                                                padding: const EdgeInsets.only(
+                                                  top: 8,
+                                                ),
+                                                child: Text(
+                                                  _aiResult!.description!,
+                                                  style: const TextStyle(
+                                                    fontSize: 12,
+                                                  ),
+                                                ),
+                                              ),
+                                          ],
+                                        )
+                                      : Row(
+                                          crossAxisAlignment:
+                                              CrossAxisAlignment.start,
+                                          children: [
+                                            Icon(
+                                              switch (_aiResult!.rechazo) {
+                                                MotivoRechazo
+                                                    .pantallaOImpresion =>
+                                                  Icons.screenshot_monitor,
+                                                MotivoRechazo.noEsSerVivo =>
+                                                  Icons.block,
+                                                _ => Icons.help_outline,
+                                              },
+                                              size: 18,
+                                              color: VeridiaColors.error,
+                                            ),
+                                            const SizedBox(width: 8),
+                                            Expanded(
+                                              child: Column(
+                                                crossAxisAlignment:
+                                                    CrossAxisAlignment.start,
+                                                children: [
+                                                  Text(
+                                                    _aiResult!.reason ??
+                                                        'La IA no pudo identificar '
+                                                            'una especie en esta foto.',
+                                                    style: const TextStyle(
+                                                      fontSize: 12,
+                                                      color:
+                                                          VeridiaColors.error,
+                                                      fontWeight:
+                                                          FontWeight.w600,
+                                                    ),
+                                                  ),
+                                                  if (_rechazosRestantes !=
+                                                          null &&
+                                                      _rechazosRestantes! > 0)
+                                                    Padding(
+                                                      padding:
+                                                          const EdgeInsets.only(
+                                                            top: 6,
+                                                          ),
+                                                      child: Text(
+                                                        'Te quedan '
+                                                        '$_rechazosRestantes '
+                                                        '${_rechazosRestantes == 1 ? 'intento' : 'intentos'} '
+                                                        'antes de una pausa.',
+                                                        style: TextStyle(
+                                                          fontSize: 11,
+                                                          color: VeridiaColors
+                                                              .onSurfaceVariant,
+                                                        ),
+                                                      ),
+                                                    ),
+                                                ],
                                               ),
                                             ),
                                           ],
                                         ),
-                                        if (_aiResult!.scientificName != null)
-                                          Padding(
-                                            padding: const EdgeInsets.only(
-                                              top: 4,
-                                            ),
-                                            child: Text(
-                                              _aiResult!.scientificName!,
-                                              style: TextStyle(
-                                                fontStyle: FontStyle.italic,
-                                                fontSize: 12,
-                                                color: VeridiaColors
-                                                    .onSurfaceVariant,
-                                              ),
-                                            ),
-                                          ),
-                                        if (_aiResult!.description != null)
-                                          Padding(
-                                            padding: const EdgeInsets.only(
-                                              top: 8,
-                                            ),
-                                            child: Text(
-                                              _aiResult!.description!,
-                                              style: const TextStyle(
-                                                fontSize: 12,
-                                              ),
-                                            ),
-                                          ),
-                                      ],
-                                    )
-                                  : Row(
-                                      crossAxisAlignment:
-                                          CrossAxisAlignment.start,
-                                      children: [
-                                        Icon(
-                                          switch (_aiResult!.rechazo) {
-                                            MotivoRechazo.pantallaOImpresion =>
-                                              Icons.screenshot_monitor,
-                                            MotivoRechazo.noEsSerVivo =>
-                                              Icons.block,
-                                            _ => Icons.help_outline,
-                                          },
-                                          size: 18,
-                                          color: VeridiaColors.error,
-                                        ),
-                                        const SizedBox(width: 8),
-                                        Expanded(
-                                          child: Column(
-                                            crossAxisAlignment:
-                                                CrossAxisAlignment.start,
-                                            children: [
-                                              Text(
-                                                _aiResult!.reason ??
-                                                    'La IA no pudo identificar '
-                                                        'una especie en esta foto.',
-                                                style: const TextStyle(
-                                                  fontSize: 12,
-                                                  color: VeridiaColors.error,
-                                                  fontWeight: FontWeight.w600,
-                                                ),
-                                              ),
-                                              if (_rechazosRestantes != null &&
-                                                  _rechazosRestantes! > 0)
-                                                Padding(
-                                                  padding:
-                                                      const EdgeInsets.only(
-                                                        top: 6,
-                                                      ),
-                                                  child: Text(
-                                                    'Te quedan '
-                                                    '$_rechazosRestantes '
-                                                    '${_rechazosRestantes == 1 ? 'intento' : 'intentos'} '
-                                                    'antes de una pausa.',
-                                                    style: TextStyle(
-                                                      fontSize: 11,
-                                                      color: VeridiaColors
-                                                          .onSurfaceVariant,
-                                                    ),
-                                                  ),
-                                                ),
-                                            ],
-                                          ),
-                                        ),
-                                      ],
-                                    ),
-                            ),
-                          ],
-                          const SizedBox(height: 16),
-                          if (!_puedeGuardar)
-                            Padding(
-                              padding: const EdgeInsets.only(bottom: 10),
-                              child: Row(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Icon(
-                                    Icons.lock_outline,
-                                    size: 15,
-                                    color: VeridiaColors.onSurfaceVariant,
-                                  ),
-                                  const SizedBox(width: 7),
-                                  Expanded(
-                                    child: Text(
-                                      _aiResult == null
-                                          ? 'Analiza la foto con la IA para '
-                                                'poder guardarla. Solo entran '
-                                                'al mapa plantas, animales y '
-                                                'hongos verificados.'
-                                          : 'Esta foto no se puede guardar en '
-                                                'el mapa comunitario.',
-                                      style: TextStyle(
-                                        fontSize: 11.5,
+                                ),
+                              ],
+                              const SizedBox(height: 16),
+                              if (!_puedeGuardar)
+                                Padding(
+                                  padding: const EdgeInsets.only(bottom: 10),
+                                  child: Row(
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.start,
+                                    children: [
+                                      Icon(
+                                        Icons.lock_outline,
+                                        size: 15,
                                         color: VeridiaColors.onSurfaceVariant,
                                       ),
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ),
-                          SizedBox(
-                            width: double.infinity,
-                            child: VeridiaBotonTactil(
-                              child: ElevatedButton(
-                                // Sin identificación aprobada no se guarda
-                                // nada: es la puerta que faltaba.
-                                onPressed: (_isSaving || !_puedeGuardar)
-                                    ? null
-                                    : _guardarObservacion,
-                                style: ElevatedButton.styleFrom(
-                                  padding: const EdgeInsets.symmetric(
-                                    vertical: 14,
-                                  ),
-                                  shape: const StadiumBorder(),
-                                ),
-                                child: _isSaving
-                                    ? const SizedBox(
-                                        width: 20,
-                                        height: 20,
-                                        child: CircularProgressIndicator(
-                                          strokeWidth: 2,
-                                          color: VeridiaColors.onSurface,
-                                        ),
-                                      )
-                                    : const Text(
-                                        'Guardar observación',
-                                        style: TextStyle(
-                                          color: VeridiaColors.onSurface,
-                                          fontWeight: FontWeight.w600,
+                                      const SizedBox(width: 7),
+                                      Expanded(
+                                        child: Text(
+                                          _aiResult == null
+                                              ? 'Analiza la foto con la IA para '
+                                                    'poder guardarla. Solo entran '
+                                                    'al mapa plantas, animales y '
+                                                    'hongos verificados.'
+                                              : 'Esta foto no se puede guardar en '
+                                                    'el mapa comunitario.',
+                                          style: TextStyle(
+                                            fontSize: 11.5,
+                                            color:
+                                                VeridiaColors.onSurfaceVariant,
+                                          ),
                                         ),
                                       ),
+                                    ],
+                                  ),
+                                ),
+                              SizedBox(
+                                width: double.infinity,
+                                child: VeridiaBotonTactil(
+                                  child: ElevatedButton(
+                                    // Sin identificación aprobada no se guarda
+                                    // nada: es la puerta que faltaba.
+                                    onPressed: (_isSaving || !_puedeGuardar)
+                                        ? null
+                                        : _guardarObservacion,
+                                    style: ElevatedButton.styleFrom(
+                                      padding: const EdgeInsets.symmetric(
+                                        vertical: 14,
+                                      ),
+                                      shape: const StadiumBorder(),
+                                    ),
+                                    child: _isSaving
+                                        ? const SizedBox(
+                                            width: 20,
+                                            height: 20,
+                                            child: CircularProgressIndicator(
+                                              strokeWidth: 2,
+                                              color: VeridiaColors.onSurface,
+                                            ),
+                                          )
+                                        : const Text(
+                                            'Guardar observación',
+                                            style: TextStyle(
+                                              color: VeridiaColors.onSurface,
+                                              fontWeight: FontWeight.w600,
+                                            ),
+                                          ),
+                                  ),
+                                ),
                               ),
-                            ),
+                            ],
                           ),
-                        ],
-                      ),
-                    ),
-                ],
+                        ),
+                    ],
+                  ),
+                ),
               ),
             ),
           ),
