@@ -191,6 +191,8 @@ class ObservationRepository {
       );
     }
 
+    _recordar(observation);
+
     // Avanza TODOS mis desafíos activos cuya especie coincida con lo que la
     // IA identificó, uno por uno: la misma foto puede sumar a más de un
     // desafío a la vez si varios piden la misma especie.
@@ -311,15 +313,68 @@ class ObservationRepository {
     }
   }
 
+  /// Historial propio ya descargado, para no pedirlo una y otra vez.
+  ///
+  /// [contextoDeFoto] se llama CUATRO veces por foto —al abrir la cámara, al
+  /// resolverse la ubicación, al terminar el análisis y al guardar— y cada una
+  /// se traía TODAS las observaciones del explorador. Como Firebase cobra por
+  /// documento leído, el costo de una sola foto crecía con el historial: a las
+  /// 100 observaciones eran 400 lecturas por foto, y el plan gratuito da
+  /// 50.000 al día para toda la app. Con cuentas nuevas no se nota; con
+  /// cuentas usadas se dispara.
+  ///
+  /// Se guarda en memoria, nunca en disco: es un atajo dentro de la misma
+  /// sesión, no una copia de la base de datos.
+  List<Observation>? _mias;
+  String? _miasDe;
+  DateTime? _miasEn;
+
+  /// Cuánto se considera fresco el historial.
+  ///
+  /// Corto a propósito. Lo que se calcula con él (el bono de la mascota) mira
+  /// cuántas especies distintas llevas HOY y a qué distancia están tus fotos
+  /// anteriores: con un par de minutos de retraso da lo mismo, y aun así
+  /// junta en una sola descarga todas las consultas de una misma foto.
+  static const _frescuraMias = Duration(minutes: 2);
+
   Future<List<Observation>> _misObservaciones(String? userId) async {
     if (userId == null) return const [];
+
+    final cache = _mias;
+    final desde = _miasEn;
+    if (cache != null &&
+        _miasDe == userId &&
+        desde != null &&
+        DateTime.now().difference(desde) < _frescuraMias) {
+      return cache;
+    }
+
     final snapshot = await _collection
         .where('userId', isEqualTo: userId)
         .get()
         .timeout(const Duration(seconds: 10));
-    return snapshot.docs
+    final lista = snapshot.docs
         .map((doc) => Observation.fromMap(doc.id, doc.data()))
         .toList();
+
+    _mias = lista;
+    _miasDe = userId;
+    _miasEn = DateTime.now();
+    return lista;
+  }
+
+  /// Añade al historial en memoria una observación recién guardada.
+  ///
+  /// Sin esto, la foto que acabas de tomar no contaría como "especie distinta
+  /// de hoy" para la siguiente hasta que venciera el plazo de frescura, y el
+  /// bono de la mascota saldría mal justo en la ráfaga de fotos seguidas que
+  /// es cuando más se usa.
+  void _recordar(Observation observacion) {
+    if (_miasDe != observacion.userId) return;
+    final cache = _mias;
+    if (cache == null) return;
+    if (cache.any((o) => o.id == observacion.id)) return;
+    _mias = [...cache, observacion];
   }
 
   /// Especies DISTINTAS que el explorador lleva hoy, contando la de ahora.

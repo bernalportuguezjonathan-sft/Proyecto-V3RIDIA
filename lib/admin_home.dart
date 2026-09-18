@@ -160,9 +160,7 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
                       labelText: 'Meta (fotos a capturar)',
                     ),
                     keyboardType: TextInputType.number,
-                    validator: (value) => value == null || value.trim().isEmpty
-                        ? 'Requerido'
-                        : null,
+                    validator: validarMeta,
                   ),
                   const SizedBox(height: 10),
                   Builder(
@@ -304,7 +302,7 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
                       title: titleController.text.trim(),
                       description: descriptionController.text.trim(),
                       targetSpecies: speciesController.text.trim(),
-                      targetGoal: int.parse(goalController.text),
+                      targetGoal: leerMeta(goalController.text),
                       dueDate: selectedDate,
                       createdDate: now,
                       assignedToUserId: selectedPlayer?.userId,

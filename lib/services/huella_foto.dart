@@ -173,25 +173,34 @@ class HuellaFotoService {
     required HuellaFoto huella,
   }) async {
     try {
-      final snapshot = await _coleccion(userId)
-          .orderBy('fecha', descending: true)
-          .limit(_maxHuellasRevisadas)
-          .get()
-          .timeout(const Duration(seconds: 12));
+      // La foto EXACTA se pregunta por su id, que es el propio sha256.
+      //
+      // Es una sola lectura en vez de recorrer la lista, nunca se queda
+      // desactualizada, y de paso alcanza más lejos: antes solo se comparaba
+      // contra las [_maxHuellasRevisadas] más recientes, así que quien
+      // superara ese número podía reenviar una foto vieja y colaba.
+      final exacta = await _coleccion(
+        userId,
+      ).doc(huella.sha256).get().timeout(const Duration(seconds: 12));
+      if (exacta.exists) {
+        final data = exacta.data() ?? const <String, dynamic>{};
+        return FotoDuplicada(
+          fecha: deIso(data['fecha'] as String?) ?? DateTime.now(),
+          origen: data['origen'] as String? ?? 'una captura anterior',
+          exacta: true,
+        );
+      }
 
-      for (final doc in snapshot.docs) {
-        final data = doc.data();
-        final fecha = deIso(data['fecha'] as String?) ?? DateTime.now();
-        final origen = data['origen'] as String? ?? 'una captura anterior';
-
-        if (doc.id == huella.sha256) {
-          return FotoDuplicada(fecha: fecha, origen: origen, exacta: true);
-        }
-
-        final ahash = data['ahash'] as String? ?? '';
-        if (huella.ahash.isEmpty || ahash.isEmpty) continue;
-        if (distanciaHamming(ahash, huella.ahash) <= umbralParecido) {
-          return FotoDuplicada(fecha: fecha, origen: origen, exacta: false);
+      // Las PARECIDAS sí hay que recorrerlas: un ahash no se puede buscar por
+      // igualdad, hay que comparar bit a bit contra cada una.
+      for (final registro in await _huellasDe(userId)) {
+        if (huella.ahash.isEmpty || registro.ahash.isEmpty) continue;
+        if (distanciaHamming(registro.ahash, huella.ahash) <= umbralParecido) {
+          return FotoDuplicada(
+            fecha: registro.fecha,
+            origen: registro.origen,
+            exacta: false,
+          );
         }
       }
     } catch (e) {
@@ -202,6 +211,57 @@ class HuellaFotoService {
     return null;
   }
 
+  /// Las huellas del explorador, descargadas como mucho una vez cada
+  /// [_frescura].
+  ///
+  /// Antes esta lista se bajaba ENTERA en cada análisis. Como Firebase cobra
+  /// por documento leído, el precio de analizar una foto crecía con el número
+  /// de fotos ya tomadas —hasta 200 lecturas por intento— y el plan gratuito
+  /// da 50.000 al día para toda la app.
+  ///
+  /// Quedarse con una copia en memoria es seguro porque esta colección solo
+  /// CRECE: las reglas de Firestore prohíben borrar y modificar huellas, así
+  /// que lo único que puede faltar en la copia es algo añadido después, y de
+  /// eso se encarga [registrar]. Lo único que se escapa es una foto subida
+  /// desde OTRO dispositivo en los últimos minutos, y aun ese caso lo atrapa
+  /// la comprobación exacta de arriba, que siempre pregunta al servidor.
+  Future<List<_HuellaGuardada>> _huellasDe(String userId) async {
+    final cache = _cache;
+    final desde = _cacheEn;
+    if (cache != null &&
+        _cacheDe == userId &&
+        desde != null &&
+        DateTime.now().difference(desde) < _frescura) {
+      return cache;
+    }
+
+    final snapshot = await _coleccion(userId)
+        .orderBy('fecha', descending: true)
+        .limit(_maxHuellasRevisadas)
+        .get()
+        .timeout(const Duration(seconds: 12));
+
+    final lista = [
+      for (final doc in snapshot.docs)
+        _HuellaGuardada(
+          ahash: doc.data()['ahash'] as String? ?? '',
+          fecha: deIso(doc.data()['fecha'] as String?) ?? DateTime.now(),
+          origen: doc.data()['origen'] as String? ?? 'una captura anterior',
+        ),
+    ];
+
+    _cache = lista;
+    _cacheDe = userId;
+    _cacheEn = DateTime.now();
+    return lista;
+  }
+
+  List<_HuellaGuardada>? _cache;
+  String? _cacheDe;
+  DateTime? _cacheEn;
+
+  static const _frescura = Duration(minutes: 10);
+
   /// Marca la foto como usada. Se llama solo cuando la captura ya contó.
   Future<void> registrar({
     required String userId,
@@ -210,14 +270,39 @@ class HuellaFotoService {
     String? referenciaId,
   }) async {
     try {
+      final ahora = DateTime.now();
       await _coleccion(userId).doc(huella.sha256).set({
         ...huella.toMap(),
         'origen': origen,
         'referenciaId': referenciaId,
-        'fecha': aIsoUtc(DateTime.now()),
+        'fecha': aIsoUtc(ahora),
       });
+
+      // Al día en memoria sin volver a preguntar: si no, dos fotos parecidas
+      // seguidas —el caso más obvio de repetir— pasarían las dos.
+      final cache = _cache;
+      if (cache != null && _cacheDe == userId) {
+        _cache = [
+          _HuellaGuardada(ahash: huella.ahash, fecha: ahora, origen: origen),
+          ...cache,
+        ];
+      }
     } catch (e) {
       debugPrint('No se pudo registrar la huella de la foto: $e');
     }
   }
+}
+
+/// Una huella ya guardada, con lo justo para comparar y para poder decir
+/// dónde y cuándo se usó.
+class _HuellaGuardada {
+  const _HuellaGuardada({
+    required this.ahash,
+    required this.fecha,
+    required this.origen,
+  });
+
+  final String ahash;
+  final DateTime fecha;
+  final String origen;
 }

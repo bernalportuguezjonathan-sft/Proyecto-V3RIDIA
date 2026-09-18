@@ -432,11 +432,29 @@ class VeridiaBotonTactil extends StatefulWidget {
   const VeridiaBotonTactil({
     super.key,
     required this.child,
-    this.radius = VeridiaRadii.md,
+    this.radius = VeridiaRadii.pill,
     this.destelloContinuo = false,
   });
 
   final Widget child;
+
+  /// Radio con el que se recortan el destello y el halo de sombra.
+  ///
+  /// **Tiene que coincidir con la forma REAL del botón envuelto.** Por
+  /// defecto es [VeridiaRadii.pill] porque el tema da `StadiumBorder` a los
+  /// tres tipos de botón (elevado, relleno y con contorno), así que
+  /// prácticamente todos los de la app son pastillas.
+  ///
+  /// Antes el valor por defecto era [VeridiaRadii.md] (18) y eso pintaba un
+  /// rectángulo de esquinas casi rectas DETRÁS de una pastilla: en los
+  /// extremos, el recorte sobresalía de la curva y el destello se veía como
+  /// una banda clara con una esquina cuadrada asomando por fuera del botón.
+  /// Se notaba en toda la app —entrar, cerrar sesión, suspender, modificar
+  /// perfil— y solo tres sitios lo habían corregido pasando el radio a mano.
+  ///
+  /// Un botón con forma propia distinta de la pastilla tiene que declarar
+  /// aquí SU radio; si no, el error vuelve al revés (el brillo recortado de
+  /// más, dejando las esquinas apagadas).
   final double radius;
 
   /// Deja el destello corriendo en bucle en vez de dispararlo solo al tocar
@@ -473,6 +491,19 @@ class _VeridiaBotonTactilState extends State<VeridiaBotonTactil>
   /// brillo permanente al ritmo del de un toque sería un parpadeo. Son los
   /// 3s del `animation: shimmer 3s infinite linear` de la referencia.
   static const _periodoContinuo = Duration(seconds: 3);
+
+  /// Cuánto se inclina la banda de brillo, en radianes. 0.35 rad ≈ 20°, que
+  /// es el `skewX(-20deg)` de la referencia.
+  ///
+  /// No es solo decorativo: de este ángulo salen el largo que necesita la
+  /// banda para tapar el botón entero y el recorrido que tiene que hacer para
+  /// cruzarlo, así que cambiarlo recalcula las dos cosas solo (ver `build`).
+  static const _inclinacion = 0.35;
+
+  /// Grosor de la banda como fracción del ancho del botón. Proporcional a
+  /// propósito: un grosor fijo se traga entero un botón angosto y pasa
+  /// desapercibido en uno de ancho completo.
+  static const _anchoBanda = 0.28;
 
   @override
   void initState() {
@@ -533,7 +564,7 @@ class _VeridiaBotonTactilState extends State<VeridiaBotonTactil>
         widget.child,
         // El destello, recortado a la forma del botón (ClipRRect) para que no
         // se salga del contorno, y medido en píxeles reales del propio botón
-        // (LayoutBuilder) en vez de un ancho fijo: así se ve igual de bien en
+        // (LayoutBuilder) en vez de un tamaño fijo: así se ve igual de bien en
         // uno angosto de 34px que en uno de ancho completo.
         Positioned.fill(
           child: IgnorePointer(
@@ -544,37 +575,114 @@ class _VeridiaBotonTactilState extends State<VeridiaBotonTactil>
                   final ancho = constraints.maxWidth.isFinite
                       ? constraints.maxWidth
                       : 120.0;
+                  // El alto también se mide. Antes no se leía y era justo el
+                  // dato que faltaba para poder inclinar bien la banda.
+                  final alto = constraints.maxHeight.isFinite
+                      ? constraints.maxHeight
+                      : 48.0;
+
+                  final banda = ancho * _anchoBanda;
+
+                  // Largo MÍNIMO para que la banda, ya inclinada, tape el
+                  // botón de arriba abajo en todo su ancho.
+                  //
+                  // Aquí estaba el fallo que dejaba el brillo "de la mitad
+                  // para abajo": la banda no podía pasar del alto del botón
+                  // -las restricciones que recibía lo impedían-, y una banda
+                  // tan alta como el botón, al girarla, saca sus dos puntas
+                  // fuera y dentro solo queda un trozo corto y caído hacia
+                  // abajo. La mitad de arriba no se iluminaba nunca.
+                  //
+                  // `alto / cos` es lo que hay que estirarla para volver a
+                  // llegar de borde a borde una vez torcida; el segundo
+                  // sumando cubre lo que se desfasa un lado de la banda
+                  // respecto al otro por su propio grosor.
+                  final largo =
+                      alto / math.cos(_inclinacion) +
+                      banda * math.tan(_inclinacion);
+
+                  // Lo que mide la banda inclinada de lado a lado, más el
+                  // botón: es exactamente el viaje que tiene que hacer para
+                  // entrar por un borde y salir por el otro. Sale de las
+                  // medidas reales, así que cruza igual de limpio un botón de
+                  // ancho completo que uno diminuto, sin factores a ojo.
+                  final recorrido =
+                      ancho +
+                      banda * math.cos(_inclinacion) +
+                      largo * math.sin(_inclinacion);
+
                   return AnimatedBuilder(
                     animation: _destello,
-                    builder: (context, _) => Transform.translate(
-                      offset: Offset(
-                        -ancho * 0.6 + _destello.value * ancho * 1.8,
-                        0,
-                      ),
-                      // -0.35 rad son los `skewX(-20deg)` exactos del `sh02`
-                      // de referencia; antes eran -0.5 (unos -29°), una
-                      // diagonal más tumbada que cruzaba de más el botón.
-                      child: Transform.rotate(
-                        angle: -0.35,
-                        child: Container(
-                          width: ancho * 0.28,
-                          height: ancho * 2,
-                          decoration: const BoxDecoration(
-                            // Blanco puro, no `onSurface`: el destello es un
-                            // reflejo de luz sobre la pieza, no un tinte de
-                            // la paleta. Sobre el esmeralda profundo un
-                            // verde claro al 16% no llegaba a leerse.
-                            gradient: LinearGradient(
-                              colors: [
-                                Colors.transparent,
-                                Color(0x47FFFFFF), // blanco al 28%
-                                Colors.transparent,
-                              ],
+                    builder: (context, _) {
+                      // Mientras no esté cruzando, NO se pinta nada.
+                      //
+                      // Este era el motivo por el que se veía una banda clara
+                      // fija en los botones: el destello estaba siempre
+                      // montado, aparcado en el extremo izquierdo, y como su
+                      // borde es un degradado su parte luminosa seguía
+                      // cayendo dentro del botón. El brillo es un gesto de
+                      // respuesta al dedo o al mouse; sin gesto no tiene por
+                      // qué haber brillo.
+                      //
+                      // La condición mira si ANIMA, no si está en el punto de
+                      // partida: al acabar la pasada la banda se queda en el
+                      // 1, no en el 0, y preguntando solo por el arranque se
+                      // quedaba montada para siempre después del primer toque.
+                      if (!widget.destelloContinuo && !_destello.isAnimating) {
+                        return const SizedBox.shrink();
+                      }
+
+                      return Transform.translate(
+                        // Centrado en el botón y desplazado medio recorrido a
+                        // cada lado: empieza justo fuera por la izquierda y
+                        // termina justo fuera por la derecha.
+                        offset: Offset((_destello.value - 0.5) * recorrido, 0),
+                        // `OverflowBox` para que la banda pueda ser MÁS ALTA
+                        // que el botón.
+                        //
+                        // Dentro de un `Positioned.fill` las restricciones
+                        // llegan ajustadas al botón, así que el `width` y el
+                        // `height` que pide el Container se recortaban a esa
+                        // caja: primero la banda salía tan ancha como el botón
+                        // entero, y al arreglar eso con un `Align` se quedó
+                        // igual de limitada en alto. `OverflowBox` suelta las
+                        // dos medidas y la deja medir lo que necesita; el
+                        // ClipRRect de arriba sigue siendo quien decide qué se
+                        // ve, así que no se sale nada.
+                        child: OverflowBox(
+                          minWidth: 0,
+                          minHeight: 0,
+                          maxWidth: double.infinity,
+                          maxHeight: double.infinity,
+                          child: Transform.rotate(
+                            // 0.35 rad son los `skewX(-20deg)` exactos del
+                            // `sh02` de referencia. Gira sobre la banda misma,
+                            // centrada en el botón: cuando giraba sobre la
+                            // caja completa con la banda pegada a un lado, el
+                            // propio giro se la llevaba hacia abajo.
+                            angle: -_inclinacion,
+                            child: Container(
+                              width: banda,
+                              height: largo,
+                              decoration: const BoxDecoration(
+                                // Blanco puro, no `onSurface`: el destello es
+                                // un reflejo de luz sobre la pieza, no un
+                                // tinte de la paleta. Sobre el esmeralda
+                                // profundo un verde claro al 16% no llegaba a
+                                // leerse.
+                                gradient: LinearGradient(
+                                  colors: [
+                                    Colors.transparent,
+                                    Color(0x47FFFFFF), // blanco al 28%
+                                    Colors.transparent,
+                                  ],
+                                ),
+                              ),
                             ),
                           ),
                         ),
-                      ),
-                    ),
+                      );
+                    },
                   );
                 },
               ),

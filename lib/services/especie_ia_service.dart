@@ -4,6 +4,7 @@ import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
 
 import '../config/gemini_key.dart';
+import 'foto_comprimida.dart';
 import 'huella_foto.dart';
 import 'limite_intentos.dart';
 import 'repositorio_u.dart';
@@ -435,6 +436,19 @@ class EspecieIAService {
       }
     }
 
+    // Se encoge justo antes de mandarla, NO antes de calcular la huella.
+    //
+    // El orden importa: la huella tiene que salir siempre de los bytes
+    // originales. Si saliera de la copia comprimida, bastaría con que el
+    // compresor cambiara un byte entre versiones de Android para que la misma
+    // foto diera un sha256 distinto y el control de repetidas dejara de
+    // reconocerla.
+    final paraIA = await comprimirParaEnviar(
+      imageBytes,
+      lado: ladoParaIA,
+      mimeOriginal: mimeType,
+    );
+
     final body = jsonEncode({
       'contents': [
         {
@@ -442,8 +456,8 @@ class EspecieIAService {
             {'text': _prompt},
             {
               'inline_data': {
-                'mime_type': mimeType,
-                'data': base64Encode(imageBytes),
+                'mime_type': paraIA.mimeType,
+                'data': base64Encode(paraIA.bytes),
               },
             },
           ],

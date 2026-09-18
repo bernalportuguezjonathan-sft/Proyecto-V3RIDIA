@@ -87,9 +87,7 @@ class _ChallengesScreenState extends State<ChallengesScreen> {
                       labelText: 'Meta (cantidad)',
                     ),
                     keyboardType: TextInputType.number,
-                    validator: (value) => value == null || value.trim().isEmpty
-                        ? 'Requerido'
-                        : null,
+                    validator: validarMeta,
                   ),
                   const SizedBox(height: 12),
                   Row(
@@ -141,7 +139,7 @@ class _ChallengesScreenState extends State<ChallengesScreen> {
                             title: titleController.text.trim(),
                             description: descriptionController.text.trim(),
                             targetSpecies: speciesController.text.trim(),
-                            targetGoal: int.parse(goalController.text),
+                            targetGoal: leerMeta(goalController.text),
                             dueDate: selectedDate,
                             createdDate: DateTime.now(),
                           ),
@@ -156,7 +154,7 @@ class _ChallengesScreenState extends State<ChallengesScreen> {
                             title: titleController.text.trim(),
                             description: descriptionController.text.trim(),
                             targetSpecies: speciesController.text.trim(),
-                            targetGoal: int.parse(goalController.text),
+                            targetGoal: leerMeta(goalController.text),
                             dueDate: selectedDate,
                           ),
                         );
@@ -659,12 +657,6 @@ class _ChallengesScreenState extends State<ChallengesScreen> {
                                                                   VeridiaColors
                                                                       .veridium,
                                                             ),
-                                                            shape: RoundedRectangleBorder(
-                                                              borderRadius:
-                                                                  BorderRadius.circular(
-                                                                    16,
-                                                                  ),
-                                                            ),
                                                             padding:
                                                                 const EdgeInsets.symmetric(
                                                                   vertical: 14,
@@ -720,12 +712,6 @@ class _ChallengesScreenState extends State<ChallengesScreen> {
                                                             foregroundColor:
                                                                 VeridiaColors
                                                                     .onPrimary,
-                                                            shape: RoundedRectangleBorder(
-                                                              borderRadius:
-                                                                  BorderRadius.circular(
-                                                                    16,
-                                                                  ),
-                                                            ),
                                                             padding:
                                                                 const EdgeInsets.symmetric(
                                                                   vertical: 14,

@@ -2,6 +2,7 @@ import 'package:flutter/foundation.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../config/supabase_config.dart';
+import 'foto_comprimida.dart';
 
 /// Resultado de subir una foto.
 ///
@@ -87,11 +88,27 @@ class FotoService {
     required String userId,
     required String observationId,
     String mimeType = 'image/jpeg',
-  }) {
+  }) async {
+    // Se encoge ANTES de subir, y no es solo por ahorrar espacio.
+    //
+    // La subida corta a los [_uploadTimeout] (25 s). Una foto de celular sin
+    // tocar pesa varios MB y en una red de colegio eso se pasa del corte con
+    // facilidad: la observación se guardaba igual, pero SIN imagen, y el
+    // explorador se quedaba sin la foto que acababa de tomar. Con unos pocos
+    // cientos de KB ese caso deja de existir.
+    //
+    // La ubicación no se toca: sale del EXIF de los bytes originales en
+    // cuanto se elige la foto, mucho antes de llegar aquí.
+    final lista = await comprimirParaEnviar(
+      bytes,
+      lado: ladoParaGuardar,
+      mimeOriginal: mimeType,
+    );
+
     return _subir(
-      ruta: '$userId/$observationId.${_extension(mimeType)}',
-      bytes: bytes,
-      mimeType: mimeType,
+      ruta: '$userId/$observationId.${_extension(lista.mimeType)}',
+      bytes: lista.bytes,
+      mimeType: lista.mimeType,
     );
   }
 

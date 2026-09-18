@@ -10,6 +10,41 @@ int calcularBonoCompletar(int metaGoal) {
   return (metaGoal / 10).ceil().clamp(1, 10);
 }
 
+/// Tope de fotos que se le pueden pedir a un desafío.
+///
+/// El bono ya está topado en 10 Veridiums, así que pedir 500 fotos no paga
+/// más: solo crea un desafío que nadie va a terminar.
+const int metaMaxima = 100;
+
+/// Valida el campo "Meta" de los dos formularios de desafío.
+///
+/// Antes solo se comprobaba que no estuviera VACÍO y justo después se hacía
+/// `int.parse` con lo que hubiera escrito. `TextInputType.number` es una
+/// sugerencia de teclado, no una restricción: en la web, con teclado físico o
+/// pegando texto entran letras sin problema. Escribir "cinco" pasaba la
+/// validación y reventaba al guardar —en el panel del administrador, sin
+/// try/catch alrededor, se iba en excepción sin llegar a decir qué pasó—.
+///
+/// Un 0 tampoco servía: el desafío se creaba, pero `registrarFoto` corta en
+/// cuanto el progreso alcanza la meta, así que nacía terminado y ninguna foto
+/// lo movía nunca.
+String? validarMeta(String? valor) {
+  final texto = valor?.trim() ?? '';
+  if (texto.isEmpty) return 'Requerido';
+  final meta = int.tryParse(texto);
+  if (meta == null) return 'Escribe un número';
+  if (meta < 1) return 'Tiene que ser 1 o más';
+  if (meta > metaMaxima) return 'Máximo $metaMaxima';
+  return null;
+}
+
+/// Lee la meta de un campo ya validado por [validarMeta].
+///
+/// Acota igual que el validador: es la red por si algún día se guarda desde
+/// un sitio que no pasó por el formulario.
+int leerMeta(String texto) =>
+    int.tryParse(texto.trim())?.clamp(1, metaMaxima) ?? 1;
+
 /// Avance de UN explorador en UN desafío.
 ///
 /// Vive en `users/{uid}/desafios/{challengeId}`, no dentro del desafío: el
