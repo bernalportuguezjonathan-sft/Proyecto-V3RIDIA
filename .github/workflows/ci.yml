@@ -16,8 +16,23 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      # Version FIJA, no "la ultima stable".
+      #
+      # Con `channel: stable` a secas, el CI se traia el Flutter mas nuevo que
+      # hubiera ese dia. El 17-09-2026 eso puso el CI en rojo sin que nadie
+      # tocara el codigo: el equipo compila con Flutter 3.44.2 y el runner
+      # habia pasado a 3.47.4, que trae analizador mas estricto. `flutter
+      # analyze` daba limpio en las maquinas del equipo y fallaba en GitHub.
+      #
+      # Fijarla ademas es MAS correcto: asi el CI revisa exactamente el mismo
+      # Flutter con el que se compila el APK que se publica. Con la version
+      # suelta estaba revisando una que aqui no usa nadie.
+      #
+      # Para subir de version: se sube aqui Y en las maquinas del equipo a la
+      # vez, y se arregla lo que el analizador nuevo saque.
       - uses: subosito/flutter-action@v2
         with:
+          flutter-version: 3.44.2
           channel: stable
           cache: true
 
