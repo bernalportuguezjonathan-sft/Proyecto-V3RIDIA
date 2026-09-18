@@ -11,7 +11,9 @@ void main() {
   Future<void> montar(WidgetTester tester, int valor) {
     return tester.pumpWidget(
       MaterialApp(
-        home: Scaffold(body: Center(child: VeridiaContador(valor: valor))),
+        home: Scaffold(
+          body: Center(child: VeridiaContador(valor: valor)),
+        ),
       ),
     );
   }

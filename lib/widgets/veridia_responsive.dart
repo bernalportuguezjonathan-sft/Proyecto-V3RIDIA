@@ -231,9 +231,11 @@ class VeridiaRejilla extends StatelessWidget {
         // El suelo en 0 cubre el primer diseño de un padre que todavía no
         // tiene ancho: ahí la resta da negativo y un `SizedBox` de ancho
         // negativo revienta el diseño entero.
-        final anchoElemento = ((disponible - espacio * (columnas - 1)) /
-                columnas)
-            .clamp(0.0, double.infinity);
+        final anchoElemento =
+            ((disponible - espacio * (columnas - 1)) / columnas).clamp(
+              0.0,
+              double.infinity,
+            );
 
         return Wrap(
           spacing: espacio,

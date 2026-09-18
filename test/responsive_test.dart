@@ -39,10 +39,7 @@ void main() {
     });
 
     test('el margen crece con el espacio disponible', () {
-      expect(
-        VeridiaAncho.compacto.margen,
-        lessThan(VeridiaAncho.medio.margen),
-      );
+      expect(VeridiaAncho.compacto.margen, lessThan(VeridiaAncho.medio.margen));
       expect(VeridiaAncho.medio.margen, lessThan(VeridiaAncho.amplio.margen));
     });
 
